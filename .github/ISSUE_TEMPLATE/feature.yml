@@ -1,7 +1,6 @@
 name: Feature
 description: Propose a new feature or improvement for AI Wars
-title: "[Feature] "
-labels: ["feature"]
+labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
@@ -14,7 +13,6 @@ body:
     attributes:
       label: Summary
       description: Short description of the feature.
-      placeholder: "Add authentication via Supabase"
     validations:
       required: true
 
@@ -23,7 +21,6 @@ body:
     attributes:
       label: Motivation
       description: Why should this feature exist? What problem does it solve?
-      placeholder: "Players need a way to persist games and identify themselves."
     validations:
       required: true
 
@@ -32,14 +29,6 @@ body:
     attributes:
       label: Scope
       description: What is included? What is explicitly out of scope?
-      placeholder: |
-        In scope:
-        - Basic email auth
-        - Anonymous guest accounts
-
-        Out of scope:
-        - Social login
-        - Permissions / roles
     validations:
       required: false
 
@@ -48,7 +37,6 @@ body:
     attributes:
       label: UI / UX Notes
       description: Any thoughts on how this should appear or behave?
-      placeholder: "Login modal before entering the galaxy view."
     validations:
       required: false
 

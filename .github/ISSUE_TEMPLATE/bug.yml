@@ -1,6 +1,5 @@
 name: Bug
 description: Report something that is not working as expected
-title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
@@ -14,7 +13,6 @@ body:
     attributes:
       label: Bug Description
       description: What is happening?
-      placeholder: "The galaxy view does not update after ending a year."
     validations:
       required: true
 
@@ -23,7 +21,6 @@ body:
     attributes:
       label: Expected Behavior
       description: What should happen instead?
-      placeholder: "The galaxy view should refresh and show updated positions."
     validations:
       required: true
 
@@ -32,10 +29,6 @@ body:
     attributes:
       label: Steps to Reproduce
       description: How can the bug be reproduced?
-      placeholder: |
-        1. Open galaxy view
-        2. End the year
-        3. Observe unchanged positions
     validations:
       required: false
 
@@ -43,8 +36,7 @@ body:
     id: context
     attributes:
       label: Context
-      description: Anything that might help (view mode, selected entity, etc.)
-      placeholder: "System view → back to galaxy, one army en route."
+      description: Anything that might help
     validations:
       required: false
 
