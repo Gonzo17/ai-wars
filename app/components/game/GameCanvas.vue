@@ -139,7 +139,7 @@ onBeforeUnmount(() => {
       variant="ghost"
       size="md"
       :icon="'i-lucide-sparkles'"
-      :label="'Back to galaxy'"
+      :label="$t('game.navigation.back-to-galaxy')"
       class="relative z-10"
       @click="emit('update:view-mode', 'galaxy')"
     />

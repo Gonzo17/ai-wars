@@ -6,6 +6,18 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'end-year'): void
 }>()
+
+const { locales, setLocale, localeProperties } = useI18n()
+
+const items = computed(() =>
+  locales.value.map(l => ({
+    label: l.name ?? l.code.toUpperCase(),
+    code: l.code,
+    onSelect: async () => {
+      setLocale(l.code)
+    }
+  }))
+)
 </script>
 
 <template>
@@ -21,11 +33,18 @@ const emit = defineEmits<{
             AI Wars
           </UBadge>
         </div>
+        <UDropdownMenu :items="items">
+          <UButton
+            variant="ghost"
+            size="sm"
+            :label="localeProperties.name"
+          />
+        </UDropdownMenu>
       </div>
       <div class="flex items-center gap-4">
-        <span class="text-sm text-slate-400">Year {{ props.year }}</span>
-        <span class="text-sm text-slate-400">Players: 3</span>
-        <span class="text-sm text-slate-400">Timer: 47s</span>
+        <span class="text-sm text-slate-400">{{ $t('game.top-bar.year', { value: props.year }) }}</span>
+        <span class="text-sm text-slate-400">{{ $t('game.top-bar.players', { count: 3 }) }}</span>
+        <span class="text-sm text-slate-400">{{ $t('game.top-bar.timer', { value: '47s' }) }}</span>
       </div>
       <div class="flex items-center gap-2">
         <UButton
@@ -35,7 +54,7 @@ const emit = defineEmits<{
           size="sm"
           @click="emit('end-year')"
         >
-          End Year
+          {{ $t('game.top-bar.end-year') }}
         </UButton>
       </div>
     </div>

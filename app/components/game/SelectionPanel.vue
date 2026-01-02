@@ -19,7 +19,7 @@ const emit = defineEmits<{
       v-if="!selection && selectionType !== 'research'"
       class="py-4 text-sm text-slate-400"
     >
-      Nothing selected. Choose a system, planet, or army to see details.
+      {{ $t('game.selection.empty') }}
     </div>
 
     <div
@@ -40,13 +40,13 @@ const emit = defineEmits<{
           variant="soft"
           size="xs"
         >
-          Planet
+          {{ $t('game.status.planet') }}
         </UBadge>
       </div>
 
       <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
         <p class="text-xs uppercase tracking-wide text-slate-400">
-          Buildings
+          {{ $t('game.selection.buildings') }}
         </p>
         <div class="mt-1 flex flex-wrap gap-1">
           <UBadge
@@ -64,13 +64,13 @@ const emit = defineEmits<{
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
           <p class="text-xs uppercase tracking-wide text-slate-400">
-            Build Queue
+            {{ $t('game.selection.build-queue') }}
           </p>
           <p
             v-if="!selection.queues.build.length"
             class="text-sm text-slate-500"
           >
-            Idle
+            {{ $t('game.selection.idle') }}
           </p>
           <ul
             v-else
@@ -86,13 +86,13 @@ const emit = defineEmits<{
         </div>
         <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
           <p class="text-xs uppercase tracking-wide text-slate-400">
-            Shipyard
+            {{ $t('game.selection.shipyard') }}
           </p>
           <p
             v-if="!selection.queues.shipyard.length"
             class="text-sm text-slate-500"
           >
-            Idle
+            {{ $t('game.selection.idle') }}
           </p>
           <ul
             v-else
@@ -115,7 +115,7 @@ const emit = defineEmits<{
           icon="i-lucide-building-2"
           class="flex-1"
         >
-          Build
+          {{ $t('game.selection.build') }}
         </UButton>
         <UButton
           color="neutral"
@@ -123,7 +123,7 @@ const emit = defineEmits<{
           icon="i-lucide-ship"
           class="flex-1"
         >
-          Shipyard
+          {{ $t('game.selection.shipyard-action') }}
         </UButton>
       </div>
     </div>
@@ -146,14 +146,13 @@ const emit = defineEmits<{
           variant="soft"
           size="xs"
         >
-          {{ selection.status === 'idle' ? 'Idle' : `En route ${selection.eta ?? ''}` }}
+          {{ selection.status === 'idle' ? $t('game.selection.idle') : $t('game.selection.en-route', { eta: selection.eta ?? '' }) }}
         </UBadge>
       </div>
 
       <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
         <div class="flex items-center justify-between text-sm text-slate-200">
-          <span>Strength</span>
-          <span>{{ selection.strength }}</span>
+          <span>{{ $t('game.selection.strength', { value: selection.strength }) }}</span>
         </div>
       </div>
 
@@ -164,7 +163,7 @@ const emit = defineEmits<{
           icon="i-lucide-navigation"
           class="flex-1"
         >
-          Issue Move Order
+          {{ $t('game.selection.issue-move-order') }}
         </UButton>
         <UButton
           color="neutral"
@@ -172,7 +171,7 @@ const emit = defineEmits<{
           icon="i-lucide-rocket"
           class="flex-1"
         >
-          Reinforce
+          {{ $t('game.selection.reinforce') }}
         </UButton>
       </div>
     </div>
@@ -187,7 +186,7 @@ const emit = defineEmits<{
             {{ selection.name }}
           </p>
           <p class="text-xs text-slate-400">
-            Probe: {{ selection.probeStatus }} • Intel: {{ selection.intel }}
+            {{ $t('game.selection.probe') }}: {{ $t('game.systems.probe-status.' + selection.probeStatus) }} • {{ $t('game.selection.intel') }}: {{ $t('game.systems.intel.' + selection.intel) }}
           </p>
         </div>
         <UBadge
@@ -195,13 +194,13 @@ const emit = defineEmits<{
           variant="soft"
           size="xs"
         >
-          System
+          {{ $t('game.status.system') }}
         </UBadge>
       </div>
 
       <div class="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
         <p class="text-xs uppercase tracking-wide text-slate-400">
-          Connections
+          {{ $t('game.selection.connections') }}
         </p>
         <div class="mt-1 flex flex-wrap gap-1">
           <UBadge
@@ -223,7 +222,7 @@ const emit = defineEmits<{
         class="w-full"
         @click="emit('update:view-mode', 'system')"
       >
-        Open System View
+        {{ $t('game.selection.open-system-view') }}
       </UButton>
     </div>
 

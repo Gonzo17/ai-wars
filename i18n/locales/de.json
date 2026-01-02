@@ -1,0 +1,136 @@
+{
+  "game": {
+    "common": {
+      "duration-years": "{count} Jahre"
+    },
+    "navigation": {
+      "back-to-galaxy": "Zurück zur Galaxie",
+      "planets": "Planeten ({count})",
+      "ships": "Schiffe ({count})"
+    },
+    "research": {
+      "current-research": "Aktuelle Forschung",
+      "years-remaining": "{count} Jahre verbleibend",
+      "panel": {
+        "heading": "Forschung",
+        "subheading": "Nächstes Programm wählen",
+        "none": "Keine",
+        "confirm": "Forschung bestätigen"
+      },
+      "options": {
+        "quantum-lattice": {
+          "name": "Quanten-Gitter",
+          "bonus": "+10% Forschungstempo"
+        },
+        "stellar-forges": {
+          "name": "Sternenschmieden",
+          "bonus": "+15% Schiffsbau"
+        },
+        "ai-commander": {
+          "name": "AI-Kommandant",
+          "bonus": "+1 Raumschiff"
+        }
+      }
+    },
+    "resources": {
+      "energy": "Energie",
+      "material": "Materialien",
+      "rare": "Selten"
+    },
+    "build": {
+      "title": "Bauen",
+      "planet-placeholder": "Ausgewählter Planet",
+      "options": {
+        "hab": {
+          "name": "Hab-Komplex",
+          "description": "Erhöht Bevölkerungslimit und Unterhalts-Effizienz.",
+          "cost": "120 Materialien",
+          "time": "2J"
+        },
+        "lab": {
+          "name": "Quantum-Labor",
+          "description": "Erhöht den Forschungsdurchsatz um +2.",
+          "cost": "180 Energie",
+          "time": "3J"
+        },
+        "shield": {
+          "name": "Aegis-Schild",
+          "description": "Planetare Verteidigungsmatrix.",
+          "cost": "140 Materialien / 30 Selten",
+          "time": "3J"
+        }
+      },
+      "cancel": "Abbrechen",
+      "confirm-queue": "Bauauftrag bestätigen"
+    },
+    "shipyard": {
+      "title": "Werft",
+      "planet-placeholder": "Ausgewählter Planet",
+      "options": {
+        "frigate": {
+          "name": "Fregattenrumpf",
+          "description": "Ausgewogenes Eskortschiff.",
+          "cost": "220 Materialien",
+          "time": "3J"
+        },
+        "carrier": {
+          "name": "Leichter Träger",
+          "description": "Setzt Jägergeschwader ein.",
+          "cost": "340 Materialien / 40 Selten",
+          "time": "4J"
+        },
+        "probe": {
+          "name": "Tiefraumsonde",
+          "description": "Erweitert das Intel-Netzwerk.",
+          "cost": "80 Energie",
+          "time": "1J"
+        }
+      },
+      "cancel": "Abbrechen",
+      "launch": "Bau starten"
+    },
+    "status": {
+      "idle": "Leerlauf",
+      "building": "Baut {item}",
+      "en-route": "Unterwegs {eta}",
+      "planet": "Planet",
+      "system": "System"
+    },
+    "selection": {
+      "empty": "Nichts ausgewählt. Wähle ein System, einen Planeten oder ein Heer, um Details zu sehen.",
+      "buildings": "Gebäude",
+      "buildings-count": "Gebäude: {count}",
+      "build-queue": "Bauwarteschlange",
+      "shipyard": "Werft",
+      "connections": "Verbindungen",
+      "probe": "Sonde",
+      "intel": "Informationsstand",
+      "build": "Bauen",
+      "shipyard-action": "Werft",
+      "issue-move-order": "Bewegungsbefehl erteilen",
+      "reinforce": "Verstärken",
+      "open-system-view": "Systemansicht öffnen",
+      "strength": "Stärke {value}",
+      "en-route": "Unterwegs {eta}",
+      "idle": "Leerlauf"
+    },
+    "systems": {
+      "probe-status": {
+        "scanned": "Gescannt",
+        "charted": "Kartiert",
+        "ping-only": "Nur Ping"
+      },
+      "intel": {
+        "high": "Hoch",
+        "medium": "Mittel",
+        "low": "Niedrig"
+      }
+    },
+    "top-bar": {
+      "year": "Jahr {value}",
+      "players": "Spieler: {count}",
+      "timer": "Timer: {value}",
+      "end-year": "Jahr beenden"
+    }
+  }
+}

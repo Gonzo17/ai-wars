@@ -1,0 +1,140 @@
+{
+  "game": {
+    "common": {
+      "duration-years": "{count} years"
+    },
+    "navigation": {
+      "back-to-galaxy": "Back to galaxy",
+      "planets": "Planets ({count})",
+      "ships": "Ships ({count})"
+    },
+    "research": {
+      "current-research": "Current Research",
+      "years-remaining": "{count} years remaining",
+      "panel": {
+        "heading": "Research",
+        "subheading": "Select next program",
+        "none": "None",
+        "confirm": "Confirm Research"
+      },
+      "options": {
+        "quantum-lattice": {
+          "name": "Quantum Lattice",
+          "bonus": "+10% research speed"
+        },
+        "stellar-forges": {
+          "name": "Stellar Forges",
+          "bonus": "+15% ship build"
+        },
+        "ai-commander": {
+          "name": "AI Commander",
+          "bonus": "+1 space ship"
+        }
+      }
+    },
+    "resources": {
+      "energy": "Energy",
+      "material": "Materials",
+      "rare": "Rare"
+    },
+    "build": {
+      "title": "Build",
+      "planet-placeholder": "Selected planet",
+      "options": {
+        "hab": {
+          "name": "Hab Complex",
+          "description": "Boosts population cap and upkeep efficiency.",
+          "cost": "120 Materials",
+          "time": "2y"
+        },
+        "lab": {
+          "name": "Quantum Lab",
+          "description": "Adds +2 research throughput.",
+          "cost": "180 Energy",
+          "time": "3y"
+        },
+        "shield": {
+          "name": "Aegis Shield",
+          "description": "Planetary defense matrix.",
+          "cost": "140 Materials / 30 Rare",
+          "time": "3y"
+        }
+      },
+      "cancel": "Cancel",
+      "confirm-queue": "Confirm Queue"
+    },
+    "shipyard": {
+      "title": "Shipyard",
+      "planet-placeholder": "Selected planet",
+      "options": {
+        "frigate": {
+          "name": "Frigate Hull",
+          "description": "Balanced escort ship.",
+          "cost": "220 Materials",
+          "time": "3y"
+        },
+        "carrier": {
+          "name": "Light Carrier",
+          "description": "Deploys fighter wings.",
+          "cost": "340 Materials / 40 Rare",
+          "time": "4y"
+        },
+        "probe": {
+          "name": "Deep Space Probe",
+          "description": "Extends intel network.",
+          "cost": "80 Energy",
+          "time": "1y"
+        }
+      },
+      "cancel": "Cancel",
+      "launch": "Launch Construction"
+    },
+    "status": {
+      "idle": "Idle",
+      "building": "Building {item}",
+      "en-route": "En route {eta}",
+      "planet": "Planet",
+      "system": "System"
+    },
+    "selection": {
+      "empty": "Nothing selected. Choose a system, planet, or army to see details.",
+      "buildings": "Buildings",
+      "buildings-count": "Buildings: {count}",
+      "build-queue": "Build Queue",
+      "shipyard": "Shipyard",
+      "connections": "Connections",
+      "probe": "Probe",
+      "intel": "Intel",
+      "build": "Build",
+      "shipyard-action": "Shipyard",
+      "issue-move-order": "Issue Move Order",
+      "reinforce": "Reinforce",
+      "open-system-view": "Open System View",
+      "strength": "Strength {value}",
+      "en-route": "En route {eta}",
+      "idle": "Idle"
+    },
+    "systems": {
+      "probe-status": {
+        "scanned": "Scanned",
+        "charted": "Charted",
+        "ping-only": "Ping only"
+      },
+      "intel": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      }
+    },
+    "top-bar": {
+      "year": "Year {value}",
+      "players": "Players: {count}",
+      "timer": "Timer: {value}",
+      "end-year": "End Year"
+    },
+    "toast": {
+      "year-advanced-title": "Year {value}",
+      "year-advanced-description": "Time advanced. (Simulation placeholder)"
+    }
+  }
+}
