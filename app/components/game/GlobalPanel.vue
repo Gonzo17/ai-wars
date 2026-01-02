@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{
   resources: Array<GameResource>
-  research: { name: string, yearsLeft: number }
+  research: { id: string, yearsLeft: number }
   armies: Array<GameArmy>
   planets: Array<GamePlanet>
   systems: Array<GameSolarSystem>
@@ -11,6 +11,8 @@ const emit = defineEmits<{
   (e: 'select-army' | 'select-planet', id: string): void
   (e: 'open-research' | 'end-year'): void
 }>()
+
+const { locale } = useI18n()
 </script>
 
 <template>
@@ -40,7 +42,7 @@ const emit = defineEmits<{
             <p
               class="mt-0 text-lg font-semibold text-slate-200"
             >
-              {{ resource.amount.toLocaleString('en-US') }}
+              {{ resource.amount.toLocaleString(locale) }}
             </p>
             <UBadge
               variant="subtle"
@@ -72,13 +74,13 @@ const emit = defineEmits<{
         <div class="relative z-10 flex items-center justify-between">
           <div>
             <p class="text-xs uppercase tracking-wide text-slate-400">
-              Active Research
+              {{ $t('game.research.current-research') }}
             </p>
             <p class="text-sm font-semibold text-violet-200">
-              {{ props.research.name }}
+              {{ $t('game.research.options.' + props.research.id + '.name') }}
             </p>
             <p class="text-xs text-slate-400">
-              {{ props.research.yearsLeft }}y remaining
+              {{ $t('game.research.years-remaining', { count: props.research.yearsLeft }) }}
             </p>
           </div>
         </div>
@@ -86,7 +88,7 @@ const emit = defineEmits<{
 
       <UCollapsible class="flex flex-col gap-2 w-full">
         <UButton
-          :label="`Planets (${props.planets.length})`"
+          :label="$t('game.navigation.planets', { count: props.planets.length })"
           icon="i-lucide-earth"
           color="neutral"
           variant="ghost"
@@ -114,12 +116,12 @@ const emit = defineEmits<{
                   variant="soft"
                   size="sm"
                 >
-                  {{ planet.queues.build.length === 0 ? 'Idle' : `Building ${planet.queues.build[0]}` }}
+                  {{ planet.queues.build.length === 0 ? $t('game.status.idle') : $t('game.status.building', { item: planet.queues.build[0] }) }}
                 </UBadge>
               </div>
               <div class="flex items-center justify-between text-xs text-slate-400">
                 <span>{{ planet.type }}</span>
-                <span>Buildings: {{ planet.buildings.length }}</span>
+                <span>{{ $t('game.selection.buildings-count', { count: planet.buildings.length }) }}</span>
               </div>
             </button>
           </div>
@@ -128,7 +130,7 @@ const emit = defineEmits<{
 
       <UCollapsible class="flex flex-col gap-2 w-full">
         <UButton
-          :label="`Armies (${props.armies.length})`"
+          :label="$t('game.navigation.ships', { count: props.armies.length })"
           icon="i-lucide-rocket"
           color="neutral"
           variant="ghost"
@@ -156,12 +158,12 @@ const emit = defineEmits<{
                   variant="soft"
                   size="sm"
                 >
-                  {{ army.status === 'idle' ? 'Idle' : `En route ${army.eta ?? ''}` }}
+                  {{ army.status === 'idle' ? $t('game.status.idle') : $t('game.selection.en-route', { eta: army.eta ?? '' }) }}
                 </UBadge>
               </div>
               <div class="flex items-center justify-between text-xs text-slate-400">
                 <span>{{ army.location }}</span>
-                <span>Strength {{ army.strength }}</span>
+                <span>{{ $t('game.selection.strength', { value: army.strength }) }}</span>
               </div>
             </button>
           </div>

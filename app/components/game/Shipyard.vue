@@ -4,20 +4,40 @@ const props = defineProps<{
   planet: string
 }>()
 
-const shipyardOptions = [
-  { id: 'frigate', name: 'Frigate Hull', cost: '220 Materials', time: '3y', description: 'Balanced escort ship.' },
-  { id: 'carrier', name: 'Light Carrier', cost: '340 Materials / 40 Rare', time: '4y', description: 'Deploys fighter wings.' },
-  { id: 'probe', name: 'Deep Space Probe', cost: '80 Energy', time: '1y', description: 'Extends intel network.' }
-]
+const { t } = useI18n()
+
+const shipyardOptions = computed(() => ([
+  {
+    id: 'frigate',
+    name: t('game.shipyard.options.frigate.name'),
+    cost: t('game.shipyard.options.frigate.cost'),
+    time: t('game.shipyard.options.frigate.time'),
+    description: t('game.shipyard.options.frigate.description')
+  },
+  {
+    id: 'carrier',
+    name: t('game.shipyard.options.carrier.name'),
+    cost: t('game.shipyard.options.carrier.cost'),
+    time: t('game.shipyard.options.carrier.time'),
+    description: t('game.shipyard.options.carrier.description')
+  },
+  {
+    id: 'probe',
+    name: t('game.shipyard.options.probe.name'),
+    cost: t('game.shipyard.options.probe.cost'),
+    time: t('game.shipyard.options.probe.time'),
+    description: t('game.shipyard.options.probe.description')
+  }
+]))
 </script>
 
 <template>
   <div>
     <p class="text-sm uppercase tracking-[0.2em] text-slate-400">
-      Shipyard
+      {{ $t('game.shipyard.title') }}
     </p>
     <p class="text-lg font-semibold text-slate-100">
-      {{ props.planet || 'Selected planet' }}
+      {{ props.planet || $t('game.shipyard.planet-placeholder') }}
     </p>
   </div>
 
@@ -52,14 +72,14 @@ const shipyardOptions = [
       variant="soft"
       block
     >
-      Cancel
+      {{ $t('game.shipyard.cancel') }}
     </UButton>
     <UButton
       color="primary"
       variant="solid"
       block
     >
-      Launch Construction
+      {{ $t('game.shipyard.launch') }}
     </UButton>
   </div>
 </template>

@@ -10,7 +10,7 @@ export interface GameResource {
 export interface GameArmy {
   id: string
   name: string
-  status: string
+  status: 'idle' | 'en-route'
   location: string
   eta?: string
   strength: number
@@ -36,8 +36,8 @@ export interface GamePlanet {
 export interface GameSolarSystem {
   id: string
   name: string
-  probeStatus: string
-  intel: string
+  probeStatus: 'scanned' | 'charted' | 'ping-only'
+  intel: 'high' | 'medium' | 'low'
   connections: string[]
   location: {
     x: number

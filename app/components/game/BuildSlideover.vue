@@ -9,11 +9,31 @@ const emit = defineEmits<{
   (e: 'confirm'): void
 }>()
 
-const buildOptions = [
-  { id: 'hab', name: 'Hab Complex', cost: '120 Materials', time: '2y', description: 'Boosts population cap and upkeep efficiency.' },
-  { id: 'lab', name: 'Quantum Lab', cost: '180 Energy', time: '3y', description: 'Adds +2 research throughput.' },
-  { id: 'shield', name: 'Aegis Shield', cost: '140 Materials / 30 Rare', time: '3y', description: 'Planetary defense matrix.' }
-]
+const { t } = useI18n()
+
+const buildOptions = computed(() => ([
+  {
+    id: 'hab',
+    name: t('game.build.options.hab.name'),
+    cost: t('game.build.options.hab.cost'),
+    time: t('game.build.options.hab.time'),
+    description: t('game.build.options.hab.description')
+  },
+  {
+    id: 'lab',
+    name: t('game.build.options.lab.name'),
+    cost: t('game.build.options.lab.cost'),
+    time: t('game.build.options.lab.time'),
+    description: t('game.build.options.lab.description')
+  },
+  {
+    id: 'shield',
+    name: t('game.build.options.shield.name'),
+    cost: t('game.build.options.shield.cost'),
+    time: t('game.build.options.shield.time'),
+    description: t('game.build.options.shield.description')
+  }
+]))
 </script>
 
 <template>
@@ -25,10 +45,10 @@ const buildOptions = [
     <template #header>
       <div>
         <p class="text-sm uppercase tracking-[0.2em] text-slate-400">
-          Build
+          {{ $t('game.build.title') }}
         </p>
         <p class="text-lg font-semibold text-cyan-200">
-          {{ props.planet || 'Selected planet' }}
+          {{ props.planet || $t('game.build.planet-placeholder') }}
         </p>
       </div>
     </template>
@@ -66,7 +86,7 @@ const buildOptions = [
           block
           @click="emit('update:open', false)"
         >
-          Cancel
+          {{ $t('game.build.cancel') }}
         </UButton>
         <UButton
           color="primary"
@@ -74,7 +94,7 @@ const buildOptions = [
           block
           @click="emit('confirm')"
         >
-          Confirm Queue
+          {{ $t('game.build.confirm-queue') }}
         </UButton>
       </div>
     </template>

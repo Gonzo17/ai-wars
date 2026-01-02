@@ -2,7 +2,6 @@
   <div class="min-h-screen bg-slate-950 text-slate-100">
     <GameTopBar
       :year="year"
-      :research="research"
       @end-year="handleEndYear"
     />
 
@@ -23,8 +22,6 @@
         <GameSelectionPanel
           :selection-type="selectedType"
           :selection="selection"
-          @issue-order="handleIssueOrder"
-          @reinforce="handleReinforce"
           @update:view-mode="handleViewModeChange"
         />
       </div>
@@ -60,24 +57,26 @@ const selectedId = ref<string | undefined>('p-aurora')
 
 const toast = useToast()
 
-const resources = ref<GameResource[]>([
-  { key: 'energy', label: 'Energy', amount: 1260, delta: '+15', accent: 'text-warning-300', icon: 'zap' },
-  { key: 'material', label: 'Material', amount: 880, delta: '+7', accent: 'text-stone-300', icon: 'wrench' },
-  { key: 'rare', label: 'Rare', amount: 210, delta: '+1', accent: 'text-pink-300', icon: 'gem' }
+const { t } = useI18n()
+
+const resources = computed((): GameResource[] => [
+  { key: 'energy', label: t('game.resources.energy'), amount: 1260, delta: '+15', accent: 'text-warning-300', icon: 'zap' },
+  { key: 'material', label: t('game.resources.material'), amount: 880, delta: '+7', accent: 'text-stone-300', icon: 'wrench' },
+  { key: 'rare', label: t('game.resources.rare'), amount: 210, delta: '+1', accent: 'text-pink-300', icon: 'gem' }
 ])
 
-const research = ref({ id: 'quantum-lattice', name: 'Quantum Lattice', yearsLeft: 2 })
+const research = ref({ id: 'quantum-lattice', yearsLeft: 2 })
 
 const armies = ref<GameArmy[]>([
   { id: 'a1', name: 'Horizon Wing', status: 'idle', location: 'Aurora Prime', strength: 82 },
-  { id: 'a2', name: 'Spearhead', status: 'en route', location: 'to Nadir Gate', eta: '2y', strength: 74 },
+  { id: 'a2', name: 'Spearhead', status: 'en-route', location: 'to Nadir Gate', eta: '2y', strength: 74 },
   { id: 'a3', name: 'Vanguard', status: 'idle', location: 'Borealis Shipyard', strength: 65 }
 ])
 
 const systems = ref<GameSolarSystem[]>([
-  { id: 's-lyra', name: 'Lyra-7', probeStatus: 'Scanned', intel: 'High', connections: ['Nadir Gate', 'Helios Fringe'], location: { x: 22, y: 35 } },
-  { id: 's-nadir', name: 'Nadir Gate', probeStatus: 'Charted', intel: 'Medium', connections: ['Lyra-7', 'Aster Drift'], location: { x: 58, y: 48 } },
-  { id: 's-helix', name: 'Helios Fringe', probeStatus: 'Ping only', intel: 'Low', connections: ['Lyra-7'], location: { x: 42, y: 68 } }
+  { id: 's-lyra', name: 'Lyra-7', probeStatus: 'scanned', intel: 'high', connections: ['Nadir Gate', 'Helios Fringe'], location: { x: 22, y: 35 } },
+  { id: 's-nadir', name: 'Nadir Gate', probeStatus: 'charted', intel: 'medium', connections: ['Lyra-7', 'Aster Drift'], location: { x: 58, y: 48 } },
+  { id: 's-helix', name: 'Helios Fringe', probeStatus: 'ping-only', intel: 'low', connections: ['Lyra-7'], location: { x: 42, y: 68 } }
 ])
 
 const planets = ref<GamePlanet[]>([
@@ -131,20 +130,12 @@ const setSelection = (type: SelectionType, id?: string) => {
   selectedId.value = id
 }
 
-const handleIssueOrder = (armyId: string) => {
-  toast.add({ title: 'Order queued', description: `Army ${armyId.toUpperCase()} now moving`, color: 'primary' })
-}
-
-const handleReinforce = (armyId: string) => {
-  toast.add({ title: 'Reinforcements scheduled', description: `${armyId.toUpperCase()} will refit next year`, color: 'neutral' })
-}
-
 const handleViewModeChange = (mode: 'galaxy' | 'system') => {
   viewMode.value = mode
 }
 
 const handleEndYear = () => {
   year.value += 1
-  toast.add({ title: `Year ${year.value}`, description: 'Time advanced. (Simulation placeholder)', color: 'neutral' })
+  toast.add({ title: t('game.toast.year-advanced-title', { value: year.value }), description: t('game.toast.year-advanced-description'), color: 'neutral' })
 }
 </script>
