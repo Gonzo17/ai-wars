@@ -1,10 +1,11 @@
 <script setup lang="ts">
 const props = defineProps<{
   year: number
+  unreadEventCount: number
 }>()
 
 const emit = defineEmits<{
-  (e: 'end-year'): void
+  (e: 'end-year' | 'toggle-event-log'): void
 }>()
 
 const { locales, setLocale, localeProperties } = useI18n()
@@ -46,7 +47,11 @@ const items = computed(() =>
         <span class="text-sm text-slate-400">{{ $t('game.top-bar.players', { count: 3 }) }}</span>
         <span class="text-sm text-slate-400">{{ $t('game.top-bar.timer', { value: '47s' }) }}</span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-3">
+        <GameEventLogButton
+          :unread-count="props.unreadEventCount"
+          @click="emit('toggle-event-log')"
+        />
         <UButton
           color="neutral"
           variant="soft"

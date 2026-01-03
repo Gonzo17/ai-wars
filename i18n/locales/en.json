@@ -135,6 +135,26 @@
     "toast": {
       "year-advanced-title": "Year {value}",
       "year-advanced-description": "Time advanced. (Simulation placeholder)"
+    },
+    "event-log": {
+      "title": "Event Log",
+      "empty": "No events to display",
+      "go-to": "Go to {entity}",
+      "filters": {
+        "all": "All",
+        "combat": "Combat",
+        "research": "Research",
+        "buildings": "Buildings",
+        "ships": "Ships",
+        "fleets": "Fleets",
+        "discovery": "Discovery",
+        "unread": "Unread"
+      },
+      "entity-types": {
+        "planet": "planet",
+        "army": "fleet",
+        "system": "system"
+      }
     }
   }
 }

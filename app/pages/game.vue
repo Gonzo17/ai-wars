@@ -1,8 +1,13 @@
 <template>
   <div class="min-h-screen bg-slate-950 text-slate-100">
+    <!-- Toast Container -->
+    <GameToastContainer />
+
     <GameTopBar
       :year="year"
+      :unread-event-count="eventLogStore.unreadCount"
       @end-year="handleEndYear"
+      @toggle-event-log="eventLogStore.toggle"
     />
 
     <div class="h-full flex gap-4 px-6 pb-8 pt-4">
@@ -26,7 +31,7 @@
         />
       </div>
 
-      <div class="flex-1">
+      <div class="relative flex-1">
         <GameCanvas
           :view-mode="viewMode"
           :selected-type="selectedType"
@@ -36,6 +41,13 @@
           @select-planet="(id: string) => setSelection('planet', id)"
           @select-system="(id: string) => setSelection('system', id)"
           @update:view-mode="handleViewModeChange"
+        />
+
+        <!-- Event Log Overlay -->
+        <GameEventLogCenter
+          v-if="eventLogStore.isOpen"
+          @close="eventLogStore.close"
+          @navigate-to="handleEventNavigate"
         />
       </div>
     </div>
@@ -56,6 +68,72 @@ const selectedType = ref<SelectionType>('planet')
 const selectedId = ref<string | undefined>('p-aurora')
 
 const toast = useToast()
+const eventLogStore = useEventLogStore()
+
+// Initialize mock data on mount
+onMounted(() => {
+  if (eventLogStore.events.length === 0) {
+    eventLogStore.initMockData(year.value)
+  }
+
+  // TODO: Remove - Demo toasts for testing
+  setTimeout(() => {
+    eventLogStore.addEvent({
+      type: 'research-complete',
+      severity: 'success',
+      year: year.value,
+      titleKey: 'events.types.research-complete.title',
+      titleParams: { name: 'Plasma Drives' },
+      descriptionKey: 'events.types.research-complete.description',
+      descriptionParams: { location: 'Aurora Prime' },
+      details: [
+        { labelKey: 'events.details.research-time', value: '3', valueParams: { count: 3 }, icon: 'i-lucide-clock' },
+        { labelKey: 'events.details.unlocks', value: 'Advanced Thrusters', icon: 'i-lucide-unlock' }
+      ],
+      relatedEntityId: 'p-aurora',
+      relatedEntityType: 'planet'
+    })
+  }, 500)
+
+  setTimeout(() => {
+    eventLogStore.addEvent({
+      type: 'combat',
+      severity: 'warning',
+      year: year.value,
+      titleKey: 'events.types.combat.title',
+      titleParams: { location: 'Nadir Gate' },
+      descriptionKey: 'events.types.combat.description',
+      descriptionParams: { outcome: 'events.values.victory' },
+      details: [
+        { labelKey: 'events.details.enemy-losses', value: '8', valueParams: { count: 8 }, icon: 'i-lucide-skull' },
+        { labelKey: 'events.details.our-losses', value: '2', valueParams: { count: 2 }, icon: 'i-lucide-heart-crack' }
+      ],
+      relatedEntityId: 's-nadir',
+      relatedEntityType: 'system'
+    })
+  }, 800)
+
+  setTimeout(() => {
+    eventLogStore.addEvent({
+      type: 'discovery',
+      severity: 'info',
+      year: year.value,
+      titleKey: 'events.types.discovery.title',
+      titleParams: {},
+      descriptionKey: 'events.types.discovery.description',
+      descriptionParams: { name: 'Omega Nebula' },
+      details: [
+        { labelKey: 'events.details.system-name', value: 'Omega Nebula', icon: 'i-lucide-star' },
+        { labelKey: 'events.details.intel-level', value: 'Low', icon: 'i-lucide-eye' }
+      ]
+    })
+  }, 2500)
+})
+
+const handleEventNavigate = (entityType: string, entityId: string) => {
+  setSelection(entityType as SelectionType, entityId)
+  eventLogStore.close()
+}
 
 const { t } = useI18n()
 

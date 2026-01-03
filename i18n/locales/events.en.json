@@ -1,0 +1,55 @@
+{
+  "events": {
+    "types": {
+      "research-complete": {
+        "title": "{name} Research Complete",
+        "description": "New technology unlocked at {location}"
+      },
+      "building-complete": {
+        "title": "{name} Completed",
+        "description": "New building operational on {location}"
+      },
+      "ship-complete": {
+        "title": "{name} Constructed",
+        "description": "New vessel ready at {location}"
+      },
+      "army-arrived": {
+        "title": "{name} Arrived",
+        "description": "Fleet arrived at {location}"
+      },
+      "combat": {
+        "title": "Combat at {location}",
+        "description": "{outcome} against enemy forces"
+      },
+      "discovery": {
+        "title": "New System Discovered",
+        "description": "Probe detected unknown system: {name}"
+      },
+      "diplomatic": {
+        "title": "Diplomatic Event",
+        "description": "{faction} has {action}"
+      }
+    },
+    "details": {
+      "research-time": "Research Time",
+      "unlocks": "Unlocks",
+      "materials-used": "Materials Used",
+      "energy-used": "Energy Used",
+      "population-bonus": "Population Bonus",
+      "fleet-strength": "Fleet Strength",
+      "travel-time": "Travel Time",
+      "enemy-losses": "Enemy Losses",
+      "our-losses": "Our Losses",
+      "outcome": "Outcome",
+      "system-name": "System Name",
+      "intel-level": "Intel Level"
+    },
+    "values": {
+      "years": "{count} year | {count} years",
+      "units": "{count} unit | {count} units",
+      "victory": "Victory",
+      "defeat": "Defeat",
+      "draw": "Draw"
+    }
+  }
+}

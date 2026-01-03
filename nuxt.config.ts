@@ -3,7 +3,8 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
     '@nuxt/ui',
-    '@nuxtjs/i18n'
+    '@nuxtjs/i18n',
+    '@pinia/nuxt'
   ],
 
   devtools: {
@@ -29,8 +30,8 @@ export default defineNuxtConfig({
 
   i18n: {
     locales: [
-      { code: 'en', file: 'en.json', name: 'English' },
-      { code: 'de', file: 'de.json', name: 'Deutsch' }
+      { code: 'en', files: ['en.json', 'events.en.json'], name: 'English' },
+      { code: 'de', files: ['de.json', 'events.de.json'], name: 'Deutsch' }
     ],
     defaultLocale: 'en',
     strategy: 'no_prefix'
