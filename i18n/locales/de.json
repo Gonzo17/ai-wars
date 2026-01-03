@@ -131,6 +131,30 @@
       "players": "Spieler: {count}",
       "timer": "Timer: {value}",
       "end-year": "Jahr beenden"
+    },
+    "toast": {
+      "year-advanced-title": "Jahr {value}",
+      "year-advanced-description": "Zeit fortgeschritten. (Simulations-Platzhalter)"
+    },
+    "event-log": {
+      "title": "Ereignisprotokoll",
+      "empty": "Keine Ereignisse vorhanden",
+      "go-to": "Zu {entity} gehen",
+      "filters": {
+        "all": "Alle",
+        "combat": "Kampf",
+        "research": "Forschung",
+        "buildings": "Gebäude",
+        "ships": "Schiffe",
+        "fleets": "Flotten",
+        "discovery": "Entdeckung",
+        "unread": "Ungelesen"
+      },
+      "entity-types": {
+        "planet": "Planet",
+        "army": "Flotte",
+        "system": "System"
+      }
     }
   }
 }
