@@ -1,5 +1,5 @@
 export type GameEventType
-  = | 'research-complete'
+  = 'research-complete'
     | 'building-complete'
     | 'ship-complete'
     | 'army-arrived'
@@ -10,8 +10,9 @@ export type GameEventType
 export type GameEventSeverity = 'info' | 'success' | 'warning' | 'critical'
 
 export interface GameEventDetail {
-  label: string
+  labelKey: string
   value: string
+  valueParams?: Record<string, string | number>
   icon?: string
 }
 
@@ -20,8 +21,10 @@ export interface GameEvent {
   type: GameEventType
   severity: GameEventSeverity
   year: number
-  title: string
-  description: string
+  titleKey: string
+  titleParams?: Record<string, string | number>
+  descriptionKey: string
+  descriptionParams?: Record<string, string | number>
   details?: GameEventDetail[]
   relatedEntityId?: string
   relatedEntityType?: 'planet' | 'army' | 'system'

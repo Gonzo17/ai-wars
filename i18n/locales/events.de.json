@@ -1,0 +1,55 @@
+{
+  "events": {
+    "types": {
+      "research-complete": {
+        "title": "Forschung {name} abgeschlossen",
+        "description": "Neue Technologie freigeschaltet auf {location}"
+      },
+      "building-complete": {
+        "title": "{name} fertiggestellt",
+        "description": "Neues Gebäude betriebsbereit auf {location}"
+      },
+      "ship-complete": {
+        "title": "{name} gebaut",
+        "description": "Neues Schiff bereit auf {location}"
+      },
+      "army-arrived": {
+        "title": "{name} angekommen",
+        "description": "Flotte angekommen bei {location}"
+      },
+      "combat": {
+        "title": "Kampf bei {location}",
+        "description": "{outcome} gegen feindliche Kräfte"
+      },
+      "discovery": {
+        "title": "Neues System entdeckt",
+        "description": "Sonde hat unbekanntes System entdeckt: {name}"
+      },
+      "diplomatic": {
+        "title": "Diplomatisches Ereignis",
+        "description": "{faction} hat {action}"
+      }
+    },
+    "details": {
+      "research-time": "Forschungszeit",
+      "unlocks": "Schaltet frei",
+      "materials-used": "Materialien verbraucht",
+      "energy-used": "Energie verbraucht",
+      "population-bonus": "Bevölkerungsbonus",
+      "fleet-strength": "Flottenstärke",
+      "travel-time": "Reisezeit",
+      "enemy-losses": "Feindliche Verluste",
+      "our-losses": "Eigene Verluste",
+      "outcome": "Ergebnis",
+      "system-name": "Systemname",
+      "intel-level": "Aufklärungsstufe"
+    },
+    "values": {
+      "years": "{count} Jahr | {count} Jahre",
+      "units": "{count} Einheit | {count} Einheiten",
+      "victory": "Sieg",
+      "defeat": "Niederlage",
+      "draw": "Unentschieden"
+    }
+  }
+}

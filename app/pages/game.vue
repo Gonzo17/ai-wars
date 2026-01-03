@@ -2,9 +2,9 @@
   <div class="min-h-screen bg-slate-950 text-slate-100">
     <GameTopBar
       :year="year"
-      :unread-event-count="unreadEventCount"
+      :unread-event-count="eventLogStore.unreadCount"
       @end-year="handleEndYear"
-      @toggle-event-log="eventLogOpen = !eventLogOpen"
+      @toggle-event-log="eventLogStore.toggle"
     />
 
     <div class="h-full flex gap-4 px-6 pb-8 pt-4">
@@ -42,10 +42,8 @@
 
         <!-- Event Log Overlay -->
         <GameEventLogCenter
-          v-if="eventLogOpen"
-          :events="events"
-          @close="eventLogOpen = false"
-          @mark-read="markEventRead"
+          v-if="eventLogStore.isOpen"
+          @close="eventLogStore.close"
           @navigate-to="handleEventNavigate"
         />
       </div>
@@ -65,104 +63,20 @@ const year = ref(2245)
 const viewMode = ref<'galaxy' | 'system'>('galaxy')
 const selectedType = ref<SelectionType>('planet')
 const selectedId = ref<string | undefined>('p-aurora')
-const eventLogOpen = ref(false)
 
 const toast = useToast()
+const eventLogStore = useEventLogStore()
 
-// Mock Events
-const events = ref<GameEvent[]>([
-  {
-    id: 'evt-1',
-    type: 'research-complete',
-    severity: 'success',
-    year: 2245,
-    title: 'Quantum Lattice Research Complete',
-    description: 'New technology unlocked at Aurora Prime',
-    details: [
-      { label: 'Research Time', value: '2 years', icon: 'i-lucide-clock' },
-      { label: 'Unlocks', value: 'Quantum Shield Generator', icon: 'i-lucide-unlock' }
-    ],
-    relatedEntityId: 'p-aurora',
-    relatedEntityType: 'planet',
-    read: false,
-    timestamp: Date.now()
-  },
-  {
-    id: 'evt-2',
-    type: 'building-complete',
-    severity: 'success',
-    year: 2245,
-    title: 'Hab Complex Completed',
-    description: 'New building operational on Aurora Prime',
-    details: [
-      { label: 'Materials Used', value: '150', icon: 'i-lucide-wrench' },
-      { label: 'Energy Used', value: '80', icon: 'i-lucide-zap' },
-      { label: 'Population Bonus', value: '+500', icon: 'i-lucide-users' }
-    ],
-    relatedEntityId: 'p-aurora',
-    relatedEntityType: 'planet',
-    read: false,
-    timestamp: Date.now() - 1000
-  },
-  {
-    id: 'evt-3',
-    type: 'army-arrived',
-    severity: 'info',
-    year: 2244,
-    title: 'Spearhead Fleet Arrived',
-    description: 'Fleet arrived at Nadir Gate',
-    details: [
-      { label: 'Fleet Strength', value: '74', icon: 'i-lucide-shield' },
-      { label: 'Travel Time', value: '2 years', icon: 'i-lucide-clock' }
-    ],
-    relatedEntityId: 'a2',
-    relatedEntityType: 'army',
-    read: true,
-    timestamp: Date.now() - 100000
-  },
-  {
-    id: 'evt-4',
-    type: 'combat',
-    severity: 'warning',
-    year: 2244,
-    title: 'Skirmish at Helios Fringe',
-    description: 'Enemy forces engaged near the border',
-    details: [
-      { label: 'Enemy Losses', value: '12 units', icon: 'i-lucide-skull' },
-      { label: 'Our Losses', value: '3 units', icon: 'i-lucide-heart-crack' },
-      { label: 'Outcome', value: 'Victory', icon: 'i-lucide-trophy' }
-    ],
-    relatedEntityId: 's-helix',
-    relatedEntityType: 'system',
-    read: true,
-    timestamp: Date.now() - 200000
-  },
-  {
-    id: 'evt-5',
-    type: 'discovery',
-    severity: 'info',
-    year: 2243,
-    title: 'New System Discovered',
-    description: 'Probe detected unknown system beyond Helios Fringe',
-    details: [
-      { label: 'System Name', value: 'Aster Drift', icon: 'i-lucide-star' },
-      { label: 'Intel Level', value: 'Low', icon: 'i-lucide-eye' }
-    ],
-    read: true,
-    timestamp: Date.now() - 300000
+// Initialize mock data on mount
+onMounted(() => {
+  if (eventLogStore.events.length === 0) {
+    eventLogStore.initMockData(year.value)
   }
-])
-
-const unreadEventCount = computed(() => events.value.filter(e => !e.read).length)
-
-const markEventRead = (id: string) => {
-  const event = events.value.find(e => e.id === id)
-  if (event) event.read = true
-}
+})
 
 const handleEventNavigate = (entityType: string, entityId: string) => {
   setSelection(entityType as SelectionType, entityId)
-  eventLogOpen.value = false
+  eventLogStore.close()
 }
 
 const { t } = useI18n()

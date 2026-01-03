@@ -15,6 +15,21 @@ const { t } = useI18n()
 
 const icon = computed(() => eventTypeIcons[props.item.type])
 const severityColor = computed(() => eventSeverityColors[props.item.severity])
+
+// Translate title with params
+const title = computed(() => t(props.item.titleKey, props.item.titleParams ?? {}))
+
+// Translate description with params
+const description = computed(() => t(props.item.descriptionKey, props.item.descriptionParams ?? {}))
+
+// Helper to translate detail values (some might be i18n keys)
+const translateValue = (value: string, params?: Record<string, string | number>): string => {
+  // Check if value looks like an i18n key (contains dots and starts with known prefix)
+  if (value.startsWith('events.')) {
+    return t(value, params ?? {})
+  }
+  return value
+}
 </script>
 
 <template>
@@ -41,10 +56,10 @@ const severityColor = computed(() => eventSeverityColors[props.item.severity])
           class="text-sm truncate"
           :class="item.read ? 'text-slate-300 font-normal' : 'text-slate-100 font-medium'"
         >
-          {{ item.title }}
+          {{ title }}
         </p>
         <p class="text-xs text-slate-400 truncate">
-          {{ item.description }}
+          {{ description }}
         </p>
       </div>
       <UIcon
@@ -70,8 +85,8 @@ const severityColor = computed(() => eventSeverityColors[props.item.severity])
             :name="detail.icon"
             class="w-3 h-3 text-slate-500"
           />
-          <span class="text-slate-400">{{ detail.label }}:</span>
-          <span class="text-slate-200">{{ detail.value }}</span>
+          <span class="text-slate-400">{{ t(detail.labelKey) }}:</span>
+          <span class="text-slate-200">{{ translateValue(detail.value, detail.valueParams) }}</span>
         </div>
       </div>
 

@@ -1,33 +1,15 @@
 <script setup lang="ts">
-import type { GameEvent, GameEventFilter } from '~~/shared/types/events'
-
-const props = defineProps<{
-  events: GameEvent[]
-}>()
+import type { GameEventFilter } from '~~/shared/types/events'
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'mark-read', id: string): void
   (e: 'navigate-to', entityType: string, entityId: string): void
 }>()
 
 const { t } = useI18n()
+const store = useEventLogStore()
 
-const activeFilter = ref<GameEventFilter>('all')
-const showOnlyUnread = ref(false)
 const expandedEvents = ref<Set<string>>(new Set())
-
-// Calculate unread counts per filter
-const unreadCounts = computed(() => {
-  const counts: Record<string, number> = { all: 0 }
-  for (const event of props.events) {
-    if (!event.read) {
-      counts.all!++
-      counts[event.type] = (counts[event.type] ?? 0) + 1
-    }
-  }
-  return counts
-})
 
 const filterOptions = computed(() => [
   { key: 'all' as const, label: t('game.event-log.filters.all'), icon: 'i-lucide-list' },
@@ -39,46 +21,20 @@ const filterOptions = computed(() => [
   { key: 'discovery' as const, label: t('game.event-log.filters.discovery'), icon: 'i-lucide-compass' }
 ])
 
-const filteredEvents = computed(() => {
-  let result = props.events
-
-  // Filter by type
-  if (activeFilter.value !== 'all') {
-    result = result.filter(e => e.type === activeFilter.value)
-  }
-
-  // Filter by unread
-  if (showOnlyUnread.value) {
-    result = result.filter(e => !e.read)
-  }
-
-  return result
-})
-
-const eventsByYear = computed(() => {
-  const grouped = new Map<number, GameEvent[]>()
-  for (const event of filteredEvents.value) {
-    const yearEvents = grouped.get(event.year) ?? []
-    yearEvents.push(event)
-    grouped.set(event.year, yearEvents)
-  }
-  return Array.from(grouped.entries()).sort((a, b) => b[0] - a[0])
-})
-
 const toggleExpanded = (eventId: string) => {
   if (expandedEvents.value.has(eventId)) {
     expandedEvents.value.delete(eventId)
   } else {
     expandedEvents.value.add(eventId)
     // Mark as read when expanding
-    emit('mark-read', eventId)
+    store.markAsRead(eventId)
   }
 }
 
 const isExpanded = (eventId: string) => expandedEvents.value.has(eventId)
 
 const getUnreadCount = (filterKey: GameEventFilter): number => {
-  return unreadCounts.value[filterKey] ?? 0
+  return store.unreadCountByType[filterKey] ?? 0
 }
 </script>
 
@@ -106,11 +62,11 @@ const getUnreadCount = (filterKey: GameEventFilter): number => {
         <div class="flex items-center gap-2">
           <!-- Unread Only Toggle -->
           <UButton
-            :icon="showOnlyUnread ? 'i-lucide-eye' : 'i-lucide-eye-off'"
-            :color="showOnlyUnread ? 'info' : 'neutral'"
-            :variant="showOnlyUnread ? 'soft' : 'ghost'"
+            :icon="store.showOnlyUnread ? 'i-lucide-eye' : 'i-lucide-eye-off'"
+            :color="store.showOnlyUnread ? 'info' : 'neutral'"
+            :variant="store.showOnlyUnread ? 'soft' : 'ghost'"
             size="sm"
-            @click="showOnlyUnread = !showOnlyUnread"
+            @click="store.toggleUnreadOnly"
           >
             {{ $t('game.event-log.filters.unread') }}
           </UButton>
@@ -133,10 +89,10 @@ const getUnreadCount = (filterKey: GameEventFilter): number => {
         >
           <UButton
             :icon="filter.icon"
-            :color="activeFilter === filter.key ? 'info' : 'neutral'"
-            :variant="activeFilter === filter.key ? 'soft' : 'ghost'"
+            :color="store.activeFilter === filter.key ? 'info' : 'neutral'"
+            :variant="store.activeFilter === filter.key ? 'soft' : 'ghost'"
             size="xs"
-            @click="activeFilter = filter.key"
+            @click="store.setFilter(filter.key)"
           >
             {{ filter.label }}
           </UButton>
@@ -152,9 +108,9 @@ const getUnreadCount = (filterKey: GameEventFilter): number => {
 
       <!-- Events List -->
       <div class="flex-1 overflow-y-auto p-5 space-y-6">
-        <template v-if="eventsByYear.length > 0">
+        <template v-if="store.eventsByYear.length > 0">
           <div
-            v-for="[year, yearEvents] in eventsByYear"
+            v-for="[year, yearEvents] in store.eventsByYear"
             :key="year"
             class="space-y-3"
           >
