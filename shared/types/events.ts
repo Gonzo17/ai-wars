@@ -27,19 +27,9 @@ export interface GameEvent {
   descriptionParams?: Record<string, string | number>
   details?: GameEventDetail[]
   relatedEntityId?: string
-  relatedEntityType?: 'planet' | 'army' | 'system'
+  relatedEntityType?: 'planet' | 'army' | 'system' | 'research'
   read: boolean
-  showToast?: boolean
   timestamp: number
 }
 
 export type GameEventFilter = GameEventType | 'all'
-
-export interface GameToast {
-  id: string
-  eventId: string
-  event: GameEvent
-  duration: number
-  requiresDismiss: boolean
-  createdAt: number
-}

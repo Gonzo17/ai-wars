@@ -9,5 +9,5 @@ watch(user, () => {
 </script>
 
 <template>
-  <div>Waiting for login...</div>
+  <div>{{ $t('auth.waiting-login') }}</div>
 </template>

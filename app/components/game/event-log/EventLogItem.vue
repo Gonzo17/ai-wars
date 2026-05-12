@@ -11,7 +11,23 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const store = useEventLogStore()
-const { translateParams, translateValue } = useTranslateParams()
+
+const translateParams = (params?: Record<string, string | number>): Record<string, string | number> => {
+  if (!params) return {}
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [
+      key,
+      typeof value === 'string' && (value.startsWith('events.') || value.startsWith('game.')) ? t(value) : value
+    ])
+  )
+}
+
+const translateValue = (value: string, params?: Record<string, string | number>): string => {
+  if (value.startsWith('events.') || value.startsWith('game.')) {
+    return t(value, params ?? {})
+  }
+  return value
+}
 
 const icon = computed(() => eventTypeIcons[props.item.type])
 const severityColor = computed(() => eventSeverityColors[props.item.severity])
@@ -19,6 +35,12 @@ const isHighlighted = computed(() => store.highlightedEventId === props.item.id)
 
 const title = computed(() => t(props.item.titleKey, translateParams(props.item.titleParams)))
 const description = computed(() => t(props.item.descriptionKey, translateParams(props.item.descriptionParams)))
+const navigateEntityType = computed(() => {
+  if (props.item.type === 'research-complete') return 'research'
+  if (props.item.type === 'ship-complete') return 'planet'
+  return props.item.relatedEntityType
+})
+const navigateEntityId = computed(() => props.item.relatedEntityId)
 </script>
 
 <template>
@@ -61,10 +83,13 @@ const description = computed(() => t(props.item.descriptionKey, translateParams(
 
     <!-- Expanded Details -->
     <div
-      v-if="expanded && item.details?.length"
+      v-if="expanded"
       class="px-4 pb-3 pt-1 border-t border-neutral-700/30"
     >
-      <div class="space-y-2">
+      <div
+        v-if="item.details?.length"
+        class="py-4 border-b border-neutral-700/30"
+      >
         <div
           v-for="(detail, idx) in item.details"
           :key="idx"
@@ -82,17 +107,17 @@ const description = computed(() => t(props.item.descriptionKey, translateParams(
 
       <!-- Navigate Button -->
       <div
-        v-if="item.relatedEntityId && item.relatedEntityType"
-        class="mt-3 pt-2 border-t border-neutral-700/30"
+        v-if="navigateEntityId && navigateEntityType"
+        class="mt-2"
       >
         <UButton
           size="xs"
           color="info"
           variant="ghost"
           icon="i-lucide-external-link"
-          @click="emit('navigate-to', item.relatedEntityType, item.relatedEntityId)"
+          @click="emit('navigate-to', navigateEntityType, navigateEntityId)"
         >
-          {{ t('game.event-log.go-to', { entity: t(`game.event-log.entity-types.${item.relatedEntityType}`) }) }}
+          {{ t('game.event-log.go-to', { entity: t(`game.event-log.entity-types.${navigateEntityType}`) }) }}
         </UButton>
       </div>
     </div>

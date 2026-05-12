@@ -34,9 +34,104 @@ export type Database = {
   }
   public: {
     Tables: {
+      game_players: {
+        Row: {
+          game_id: string
+          joined_at: string | null
+          ready_at: string | null
+          ready_turn: number | null
+          user_id: string
+        }
+        Insert: {
+          game_id: string
+          joined_at?: string | null
+          ready_at?: string | null
+          ready_turn?: number | null
+          user_id: string
+        }
+        Update: {
+          game_id?: string
+          joined_at?: string | null
+          ready_at?: string | null
+          ready_turn?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'game_players_game_id_fkey'
+            columns: ['game_id']
+            isOneToOne: false
+            referencedRelation: 'games'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      game_state: {
+        Row: {
+          created_at: string | null
+          game_id: string
+          state_json: Json
+          turn: number
+        }
+        Insert: {
+          created_at?: string | null
+          game_id: string
+          state_json: Json
+          turn: number
+        }
+        Update: {
+          created_at?: string | null
+          game_id?: string
+          state_json?: Json
+          turn?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'game_state_game_id_fkey'
+            columns: ['game_id']
+            isOneToOne: false
+            referencedRelation: 'games'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+      games: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          phase: string
+          resolving_turn: number | null
+          status: string
+          turn: number
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id?: string
+          phase?: string
+          resolving_turn?: number | null
+          status?: string
+          turn?: number
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          phase?: string
+          resolving_turn?: number | null
+          status?: string
+          turn?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lobbies: {
         Row: {
           created_at: string | null
+          game_id: string | null
           host_id: string | null
           id: string
           name: string
@@ -45,6 +140,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          game_id?: string | null
           host_id?: string | null
           id?: string
           name: string
@@ -53,13 +149,22 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          game_id?: string | null
           host_id?: string | null
           id?: string
           name?: string
           started_at?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'lobbies_game_id_fkey'
+            columns: ['game_id']
+            isOneToOne: false
+            referencedRelation: 'games'
+            referencedColumns: ['id']
+          }
+        ]
       }
       lobby_players: {
         Row: {
@@ -107,6 +212,38 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      turn_plans: {
+        Row: {
+          game_id: string
+          plan_json: Json
+          submitted_at: string | null
+          turn: number
+          user_id: string
+        }
+        Insert: {
+          game_id: string
+          plan_json: Json
+          submitted_at?: string | null
+          turn: number
+          user_id: string
+        }
+        Update: {
+          game_id?: string
+          plan_json?: Json
+          submitted_at?: string | null
+          turn?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'turn_plans_game_id_fkey'
+            columns: ['game_id']
+            isOneToOne: false
+            referencedRelation: 'games'
+            referencedColumns: ['id']
+          }
+        ]
       }
     }
     Views: {

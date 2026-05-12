@@ -2,7 +2,7 @@
 const { t } = useI18n()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
-const toast = useToast()
+const authFetch = useAuthFetch()
 
 const lobbies = ref<Lobby[]>([])
 const members = ref<LobbyPlayer[]>([])
@@ -27,9 +27,10 @@ type LobbyPlayer = {
 type Lobby = {
   id: string
   name: string
-  status: 'waiting' | 'started' | 'starting'
+  status: 'open' | 'started' | 'closed'
   created_at: string
   host_id: string
+  game_id?: string | null
   host?: {
     username?: string | null
   } | null
@@ -71,11 +72,7 @@ const signOut = async () => {
   members.value = []
   myLobbyId.value = null
 
-  toast.add({
-    title: t('lobby.logged-out'),
-    icon: 'i-lucide-log-out',
-    color: 'neutral'
-  })
+  console.log(t('lobby.logged-out'))
 
   await navigateTo('/')
 }
@@ -94,7 +91,7 @@ const refreshLobbies = async () => {
 
   const { data, error } = await supabase
     .from('lobbies')
-    .select('id, name, status, created_at, host_id, lobby_players(count)')
+    .select('id, name, status, created_at, host_id, game_id, lobby_players(count)')
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -216,14 +213,22 @@ const createLobby = async () => {
 
   const { data, error } = await supabase
     .from('lobbies')
-    .insert({ name: finalName, host_id: userId, status: 'waiting' })
+    .insert({ name: finalName, host_id: userId, status: 'open' })
     .select()
     .single()
 
   if (error) {
     displayError(error)
   } else if (data) {
-    await supabase.from('lobby_players').upsert({ lobby_id: data.id, user_id: userId, is_host: true })
+    const { error: joinError } = await supabase
+      .from('lobby_players')
+      .upsert({ lobby_id: data.id, user_id: userId, is_host: true })
+
+    if (joinError) {
+      displayError(joinError)
+      return
+    }
+
     myLobbyId.value = data.id
     lobbyName.value = ''
     await refreshLobbies()
@@ -258,23 +263,21 @@ const joinLobby = async (lobbyId: string) => {
 const startLobby = async () => {
   const userId = await getUserId()
   if (!userId || !currentLobby.value || !isHost.value) return
-  const { error } = await supabase
-    .from('lobbies')
-    .update({ status: 'started', started_at: new Date().toISOString() })
-    .eq('id', currentLobby.value.id)
-    .eq('host_id', userId)
-
-  if (error) displayError(error)
-  else navigateTo('/game')
+  try {
+    const { gameId } = await authFetch<{ gameId: string }>(`/api/lobbies/${currentLobby.value.id}/start`, {
+      method: 'POST'
+    })
+    if (gameId) {
+      navigateTo(`/game?gameId=${gameId}`)
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : t('lobby.error')
+    displayError({ message })
+  }
 }
 
 const displayError = (error: { message: string }) => {
-  toast.add({
-    title: t('lobby.error'),
-    description: error.message,
-    color: 'error',
-    icon: 'i-lucide-alert-circle'
-  })
+  console.error(error.message)
 }
 
 const subscribeRealtime = () => {
@@ -306,7 +309,7 @@ onUnmounted(() => {
 })
 
 watch(currentLobby, (value) => {
-  if (value?.status === 'started') navigateTo('/game')
+  if (value?.status === 'started' && value.game_id) navigateTo(`/game?gameId=${value.game_id}`)
 })
 </script>
 
@@ -387,7 +390,7 @@ watch(currentLobby, (value) => {
                       <span
                         v-if="player.is_host"
                         class="text-xs uppercase text-primary-300 bg-primary-500/20 px-2 py-1 rounded"
-                      >⭐ Host</span>
+                      >{{ t('lobby.host-badge') }}</span>
                     </div>
                     <p
                       v-if="!members.length"

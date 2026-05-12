@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { AscensionTier } from '~~/shared/types/research'
-import { ASCENSION_TIER_LABELS } from '~~/shared/types/research'
 
 const props = defineProps<{
   toTier: AscensionTier
@@ -11,9 +10,12 @@ const emit = defineEmits<{
 }>()
 
 const store = useResearchStore()
+const { t, te } = useI18n()
 
 const gateStatus = computed(() => store.getAscensionGateStatus(props.toTier))
-const tierLabel = computed(() => ASCENSION_TIER_LABELS[props.toTier])
+const tierLabel = computed(() => t(`game.research.tiers.${props.toTier.replace('.', '-')}`))
+const techNameKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.name`
+const getTechName = (tech: { id: string, name: string }) => (te(techNameKey(tech.id)) ? t(techNameKey(tech.id)) : tech.name)
 
 const completedTechCount = computed(() =>
   gateStatus.value?.techProgress.filter(t => t.completed).length ?? 0
@@ -69,7 +71,7 @@ const totalTechCount = computed(() =>
           </div>
           <div>
             <div class="text-xs text-neutral-500 uppercase tracking-wider">
-              {{ gateStatus.alreadyAscended ? 'Aufgestiegen' : 'Aufstieg zu' }}
+              {{ gateStatus.alreadyAscended ? $t('game.research.gate.status-ascended') : $t('game.research.gate.status-ascend-to') }}
             </div>
             <h3
               class="font-semibold"
@@ -97,7 +99,7 @@ const totalTechCount = computed(() =>
             name="i-lucide-rocket"
             class="w-4 h-4 mr-1"
           />
-          Aufsteigen
+          {{ $t('game.research.gate.action-ascend') }}
         </UButton>
         <UBadge
           v-else-if="gateStatus.alreadyAscended"
@@ -108,7 +110,7 @@ const totalTechCount = computed(() =>
             name="i-lucide-check"
             class="w-3 h-3 mr-1"
           />
-          Erreicht
+          {{ $t('game.research.gate.badge-reached') }}
         </UBadge>
       </div>
 
@@ -121,7 +123,7 @@ const totalTechCount = computed(() =>
               name="i-lucide-flask-conical"
               class="w-3 h-3"
             />
-            <span>Technologien ({{ completedTechCount }}/{{ totalTechCount }})</span>
+            <span>{{ $t('game.research.gate.tech-progress', { completed: completedTechCount, total: totalTechCount }) }}</span>
           </div>
           <div class="space-y-1">
             <div
@@ -138,7 +140,7 @@ const totalTechCount = computed(() =>
                 :class="tech.completed ? 'text-neutral-300' : 'text-neutral-500'"
                 class="truncate"
               >
-                {{ tech.tech?.name ?? tech.techId }}
+                {{ tech.tech ? getTechName(tech.tech) : tech.techId }}
               </span>
             </div>
           </div>
@@ -151,7 +153,7 @@ const totalTechCount = computed(() =>
               name="i-lucide-cpu"
               class="w-3 h-3"
             />
-            <span>Compute Level</span>
+            <span>{{ $t('game.research.gate.compute-level') }}</span>
           </div>
           <div class="flex items-center gap-2">
             <UProgress
@@ -179,7 +181,7 @@ const totalTechCount = computed(() =>
               name="i-lucide-crown"
               class="w-3 h-3"
             />
-            <span>Imperium</span>
+            <span>{{ $t('game.research.gate.empire') }}</span>
           </div>
           <div class="space-y-1">
             <div

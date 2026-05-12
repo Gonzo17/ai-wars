@@ -16,7 +16,7 @@ export interface TechDef {
   category: ResearchCategory
   tier: AscensionTier
   prerequisites: string[]
-  timeYears: number
+  researchPoints?: number
   requires?: {
     ascension?: AscensionTier
     compute?: number
@@ -40,7 +40,7 @@ export interface AscensionGateDef {
 export interface ActiveResearch {
   techId: string
   startedAt: number
-  progress: number
+  progressPoints: number
 }
 
 export interface PlayerResearchState {
@@ -53,6 +53,7 @@ export interface PlayerResearchState {
   }
   completedTechIds: string[]
   activeResearch?: ActiveResearch
+  progressMemory: Record<string, number>
 }
 
 export interface TechLockedReason {

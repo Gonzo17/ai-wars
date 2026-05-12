@@ -2,7 +2,6 @@
 const { t } = useI18n()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
-const toast = useToast()
 
 const loading = ref(false)
 const form = reactive({
@@ -50,24 +49,14 @@ const saveProfile = async () => {
 
   if (error) displayError(error)
   else {
-    toast.add({
-      title: t('profile.saved-success-title'),
-      description: t('profile.saved-success-desc'),
-      color: 'success',
-      icon: 'i-lucide-check-circle'
-    })
+    console.log('Profile updated successfully.')
   }
 
   loading.value = false
 }
 
 const displayError = (error: { message: string }) => {
-  toast.add({
-    title: t('lobby.error'),
-    description: error.message,
-    color: 'error',
-    icon: 'i-lucide-alert-circle'
-  })
+  console.error(error.message)
 }
 
 onMounted(loadProfile)

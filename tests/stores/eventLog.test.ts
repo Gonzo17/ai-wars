@@ -5,7 +5,6 @@ const createMockEvent = (overrides: Partial<{
   type: GameEventType
   severity: GameEventSeverity
   year: number
-  showToast: boolean
 }> = {}) => ({
   type: 'research-complete' as GameEventType,
   severity: 'success' as GameEventSeverity,
@@ -51,117 +50,15 @@ describe('eventLog Store', () => {
 
       expect(event.read).toBe(false)
     })
-
-    it('creates toast automatically', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent())
-
-      expect(store.toasts).toHaveLength(1)
-    })
-
-    it('does not create toast when showToast is false', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ showToast: false }))
-
-      expect(store.toasts).toHaveLength(0)
-    })
-
-    it('does not create toast when options.showToast is false', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent(), { showToast: false })
-
-      expect(store.toasts).toHaveLength(0)
-    })
-  })
-
-  describe('toast management', () => {
-    it('limits toasts to maximum of 3', () => {
-      const store = useEventLogStore()
-
-      store.addEvent(createMockEvent())
-      store.addEvent(createMockEvent())
-      store.addEvent(createMockEvent())
-      store.addEvent(createMockEvent())
-
-      expect(store.toasts).toHaveLength(3)
-    })
-
-    it('sets requiresDismiss to true for warning severity', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'warning' }))
-
-      expect(store.toasts[0].requiresDismiss).toBe(true)
-    })
-
-    it('sets requiresDismiss to true for critical severity', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'critical' }))
-
-      expect(store.toasts[0].requiresDismiss).toBe(true)
-    })
-
-    it('sets requiresDismiss to false for info severity', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'info' }))
-
-      expect(store.toasts[0].requiresDismiss).toBe(false)
-    })
-
-    it('sets requiresDismiss to false for success severity', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'success' }))
-
-      expect(store.toasts[0].requiresDismiss).toBe(false)
-    })
-
-    it('dismisses toast by ID', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent())
-      const toastId = store.toasts[0].id
-
-      store.dismissToast(toastId)
-
-      expect(store.toasts).toHaveLength(0)
-    })
-
-    it('dismisses all toasts', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent())
-      store.addEvent(createMockEvent())
-
-      store.dismissAllToasts()
-
-      expect(store.toasts).toHaveLength(0)
-    })
-
-    it('auto-dismisses toast after duration for non-critical events', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'success' }))
-
-      expect(store.toasts).toHaveLength(1)
-
-      vi.advanceTimersByTime(5000)
-
-      expect(store.toasts).toHaveLength(0)
-    })
-
-    it('does not auto-dismiss toast for warning severity', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent({ severity: 'warning' }))
-
-      vi.advanceTimersByTime(10000)
-
-      expect(store.toasts).toHaveLength(1)
-    })
   })
 
   describe('filtering', () => {
     it('filters events by type', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent({ type: 'research-complete' }), { showToast: false })
-      store.addEvent(createMockEvent({ type: 'combat' }), { showToast: false })
-      store.addEvent(createMockEvent({ type: 'research-complete' }), { showToast: false })
+      store.addEvent(createMockEvent({ type: 'research-complete' }))
+      store.addEvent(createMockEvent({ type: 'combat' }))
+      store.addEvent(createMockEvent({ type: 'research-complete' }))
 
       store.setFilter('research-complete')
 
@@ -173,8 +70,8 @@ describe('eventLog Store', () => {
     it('shows all events when filter is "all"', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent({ type: 'research-complete' }), { showToast: false })
-      store.addEvent(createMockEvent({ type: 'combat' }), { showToast: false })
+      store.addEvent(createMockEvent({ type: 'research-complete' }))
+      store.addEvent(createMockEvent({ type: 'combat' }))
 
       store.setFilter('all')
 
@@ -184,8 +81,8 @@ describe('eventLog Store', () => {
     it('filters unread events only', () => {
       const store = useEventLogStore()
 
-      const event1 = store.addEvent(createMockEvent(), { showToast: false })
-      store.addEvent(createMockEvent(), { showToast: false })
+      const event1 = store.addEvent(createMockEvent())
+      store.addEvent(createMockEvent())
       store.markAsRead(event1.id)
 
       store.toggleUnreadOnly()
@@ -198,7 +95,7 @@ describe('eventLog Store', () => {
   describe('read status', () => {
     it('marks single event as read', () => {
       const store = useEventLogStore()
-      const event = store.addEvent(createMockEvent(), { showToast: false })
+      const event = store.addEvent(createMockEvent())
 
       expect(event.read).toBe(false)
 
@@ -210,9 +107,9 @@ describe('eventLog Store', () => {
     it('marks all events as read', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent(), { showToast: false })
-      store.addEvent(createMockEvent(), { showToast: false })
-      store.addEvent(createMockEvent(), { showToast: false })
+      store.addEvent(createMockEvent())
+      store.addEvent(createMockEvent())
+      store.addEvent(createMockEvent())
 
       store.markAllAsRead()
       // @ts-expect-error type any for test
@@ -224,9 +121,9 @@ describe('eventLog Store', () => {
     it('calculates total unread count correctly', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent(), { showToast: false })
-      store.addEvent(createMockEvent(), { showToast: false })
-      const event3 = store.addEvent(createMockEvent(), { showToast: false })
+      store.addEvent(createMockEvent())
+      store.addEvent(createMockEvent())
+      const event3 = store.addEvent(createMockEvent())
 
       expect(store.unreadCount).toBe(3)
 
@@ -238,9 +135,9 @@ describe('eventLog Store', () => {
     it('calculates unread count by type correctly', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent({ type: 'research-complete' }), { showToast: false })
-      store.addEvent(createMockEvent({ type: 'combat' }), { showToast: false })
-      store.addEvent(createMockEvent({ type: 'research-complete' }), { showToast: false })
+      store.addEvent(createMockEvent({ type: 'research-complete' }))
+      store.addEvent(createMockEvent({ type: 'combat' }))
+      store.addEvent(createMockEvent({ type: 'research-complete' }))
 
       expect(store.unreadCountByType['research-complete']).toBe(2)
       expect(store.unreadCountByType['combat']).toBe(1)
@@ -251,7 +148,7 @@ describe('eventLog Store', () => {
   describe('openToEvent', () => {
     it('opens event log and sets correct filter', () => {
       const store = useEventLogStore()
-      const event = store.addEvent(createMockEvent({ type: 'combat' }), { showToast: false })
+      const event = store.addEvent(createMockEvent({ type: 'combat' }))
 
       store.openToEvent(event.id)
 
@@ -261,7 +158,7 @@ describe('eventLog Store', () => {
 
     it('sets highlighted event ID', () => {
       const store = useEventLogStore()
-      const event = store.addEvent(createMockEvent(), { showToast: false })
+      const event = store.addEvent(createMockEvent())
 
       store.openToEvent(event.id)
 
@@ -270,7 +167,7 @@ describe('eventLog Store', () => {
 
     it('clears highlight after timeout', () => {
       const store = useEventLogStore()
-      const event = store.addEvent(createMockEvent(), { showToast: false })
+      const event = store.addEvent(createMockEvent())
 
       store.openToEvent(event.id)
       expect(store.highlightedEventId).toBe(event.id)
@@ -283,24 +180,11 @@ describe('eventLog Store', () => {
     it('resets unread filter when opening to event', () => {
       const store = useEventLogStore()
       store.toggleUnreadOnly()
-      const event = store.addEvent(createMockEvent(), { showToast: false })
+      const event = store.addEvent(createMockEvent())
 
       store.openToEvent(event.id)
 
       expect(store.showOnlyUnread).toBe(false)
-    })
-  })
-
-  describe('handleToastClick', () => {
-    it('opens event log and dismisses toast', () => {
-      const store = useEventLogStore()
-      store.addEvent(createMockEvent())
-      const toastId = store.toasts[0].id
-
-      store.handleToastClick(toastId)
-
-      expect(store.isOpen).toBe(true)
-      expect(store.toasts).toHaveLength(0)
     })
   })
 
@@ -337,10 +221,10 @@ describe('eventLog Store', () => {
     it('groups events by year in descending order', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent({ year: 2243 }), { showToast: false })
-      store.addEvent(createMockEvent({ year: 2245 }), { showToast: false })
-      store.addEvent(createMockEvent({ year: 2244 }), { showToast: false })
-      store.addEvent(createMockEvent({ year: 2245 }), { showToast: false })
+      store.addEvent(createMockEvent({ year: 2243 }))
+      store.addEvent(createMockEvent({ year: 2245 }))
+      store.addEvent(createMockEvent({ year: 2244 }))
+      store.addEvent(createMockEvent({ year: 2245 }))
 
       const grouped = store.eventsByYear
 
@@ -356,8 +240,8 @@ describe('eventLog Store', () => {
     it('removes all events', () => {
       const store = useEventLogStore()
 
-      store.addEvent(createMockEvent(), { showToast: false })
-      store.addEvent(createMockEvent(), { showToast: false })
+      store.addEvent(createMockEvent())
+      store.addEvent(createMockEvent())
 
       store.clearEvents()
 

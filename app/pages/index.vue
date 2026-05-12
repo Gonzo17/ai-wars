@@ -47,11 +47,11 @@ const features = computed(() => [
           <div class="space-y-4 justify-center items-center flex flex-col">
             <img
               src="/logo.png"
-              alt="Ascension of AI logo"
+              :alt="t('home.logo-alt')"
               :width="400"
             >
             <h1 class="text-5xl md:text-7xl font-bold sr-only">
-              Ascension of AI
+              {{ t('home.title') }}
             </h1>
             <p class="text-xl md:text-2xl text-neutral-200 font-light">
               {{ t('home.tagline') }}

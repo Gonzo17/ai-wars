@@ -1,3 +1,6 @@
+import type { GameEvent } from './events'
+import type { PlayerResearchState } from './research'
+
 export type Id<T extends string> = `${T}:${string}`
 
 export type IntelLevel = 'low' | 'medium' | 'high'
@@ -37,6 +40,23 @@ export interface SolarSystem {
 }
 
 export type PlanetId = Id<'pl'>
+
+export type ResourceNodeType = 'ore'
+
+export interface PlanetSlotData {
+  index: number
+  zone: 'surface' | 'orbital'
+  buildingId: BuildingId | null
+  buildingLevel: number
+  isConstructing: boolean
+  constructionTimeLeft: number
+  resourceNode: ResourceNodeType | null
+}
+
+export interface BuildQueueItem {
+  slotIndex: number
+}
+
 export interface Planet {
   id: PlanetId
   systemId: SolarSystemId
@@ -44,11 +64,15 @@ export interface Planet {
   owner: PlayerId | 'unknown' | 'unclaimed'
   type: 'terrestrial' | 'gas-giant' | 'ice-giant' | 'barren' | 'oceanic' | 'desert'
   size: 'small' | 'medium' | 'large' | 'huge'
-  buildings: Building[]
+  workers: number
+  productionPerWorker: number
+  slots: PlanetSlotData[]
   queues: {
-    build: Building[]
+    build: BuildQueueItem[]
     shipyard: Unit[]
   }
+  progressMemory: Record<string, { productionSpent: number, resourcePaid: boolean }>
+  productionCarryover: number
   location: {
     x: number
     y: number
@@ -90,6 +114,7 @@ export interface Unit {
   destination?: PlanetId | SolarSystemId | GalaxyId
   eta?: number
   strength: number
+  ownerId: PlayerId
 }
 
 export type ResourceId = Id<'res'>
@@ -103,3 +128,26 @@ export interface Resource {
 export type Energy = Resource & { key: 'res:energy' }
 export type Material = Resource & { key: 'res:material' }
 export type Rare = Resource & { key: 'res:rare' }
+
+export type GameStatus = 'active' | 'finished'
+export type GamePhase = 'planning' | 'resolving'
+
+export interface PlayerSnapshot {
+  id: PlayerId
+  userId: string
+  planets: PlanetId[]
+  fleets: UnitId[]
+  research: PlayerResearchState
+  availableResearchIds: ResearchId[]
+  resources: Resource[]
+  events: GameEvent[]
+}
+
+export interface GameSnapshot {
+  turn: number
+  players: PlayerSnapshot[]
+  galaxies: Galaxy[]
+  systems: SolarSystem[]
+  planets: Planet[]
+  fleets: Unit[]
+}

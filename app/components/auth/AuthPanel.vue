@@ -8,7 +8,6 @@ const props = withDefaults(defineProps<{
 })
 
 const supabase = useSupabaseClient()
-const toast = useToast()
 const { t } = useI18n()
 
 const sign = ref<'in' | 'up'>('in')
@@ -106,7 +105,7 @@ const signIn = async (email: string, password: string, username?: string | null)
     password
   })
   if (error) {
-    displayError(error)
+    console.error(error.message)
     return
   }
 
@@ -128,13 +127,9 @@ const signUp = async (email: string, password: string, username?: string | null)
     email,
     password
   })
-  if (error) displayError(error)
+  if (error) console.error(error.message)
   else {
-    toast.add({
-      title: t('auth.signup-success'),
-      icon: 'i-lucide-check-circle',
-      color: 'success'
-    })
+    console.log('Account created. Please confirm your email.')
     await signIn(email, password, username)
   }
 }
@@ -149,12 +144,7 @@ const onSubmit = async (payload: FormSubmitEvent<{ email: string, password: stri
 }
 
 const displayError = (error: { message: string }) => {
-  toast.add({
-    title: t('auth.error-title'),
-    description: error.message,
-    icon: 'i-lucide-alert-circle',
-    color: 'error'
-  })
+  console.error(error.message)
 }
 
 const signInAsGuest = async () => {

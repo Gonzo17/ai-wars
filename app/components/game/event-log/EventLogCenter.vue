@@ -45,7 +45,7 @@ const getUnreadCount = (filterKey: GameEventFilter): number => {
     />
 
     <!-- Panel -->
-    <div class="relative w-full max-w-3xl max-h-[calc(100%-4rem)] flex flex-col rounded-lg border border-info-500/30 bg-neutral-900/95 shadow-lg shadow-info-500/10 overflow-hidden">
+    <div class="relative w-full max-w-3xl h-[calc(100vh-16rem)] flex flex-col rounded-lg border border-info-500/30 bg-neutral-900/95 shadow-lg shadow-info-500/10 overflow-hidden">
       <!-- Header -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-700/50">
         <div class="flex items-center gap-3">

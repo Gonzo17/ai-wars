@@ -12,7 +12,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: [],
-    timeYears: 1
+    researchPoints: 100
   },
   {
     id: 'tech:basic-industrial-robotics',
@@ -21,7 +21,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    timeYears: 2
+    researchPoints: 200
   },
   {
     id: 'tech:planetary-grid-management',
@@ -30,7 +30,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    timeYears: 2
+    researchPoints: 200
   },
   {
     id: 'tech:probe-design',
@@ -39,7 +39,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    timeYears: 2
+    researchPoints: 200
   },
   {
     id: 'tech:first-shipyard',
@@ -48,7 +48,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.6',
     prerequisites: ['tech:basic-industrial-robotics'],
-    timeYears: 3
+    researchPoints: 300
   },
   {
     id: 'tech:data-center-i',
@@ -57,7 +57,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: ['tech:planetary-grid-management'],
-    timeYears: 3
+    researchPoints: 300
   },
 
   // ============================================
@@ -71,7 +71,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.8',
     prerequisites: ['tech:basic-industrial-robotics', 'tech:data-center-i'],
-    timeYears: 3,
+    researchPoints: 300,
     requires: { compute: 2 }
   },
   {
@@ -81,7 +81,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k0.8',
     prerequisites: ['tech:probe-design'],
-    timeYears: 3
+    researchPoints: 300
   },
   {
     id: 'tech:navigation-algorithms',
@@ -90,7 +90,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k0.8',
     prerequisites: ['tech:deep-system-scan'],
-    timeYears: 2
+    researchPoints: 200
   },
   {
     id: 'tech:habitation-modules',
@@ -99,7 +99,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'colonization_planettypes',
     tier: 'k0.8',
     prerequisites: ['tech:first-shipyard'],
-    timeYears: 3
+    researchPoints: 300
   },
   {
     id: 'tech:colony-ship-design',
@@ -108,7 +108,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'colonization_planettypes',
     tier: 'k0.8',
     prerequisites: ['tech:habitation-modules', 'tech:navigation-algorithms'],
-    timeYears: 4
+    researchPoints: 400
   },
   {
     id: 'tech:data-center-ii',
@@ -117,7 +117,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.8',
     prerequisites: ['tech:data-center-i'],
-    timeYears: 4,
+    researchPoints: 400,
     requires: { compute: 3 }
   },
   {
@@ -127,7 +127,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k0.8',
     prerequisites: ['tech:first-shipyard'],
-    timeYears: 3
+    researchPoints: 300
   },
   // ============================================
   // K1.0 PLANETARY DOMINION (5 techs)
@@ -140,7 +140,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.0',
     prerequisites: ['tech:autonomous-resource-allocation'],
-    timeYears: 4,
+    researchPoints: 400,
     requires: { compute: 4 }
   },
   {
@@ -150,7 +150,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.0',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:efficient-thrusters'],
-    timeYears: 5
+    researchPoints: 500
   },
   {
     id: 'tech:combat-ai',
@@ -159,7 +159,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k1.0',
     prerequisites: ['tech:data-center-ii'],
-    timeYears: 3,
+    researchPoints: 300,
     requires: { compute: 5 }
   },
   {
@@ -169,7 +169,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k1.0',
     prerequisites: ['tech:combat-ai', 'tech:navigation-algorithms'],
-    timeYears: 4
+    researchPoints: 400
   },
   {
     id: 'tech:shield-generators',
@@ -178,7 +178,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k1.0',
     prerequisites: ['tech:combat-ai'],
-    timeYears: 4
+    researchPoints: 400
   },
 
   // ============================================
@@ -192,7 +192,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.5',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:efficient-thrusters'],
-    timeYears: 4,
+    researchPoints: 400,
     requires: { compute: 6 }
   },
   {
@@ -202,7 +202,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.5',
     prerequisites: ['tech:orbital-shipyard', 'tech:orbital-mining'],
-    timeYears: 5
+    researchPoints: 500
   },
   {
     id: 'tech:ai-governor-systems',
@@ -211,7 +211,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k1.5',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:data-center-ii'],
-    timeYears: 5,
+    researchPoints: 500,
     requires: { compute: 8, empire: { planetsControlled: 3 } }
   },
   {
@@ -221,7 +221,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k1.5',
     prerequisites: ['tech:ai-governor-systems'],
-    timeYears: 5,
+    researchPoints: 500,
     requires: { compute: 8 }
   },
   {
@@ -231,7 +231,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k1.5',
     prerequisites: ['tech:shield-generators', 'tech:fleet-coordination'],
-    timeYears: 5
+    researchPoints: 500
   },
 
   // ============================================
@@ -245,7 +245,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k2.0',
     prerequisites: ['tech:orbital-fabricators', 'tech:data-center-iii'],
-    timeYears: 6,
+    researchPoints: 600,
     requires: { compute: 10, empire: { homeSystemMajority: true } }
   },
   {
@@ -255,7 +255,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k2.0',
     prerequisites: ['tech:stellar-energy-capture'],
-    timeYears: 8
+    researchPoints: 800
   },
   {
     id: 'tech:stellar-computation',
@@ -264,7 +264,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k2.0',
     prerequisites: ['tech:dyson-swarm'],
-    timeYears: 6,
+    researchPoints: 600,
     requires: { compute: 12 }
   },
   {
@@ -274,7 +274,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k2.0',
     prerequisites: ['tech:system-defense-network', 'tech:stellar-energy-capture'],
-    timeYears: 7
+    researchPoints: 700
   },
 
   // ============================================
@@ -288,7 +288,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k2.3',
     prerequisites: ['tech:stellar-energy-capture', 'tech:orbital-fabricators'],
-    timeYears: 8,
+    researchPoints: 800,
     requires: { compute: 14 }
   },
   {
@@ -298,7 +298,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'colonization_planettypes',
     tier: 'k2.3',
     prerequisites: ['tech:interstellar-probe', 'tech:ai-governor-systems'],
-    timeYears: 12
+    researchPoints: 1200
   },
 
   // ============================================
@@ -312,7 +312,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k3.0',
     prerequisites: ['tech:generation-ship', 'tech:stellar-computation'],
-    timeYears: 20,
+    researchPoints: 2000,
     requires: { compute: 20 }
   }
 ]

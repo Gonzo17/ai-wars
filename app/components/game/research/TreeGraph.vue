@@ -2,17 +2,22 @@
 import type { TechDef, AscensionTier, AscensionGateDef } from '~~/shared/types/research'
 import {
   ASCENSION_TIER_ORDER,
-  ASCENSION_TIER_LABELS,
   RESEARCH_CATEGORY_COLORS,
   RESEARCH_CATEGORY_ICONS
 } from '~~/shared/types/research'
 import { TECH_DEFS, ASCENSION_GATES, getTechById } from '~~/shared/defs/research-tree'
 
 const emit = defineEmits<{
-  close: []
+  'close': []
+  'start-research': [techId: string]
 }>()
 
 const store = useResearchStore()
+const { t, te } = useI18n()
+
+const getTierLabel = (tier: AscensionTier) => t(`game.research.tiers.${tier.replace('.', '-')}`)
+const techNameKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.name`
+const getTechName = (tech: TechDef) => (te(techNameKey(tech.id)) ? t(techNameKey(tech.id)) : tech.name)
 
 // --- Layout Constants ---
 const NODE_WIDTH = 200
@@ -320,7 +325,7 @@ const getGateStatus = (gate: AscensionGateDef): GateStatus => {
   const requiredTechNames = gate.requiresTech.map((techId) => {
     const tech = getTechById(techId)
     return {
-      name: tech?.name || techId,
+      name: tech ? getTechName(tech) : techId,
       completed: store.isTechCompleted(techId)
     }
   })
@@ -402,35 +407,29 @@ const handleTechHover = (techId: string | null) => {
 }
 
 const handleTechClick = (techId: string) => {
+  const status = store.getTechStatus(techId)
+  if (status !== 'available' && status !== 'researching') return
   selectedTechId.value = selectedTechId.value === techId ? null : techId
-}
-
-const handleStartResearch = (techId: string, event: Event) => {
-  event.stopPropagation()
-  store.startResearch(techId)
+  emit('start-research', techId)
 }
 
 // --- Navigation ---
-const scrollToBottom = () => {
+const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
   if (!scrollContainer.value) return
   scrollContainer.value.scrollTo({
     top: scrollContainer.value.scrollHeight,
-    behavior: 'smooth'
-  })
-}
-
-const scrollToTop = () => {
-  if (!scrollContainer.value) return
-  scrollContainer.value.scrollTo({
-    top: 0,
-    behavior: 'smooth'
+    behavior
   })
 }
 
 onMounted(() => {
   nextTick(() => {
     // Start at bottom where root (Bootstrapped AI Core) is
-    scrollToBottom()
+    if (scrollContainer.value) {
+      scrollContainer.value.scrollTop = scrollContainer.value.scrollHeight
+    } else {
+      scrollToBottom('auto')
+    }
   })
 })
 </script>
@@ -450,13 +449,13 @@ onMounted(() => {
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl bg-linear-to-br from-info-500/30 to-blue-600/20 flex items-center justify-center ring-1 ring-info-500/30">
             <UIcon
-              name="i-lucide-git-branch"
+              name="i-lucide-flask-conical"
               class="w-6 h-6 text-info-400"
             />
           </div>
           <div>
             <h2 class="text-xl font-bold text-neutral-100">
-              Forschungsbaum
+              {{ $t('game.research.tree.title') }}
             </h2>
             <div class="flex items-center gap-3 mt-1 text-sm text-neutral-400">
               <UBadge
@@ -464,87 +463,21 @@ onMounted(() => {
                 variant="subtle"
                 size="sm"
               >
-                {{ ASCENSION_TIER_LABELS[store.ascensionTierReached] }}
+                {{ getTierLabel(store.ascensionTierReached) }}
               </UBadge>
               <span class="text-neutral-600">•</span>
-              <span>{{ store.completedTechIds.length }} / {{ TECH_DEFS.length }} erforscht</span>
+              <span>{{ $t('game.research.tree.completed-count', { completed: store.completedTechIds.length, total: TECH_DEFS.length }) }}</span>
             </div>
           </div>
         </div>
 
-        <div class="flex items-center gap-3">
-          <UButton
-            icon="i-lucide-chevrons-up"
-            color="neutral"
-            variant="soft"
-            size="sm"
-            title="Zum Endgame (oben)"
-            @click="scrollToTop"
-          >
-            Endgame
-          </UButton>
-          <UButton
-            icon="i-lucide-chevrons-down"
-            color="primary"
-            variant="soft"
-            size="sm"
-            title="Zur Wurzel (unten)"
-            @click="scrollToBottom"
-          >
-            Wurzel
-          </UButton>
-          <div class="w-px h-8 bg-neutral-700" />
-          <UButton
-            icon="i-lucide-x"
-            color="neutral"
-            variant="ghost"
-            size="sm"
-            @click="emit('close')"
-          />
-        </div>
-      </div>
-
-      <!-- Current Research Info Bar -->
-      <div
-        v-if="store.activeResearch"
-        class="flex items-center gap-4 px-6 py-3 border-b border-info-500/30 bg-linear-to-r from-info-950/50 to-neutral-900/50 shrink-0"
-      >
-        <div class="w-8 h-8 rounded-lg bg-info-500/20 flex items-center justify-center">
-          <UIcon
-            name="i-lucide-flask-conical"
-            class="w-4 h-4 text-info-400 animate-pulse"
-          />
-        </div>
-        <div class="flex-1">
-          <span class="text-sm font-semibold text-info-300">
-            {{ store.allTechs.find(t => t.id === store.activeResearch?.techId)?.name }}
-          </span>
-          <div class="flex items-center gap-3 mt-1">
-            <UProgress
-              :model-value="store.activeResearch.progress"
-              color="info"
-              size="sm"
-              class="w-48"
-            />
-            <span class="text-sm text-info-400 font-mono">{{ store.activeResearch.progress }}%</span>
-          </div>
-        </div>
-        <div class="flex items-center gap-6 text-sm text-neutral-400">
-          <div class="flex items-center gap-2">
-            <UIcon
-              name="i-lucide-cpu"
-              class="w-4 h-4 text-neutral-500"
-            />
-            <span>Compute: <span class="text-info-400 font-medium">{{ store.computeLevel }}</span></span>
-          </div>
-          <div class="flex items-center gap-2">
-            <UIcon
-              name="i-lucide-globe"
-              class="w-4 h-4 text-neutral-500"
-            />
-            <span><span class="text-info-400 font-medium">{{ store.empireState.planetsControlled }}</span> Planeten</span>
-          </div>
-        </div>
+        <UButton
+          icon="i-lucide-x"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="emit('close')"
+        />
       </div>
 
       <!-- Tree View Container -->
@@ -687,13 +620,13 @@ onMounted(() => {
                       class="text-sm font-bold"
                       :class="getGateStatus(gatePos.gate).isUnlocked ? 'text-success-200' : 'text-warning-200'"
                     >
-                      Aufstieg zu {{ ASCENSION_TIER_LABELS[gatePos.gate.toTier] }}
+                      {{ $t('game.research.gate.status-ascend-to') }} {{ getTierLabel(gatePos.gate.toTier) }}
                     </div>
                     <div
                       class="text-xs"
                       :class="getGateStatus(gatePos.gate).isUnlocked ? 'text-success-400/80' : 'text-warning-400/80'"
                     >
-                      {{ getGateStatus(gatePos.gate).isUnlocked ? '✓ Freigeschaltet' : 'Klicken für Details' }}
+                      {{ getGateStatus(gatePos.gate).isUnlocked ? $t('game.research.gate.unlocked') : $t('game.research.gate.click-details') }}
                     </div>
                   </div>
                 </div>
@@ -768,7 +701,7 @@ onMounted(() => {
                   <!-- Required Techs -->
                   <div>
                     <div class="text-xs font-semibold text-neutral-400 mb-2">
-                      Benötigte Technologien:
+                      {{ $t('game.research.gate.required-techs') }}
                     </div>
                     <div class="flex flex-wrap gap-2">
                       <div
@@ -800,7 +733,7 @@ onMounted(() => {
                         class="text-xs"
                         :class="getGateStatus(gatePos.gate).computeMet ? 'text-success-300' : 'text-neutral-400'"
                       >
-                        Compute: {{ store.computeLevel }}/{{ gatePos.gate.requiresCompute }}
+                        {{ $t('game.research.compute-label') }} {{ store.computeLevel }}/{{ gatePos.gate.requiresCompute }}
                       </span>
                     </div>
 
@@ -822,7 +755,7 @@ onMounted(() => {
                           class="text-xs"
                           :class="store.empireState.planetsControlled >= gatePos.gate.requiresEmpire.planetsControlled ? 'text-success-300' : 'text-neutral-400'"
                         >
-                          Planeten: {{ store.empireState.planetsControlled }}/{{ gatePos.gate.requiresEmpire.planetsControlled }}
+                          {{ $t('game.research.gate.planets-label') }} {{ store.empireState.planetsControlled }}/{{ gatePos.gate.requiresEmpire.planetsControlled }}
                         </span>
                       </div>
                       <div
@@ -838,7 +771,7 @@ onMounted(() => {
                           class="text-xs"
                           :class="store.empireState.homeSystemMajority ? 'text-success-300' : 'text-neutral-400'"
                         >
-                          System-Mehrheit {{ store.empireState.homeSystemMajority ? '✓' : '✗' }}
+                          {{ $t('game.research.gate.home-system-label') }} {{ store.empireState.homeSystemMajority ? '✓' : '✗' }}
                         </span>
                       </div>
                     </div>
@@ -905,14 +838,23 @@ onMounted(() => {
                   </div>
                   <div class="flex-1 min-w-0">
                     <h4 class="text-xs font-bold text-neutral-100 leading-tight line-clamp-2">
-                      {{ pos.tech.name }}
+                      {{ getTechName(pos.tech) }}
                     </h4>
-                    <span class="text-[10px] text-neutral-500 flex items-center gap-1 mt-0.5">
-                      <UIcon
-                        name="i-lucide-clock"
-                        class="w-2.5 h-2.5"
-                      />
-                      {{ pos.tech.timeYears }} Jahre
+                    <span class="text-[10px] text-neutral-500 flex items-center gap-2 mt-0.5">
+                      <span class="flex items-center gap-1">
+                        <UIcon
+                          name="i-lucide-clock"
+                          class="w-2.5 h-2.5"
+                        />
+                        {{ $t('game.common.duration-rounds', { count: store.getRemainingTurns(pos.tech.id) }) }}
+                      </span>
+                      <span class="flex items-center gap-1">
+                        <UIcon
+                          name="i-lucide-flask-conical"
+                          class="w-2.5 h-2.5"
+                        />
+                        {{ store.getTechPointsRequired(pos.tech.id) }}
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -920,34 +862,17 @@ onMounted(() => {
                 <!-- Spacer -->
                 <div class="flex-1" />
 
-                <!-- Progress bar for researching -->
+                <!-- Progress bar -->
                 <div
-                  v-if="store.getTechStatus(pos.tech.id) === 'researching' && store.activeResearch"
+                  v-if="store.getProgressPercent(pos.tech.id) > 0"
                   class="mt-1"
                 >
                   <UProgress
-                    :model-value="store.activeResearch.progress"
+                    :model-value="store.getProgressPercent(pos.tech.id)"
                     color="info"
                     size="xs"
                   />
                 </div>
-
-                <!-- Research button for available -->
-                <UButton
-                  v-else-if="store.getTechStatus(pos.tech.id) === 'available'"
-                  color="primary"
-                  variant="soft"
-                  size="xs"
-                  block
-                  class="mt-1"
-                  @click="(e: Event) => handleStartResearch(pos.tech.id, e)"
-                >
-                  <UIcon
-                    name="i-lucide-flask-conical"
-                    class="w-3 h-3 mr-1"
-                  />
-                  Erforschen
-                </UButton>
               </div>
             </div>
           </div>
@@ -957,7 +882,7 @@ onMounted(() => {
       <!-- Legend Footer -->
       <div class="flex items-center justify-between px-6 py-3 border-t border-neutral-700/60 bg-neutral-900/90 shrink-0">
         <div class="flex items-center gap-6 text-sm">
-          <span class="text-neutral-500 font-semibold">Legende:</span>
+          <span class="text-neutral-500 font-semibold">{{ $t('game.research.legend.title') }}</span>
           <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-full bg-linear-to-br from-success-400 to-success-600 flex items-center justify-center">
               <UIcon
@@ -965,27 +890,20 @@ onMounted(() => {
                 class="w-3 h-3 text-neutral-950"
               />
             </div>
-            <span class="text-neutral-400">Erforscht</span>
+            <span class="text-neutral-400">{{ $t('game.research.legend.completed') }}</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-full bg-linear-to-br from-info-400 to-info-600 animate-pulse" />
-            <span class="text-neutral-400">In Erforschung</span>
+            <span class="text-neutral-400">{{ $t('game.research.legend.researching') }}</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-lg border-2 border-neutral-500 bg-neutral-800" />
-            <span class="text-neutral-400">Verfügbar</span>
+            <span class="text-neutral-400">{{ $t('game.research.legend.available') }}</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-5 h-5 rounded-lg border border-neutral-700 bg-neutral-900 opacity-50" />
-            <span class="text-neutral-400">Gesperrt</span>
+            <span class="text-neutral-400">{{ $t('game.research.legend.locked') }}</span>
           </div>
-        </div>
-        <div class="text-sm text-neutral-500 flex items-center gap-2">
-          <UIcon
-            name="i-lucide-info"
-            class="w-4 h-4"
-          />
-          ↑ Endgame • ↓ Bootstrapped AI Core (Wurzel)
         </div>
       </div>
     </div>

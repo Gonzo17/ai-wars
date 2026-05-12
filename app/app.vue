@@ -1,7 +1,7 @@
 <script setup>
 import * as locales from '@nuxt/ui/locale'
 
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 
 useHead(() => ({
   meta: [
@@ -15,16 +15,17 @@ useHead(() => ({
   }
 }))
 
-const title = 'Nuxt Starter Template'
-const description = 'A production-ready starter template powered by Nuxt UI. Build beautiful, accessible, and performant applications in minutes, not hours.'
+const title = computed(() => t('meta.title'))
+const description = computed(() => t('meta.description'))
+const ogImage = '/logo.png'
 
 useSeoMeta({
   title,
   description,
   ogTitle: title,
   ogDescription: description,
-  ogImage: 'https://ui.nuxt.com/assets/templates/nuxt/starter-light.png',
-  twitterImage: 'https://ui.nuxt.com/assets/templates/nuxt/starter-light.png',
+  ogImage,
+  twitterImage: ogImage,
   twitterCard: 'summary_large_image'
 })
 </script>

@@ -5,6 +5,7 @@ import type {
   TechLockedReason,
   ActiveResearch
 } from '~~/shared/types/research'
+import type { PlayerSnapshot } from '~~/shared/types/game'
 import {
   TECH_DEFS,
   ASCENSION_GATES,
@@ -16,31 +17,30 @@ import { ASCENSION_TIER_ORDER } from '~~/shared/types/research'
 export const useResearchStore = defineStore('research', () => {
   const isOpen = ref(false)
   const searchQuery = ref('')
+  const { t, te } = useI18n()
 
-  const ascensionTierReached = ref<AscensionTier>('k0.8')
-  const computeLevel = ref(5)
+  const techNameKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.name`
+  const techDescriptionKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.description`
+  const getTechName = (tech: TechDef) => (te(techNameKey(tech.id)) ? t(techNameKey(tech.id)) : tech.name)
+  const getTechDescription = (tech: TechDef) => {
+    if (!tech.description) return ''
+    return te(techDescriptionKey(tech.id)) ? t(techDescriptionKey(tech.id)) : tech.description
+  }
+
+  const ascensionTierReached = ref<AscensionTier>('k0.6')
+  const computeLevel = ref(1)
   const empireState = ref({
-    planetsControlled: 3,
+    planetsControlled: 1,
     homeSystemMajority: true,
-    intelLevel: 'medium' as 'low' | 'medium' | 'high'
+    intelLevel: 'low' as 'low' | 'medium' | 'high'
   })
 
-  // Testdaten: Alle K0.6 Technologien erforscht -> erstes Gate (K0.8) erfüllt
-  const completedTechIds = ref<string[]>([
-    // K0.6 - Alle 6 erforscht
-    'tech:bootstrapped-ai-core',
-    'tech:basic-industrial-robotics',
-    'tech:planetary-grid-management',
-    'tech:probe-design',
-    'tech:first-shipyard',
-    'tech:data-center-i'
-  ])
+  // Initialzustand: keine Forschung abgeschlossen und keine aktive Forschung
+  const completedTechIds = ref<string[]>([])
 
-  const activeResearch = ref<ActiveResearch | undefined>({
-    techId: 'tech:autonomous-resource-allocation',
-    startedAt: Date.now() - 1000 * 60 * 60 * 24 * 365,
-    progress: 45
-  })
+  const activeResearch = ref<ActiveResearch | undefined>(undefined)
+  const progressMemory = ref<Record<string, number>>({})
+  const researchPointsPerTurn = ref(0)
 
   const allTechs = computed(() => TECH_DEFS)
 
@@ -58,9 +58,9 @@ export const useResearchStore = defineStore('research', () => {
     }
     const query = searchQuery.value.toLowerCase()
     return allTechs.value.filter(tech =>
-      tech.name.toLowerCase().includes(query)
-      || tech.description?.toLowerCase().includes(query)
-      || tech.category.toLowerCase().includes(query)
+      getTechName(tech).toLowerCase().includes(query)
+      || getTechDescription(tech).toLowerCase().includes(query)
+      || t(`game.research.categories.${tech.category}`).toLowerCase().includes(query)
     )
   })
 
@@ -103,16 +103,17 @@ export const useResearchStore = defineStore('research', () => {
 
   function getTechLockedReasons(techId: string): TechLockedReason[] {
     const tech = getTechById(techId)
-    if (!tech) return [{ type: 'prerequisite', message: 'Tech not found' }]
+    if (!tech) return [{ type: 'prerequisite', message: t('game.research.locked.tech-not-found') }]
 
     const reasons: TechLockedReason[] = []
 
     for (const prereqId of tech.prerequisites) {
       if (!isTechCompleted(prereqId)) {
         const prereq = getTechById(prereqId)
+        const prereqName = prereq ? getTechName(prereq) : prereqId
         reasons.push({
           type: 'prerequisite',
-          message: `Requires: ${prereq?.name ?? prereqId}`,
+          message: t('game.research.locked.requires-tech', { tech: prereqName }),
           value: prereqId
         })
       }
@@ -121,7 +122,7 @@ export const useResearchStore = defineStore('research', () => {
     if (!isTierUnlocked(tech.tier)) {
       reasons.push({
         type: 'ascension',
-        message: `Requires Ascension to ${tech.tier}`,
+        message: t('game.research.locked.requires-ascension', { tier: t(`game.research.tiers.${tech.tier.replace('.', '-')}`) }),
         value: tech.tier
       })
     }
@@ -129,7 +130,7 @@ export const useResearchStore = defineStore('research', () => {
     if (tech.requires?.compute && computeLevel.value < tech.requires.compute) {
       reasons.push({
         type: 'compute',
-        message: `Requires Compute Level ${tech.requires.compute}`,
+        message: t('game.research.locked.requires-compute', { level: tech.requires.compute }),
         value: computeLevel.value,
         required: tech.requires.compute
       })
@@ -140,7 +141,7 @@ export const useResearchStore = defineStore('research', () => {
       if (req.planetsControlled && empireState.value.planetsControlled < req.planetsControlled) {
         reasons.push({
           type: 'empire',
-          message: `Requires ${req.planetsControlled} planets controlled`,
+          message: t('game.research.locked.requires-planets', { count: req.planetsControlled }),
           value: empireState.value.planetsControlled,
           required: req.planetsControlled
         })
@@ -148,7 +149,7 @@ export const useResearchStore = defineStore('research', () => {
       if (req.homeSystemMajority && !empireState.value.homeSystemMajority) {
         reasons.push({
           type: 'empire',
-          message: 'Requires home system majority'
+          message: t('game.research.locked.requires-home-system')
         })
       }
       if (req.intelLevel) {
@@ -158,7 +159,7 @@ export const useResearchStore = defineStore('research', () => {
         if (currentIndex < requiredIndex) {
           reasons.push({
             type: 'empire',
-            message: `Requires ${req.intelLevel} intel level`,
+            message: t('game.research.locked.requires-intel', { level: t(`game.systems.intel.${req.intelLevel}`) }),
             value: empireState.value.intelLevel,
             required: req.intelLevel
           })
@@ -174,6 +175,32 @@ export const useResearchStore = defineStore('research', () => {
     if (isTechResearching(techId)) return 'researching'
     if (isTechAvailable(techId)) return 'available'
     return 'locked'
+  }
+
+  function getTechPointsRequired(techId: string): number {
+    const tech = getTechById(techId)
+    if (!tech) return 0
+    return tech.researchPoints ?? 0
+  }
+
+  function getProgressPercent(techId: string): number {
+    const required = getTechPointsRequired(techId)
+    if (required <= 0) return 0
+    const current = activeResearch.value?.techId === techId
+      ? activeResearch.value.progressPoints
+      : (progressMemory.value[techId] ?? 0)
+    return Math.min(100, Math.round((current / required) * 100))
+  }
+
+  function getRemainingTurns(techId: string): number {
+    const required = getTechPointsRequired(techId)
+    if (required <= 0) return 0
+    const current = activeResearch.value?.techId === techId
+      ? activeResearch.value.progressPoints
+      : (progressMemory.value[techId] ?? 0)
+    const remaining = Math.max(0, required - current)
+    if (researchPointsPerTurn.value <= 0) return 0
+    return Math.max(1, Math.ceil(remaining / researchPointsPerTurn.value))
   }
 
   function canAscend(toTier: AscensionTier): boolean {
@@ -233,7 +260,7 @@ export const useResearchStore = defineStore('research', () => {
         const met = empireState.value.planetsControlled >= req.planetsControlled
         empireMet = empireMet && met
         empireDetails.push({
-          requirement: `${req.planetsControlled} planets`,
+          requirement: t('game.research.gate.requirements.planets', { count: req.planetsControlled }),
           met
         })
       }
@@ -241,7 +268,7 @@ export const useResearchStore = defineStore('research', () => {
         const met = empireState.value.homeSystemMajority
         empireMet = empireMet && met
         empireDetails.push({
-          requirement: 'Home system majority',
+          requirement: t('game.research.gate.requirements.home-system'),
           met
         })
       }
@@ -250,7 +277,7 @@ export const useResearchStore = defineStore('research', () => {
         const met = intelOrder.indexOf(empireState.value.intelLevel) >= intelOrder.indexOf(req.intelLevel)
         empireMet = empireMet && met
         empireDetails.push({
-          requirement: `${req.intelLevel} intel`,
+          requirement: t('game.research.gate.requirements.intel', { level: t(`game.systems.intel.${req.intelLevel}`) }),
           met
         })
       }
@@ -270,33 +297,41 @@ export const useResearchStore = defineStore('research', () => {
   }
 
   function startResearch(techId: string) {
-    if (!isTechAvailable(techId)) return false
-    if (activeResearch.value) return false
+    if (!isTechAvailable(techId) && activeResearch.value?.techId !== techId) return false
 
-    activeResearch.value = {
-      techId,
-      startedAt: Date.now(),
-      progress: 0
+    if (activeResearch.value && activeResearch.value.techId !== techId) {
+      progressMemory.value[activeResearch.value.techId] = activeResearch.value.progressPoints
+    }
+
+    if (!activeResearch.value || activeResearch.value.techId !== techId) {
+      const stored = progressMemory.value[techId] ?? 0
+      activeResearch.value = {
+        techId,
+        startedAt: Date.now(),
+        progressPoints: stored
+      }
     }
     return true
   }
 
   function cancelResearch() {
+    if (activeResearch.value) {
+      progressMemory.value[activeResearch.value.techId] = activeResearch.value.progressPoints
+    }
     activeResearch.value = undefined
   }
 
   function completeResearch() {
     if (!activeResearch.value) return
     completedTechIds.value.push(activeResearch.value.techId)
+    const { [activeResearch.value.techId]: _removed, ...remaining } = progressMemory.value
+    progressMemory.value = remaining
     activeResearch.value = undefined
   }
 
-  function tickProgress(deltaPercent: number = 5) {
+  function tickProgress(deltaPoints: number = 10) {
     if (!activeResearch.value) return
-    activeResearch.value.progress = Math.min(100, activeResearch.value.progress + deltaPercent)
-    if (activeResearch.value.progress >= 100) {
-      completeResearch()
-    }
+    activeResearch.value.progressPoints = Math.max(0, activeResearch.value.progressPoints + deltaPoints)
   }
 
   function ascendToTier(tier: AscensionTier) {
@@ -321,6 +356,21 @@ export const useResearchStore = defineStore('research', () => {
     searchQuery.value = query
   }
 
+  function hydrateFromSnapshot(player: PlayerSnapshot) {
+    ascensionTierReached.value = player.research.ascensionTierReached
+    computeLevel.value = player.research.computeLevel
+    empireState.value = { ...player.research.empireState }
+    completedTechIds.value = [...player.research.completedTechIds]
+    activeResearch.value = player.research.activeResearch
+      ? { ...player.research.activeResearch }
+      : undefined
+    progressMemory.value = { ...player.research.progressMemory }
+  }
+
+  function setResearchPointsPerTurn(points: number) {
+    researchPointsPerTurn.value = points
+  }
+
   return {
     isOpen,
     searchQuery,
@@ -329,6 +379,8 @@ export const useResearchStore = defineStore('research', () => {
     empireState,
     completedTechIds,
     activeResearch,
+    progressMemory,
+    researchPointsPerTurn,
 
     allTechs,
     techsByTier,
@@ -340,6 +392,9 @@ export const useResearchStore = defineStore('research', () => {
     isTechAvailable,
     getTechLockedReasons,
     getTechStatus,
+    getTechPointsRequired,
+    getProgressPercent,
+    getRemainingTurns,
     isTierUnlocked,
 
     canAscend,
@@ -354,6 +409,8 @@ export const useResearchStore = defineStore('research', () => {
     open,
     close,
     toggle,
-    setSearchQuery
+    setSearchQuery,
+    hydrateFromSnapshot,
+    setResearchPointsPerTurn
   }
 })

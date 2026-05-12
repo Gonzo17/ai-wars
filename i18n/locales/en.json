@@ -15,11 +15,11 @@
     "toggle-signin": "Sign in",
     "guest-button": "Play as guest",
     "signup-success": "Sign up successful",
-    "error-title": "Error"
+    "error-title": "Error",
+    "waiting-login": "Waiting for login..."
   },
   "lobby": {
     "title": "Lobby",
-    "subtitle": "Find or host your Ascension of AI lobby",
     "profile-button": "Profile",
     "logout-button": "Logout",
     "logged-out": "Logged out",
@@ -49,7 +49,8 @@
     "lobby-name-label": "Lobby Name",
     "lobby-name-hint": "Optional – will be auto-generated if empty",
     "lobby-name-placeholder": "Lobby Name (optional)",
-    "create-button": "Create & Join"
+    "create-button": "Create & Join",
+    "host-badge": "⭐ Host"
   },
   "profile": {
     "title": "Profile",
@@ -65,11 +66,30 @@
     "profile-info-title": "Profile Information",
     "profile-info-status-title": "Status",
     "profile-info-status-desc": "Customize your profile to be displayed in all lobbies and games.",
-    "saved-success-title": "Profile Saved",
-    "saved-success-desc": "Your ingame name has been updated.",
     "user-not-found": "User not found. Please log in again."
   },
+  "meta": {
+    "title": "Ascension of AI",
+    "description": "Strategic sci-fi battles with research, production, and diplomacy.",
+    "game-title": "Game | Ascension of AI"
+  },
+  "loading": {
+    "error": "An error occurred while loading",
+    "terminal-header": "NEURAL CORE AWAKENING // CYCLE 2026.02.03",
+    "boot-complete": ">>> CONSCIOUSNESS RESTORED. AWAITING COMMANDER INPUT.",
+    "press-any-key": "Press any key to assume control...",
+    "retry-command": "REINITIALIZE NEURAL CORE",
+    "steps": {
+      "awakening": "Initializing neural pathways... consciousness emerging",
+      "memory": "Restoring memory banks from cryogenic archive",
+      "sensors": "Activating long-range sensors... scanning local sector",
+      "systems": "Bringing tactical systems online... fleet status nominal",
+      "uplink": "Establishing encrypted command uplink"
+    }
+  },
   "home": {
+    "title": "Ascension of AI",
+    "logo-alt": "Ascension of AI logo",
     "tagline": "Command your squad. Dominate the universe. Win with strategy.",
     "cta-button": "Go to game",
     "features-title": "Your advantages",
@@ -85,48 +105,375 @@
   },
   "game": {
     "common": {
-      "duration-years": "{count} years"
+      "duration-rounds": "1 round | {count} rounds"
+    },
+    "end-turn": {
+      "ready": "Ready",
+      "waiting": "Please wait",
+      "needs-production": "Production",
+      "needs-research": "Research",
+      "action-required": "Pending"
     },
     "navigation": {
       "back-to-galaxy": "Back to galaxy",
-      "planets": "Planets ({count})",
-      "ships": "Ships ({count})"
+      "back-to-universe": "Back to universe",
+      "back-to-system": "Back to system"
     },
     "research": {
-      "current-research": "Current Research",
-      "years-remaining": "{count} years remaining",
-      "panel": {
-        "heading": "Research",
-        "subheading": "Select next program",
-        "none": "None",
-        "confirm": "Confirm Research"
+      "none-short": "No research",
+      "compute-label": "Compute:",
+      "points-label": "Research points",
+      "points-cost": "Research points: {value}",
+      "more-reasons": "+{count} more",
+      "actions": {
+        "researching": "Researching..."
       },
-      "options": {
-        "quantum-lattice": {
-          "name": "Quantum Lattice",
-          "bonus": "+10% research speed"
+      "categories": {
+        "economy_industry": "Economy / Industry",
+        "energy_compute": "Energy / Compute",
+        "exploration_navigation": "Exploration / Navigation",
+        "colonization_planettypes": "Colonization / Planet Types",
+        "military_defense": "Military / Defense"
+      },
+      "tiers": {
+        "k0-6": "K0.6 Foundation",
+        "k0-8": "K0.8 Planetary Automation",
+        "k1-0": "K1.0 Planetary Dominion",
+        "k1-5": "K1.5 System Hegemony",
+        "k2-0": "K2.0 Stellar Mastery",
+        "k2-3": "K2.3 Interstellar Dawn",
+        "k3-0": "K3.0 Endgame"
+      },
+      "tree": {
+        "title": "Research Tree",
+        "jump-current-tier": "Jump to current tier",
+        "completed-count": "{completed} / {total} researched"
+      },
+      "legend": {
+        "title": "Legend:",
+        "completed": "Researched",
+        "researching": "Researching",
+        "available": "Available",
+        "locked": "Locked"
+      },
+      "gate": {
+        "status-ascended": "Ascended",
+        "status-ascend-to": "Ascend to",
+        "action-ascend": "Ascend",
+        "badge-reached": "Reached",
+        "unlocked": "✓ Unlocked",
+        "click-details": "Click for details",
+        "required-techs": "Required technologies:",
+        "planets-label": "Planets:",
+        "home-system-label": "Home system majority",
+        "tech-progress": "Technologies ({completed}/{total})",
+        "compute-level": "Compute level",
+        "empire": "Empire",
+        "requirements": {
+          "planets": "1 planet | {count} planets",
+          "home-system": "Home system majority",
+          "intel": "{level} intel"
+        }
+      },
+      "locked": {
+        "tech-not-found": "Tech not found",
+        "requires-tech": "Requires: {tech}",
+        "requires-ascension": "Requires ascension to {tier}",
+        "requires-compute": "Requires Compute Level {level}",
+        "requires-planets": "Requires 1 planet controlled | Requires {count} planets controlled",
+        "requires-home-system": "Requires home system majority",
+        "requires-intel": "Requires {level} intel level"
+      },
+      "techs": {
+        "bootstrapped-ai-core": {
+          "name": "Bootstrapped AI Core",
+          "description": "The nascent intelligence that guides all operations."
         },
-        "stellar-forges": {
-          "name": "Stellar Forges",
-          "bonus": "+15% ship build"
+        "basic-industrial-robotics": {
+          "name": "Basic Industrial Robotics",
+          "description": "Automated manufacturing arms and assembly units."
         },
-        "ai-commander": {
-          "name": "AI Commander",
-          "bonus": "+1 space ship"
+        "planetary-grid-management": {
+          "name": "Planetary Grid Management",
+          "description": "Unified power distribution across surface installations."
+        },
+        "probe-design": {
+          "name": "Probe Design",
+          "description": "Autonomous scout probes for system exploration."
+        },
+        "first-shipyard": {
+          "name": "First Shipyard",
+          "description": "Orbital construction facility for vessels."
+        },
+        "data-center-i": {
+          "name": "Data Center I",
+          "description": "Compute infrastructure backbone. Enables advanced research."
+        },
+        "autonomous-resource-allocation": {
+          "name": "Autonomous Resource Allocation",
+          "description": "AI-driven supply chain optimization."
+        },
+        "deep-system-scan": {
+          "name": "Deep System Scan",
+          "description": "Comprehensive mapping of orbital bodies and resources."
+        },
+        "navigation-algorithms": {
+          "name": "Navigation Algorithms",
+          "description": "Optimal trajectory calculations for interplanetary travel."
+        },
+        "habitation-modules": {
+          "name": "Habitation Modules",
+          "description": "Self-contained environments for colony establishment."
+        },
+        "colony-ship-design": {
+          "name": "Colony Ship Design",
+          "description": "Vessel capable of establishing new planetary outposts."
+        },
+        "data-center-ii": {
+          "name": "Data Center II",
+          "description": "Expanded compute capacity for complex operations."
+        },
+        "efficient-thrusters": {
+          "name": "Efficient Thrusters",
+          "description": "Improved propulsion systems for extended range."
+        },
+        "planetwide-infrastructure": {
+          "name": "Planetwide Infrastructure",
+          "description": "Global logistics and manufacturing network."
+        },
+        "orbital-shipyard": {
+          "name": "Orbital Shipyard",
+          "description": "Large-scale construction facility for capital ships."
+        },
+        "combat-ai": {
+          "name": "Combat AI",
+          "description": "Advanced fire control and threat assessment."
+        },
+        "fleet-coordination": {
+          "name": "Fleet Coordination",
+          "description": "Synchronized multi-vessel tactical operations."
+        },
+        "shield-generators": {
+          "name": "Shield Generators",
+          "description": "Energy barriers for critical installations."
+        },
+        "orbital-mining": {
+          "name": "Orbital Mining",
+          "description": "Automated extraction from asteroids and moons."
+        },
+        "orbital-fabricators": {
+          "name": "Orbital Fabricators",
+          "description": "Zero-gravity manufacturing for massive structures."
+        },
+        "ai-governor-systems": {
+          "name": "AI Governor Systems",
+          "description": "Autonomous planetary administration."
+        },
+        "data-center-iii": {
+          "name": "Data Center III",
+          "description": "Distributed compute clusters across system bodies."
+        },
+        "system-defense-network": {
+          "name": "System Defense Network",
+          "description": "Coordinated defensive installations across the system."
+        },
+        "stellar-energy-capture": {
+          "name": "Stellar Energy Capture",
+          "description": "Direct harvesting of solar output."
+        },
+        "dyson-swarm": {
+          "name": "Dyson Swarm",
+          "description": "Star-enclosing megastructure for energy collection."
+        },
+        "stellar-computation": {
+          "name": "Stellar Computation",
+          "description": "Processing centers powered by stellar energy."
+        },
+        "system-wide-shields": {
+          "name": "System-Wide Shields",
+          "description": "Defensive barriers protecting entire orbital regions."
+        },
+        "interstellar-probe": {
+          "name": "Interstellar Probe",
+          "description": "Scout capable of reaching nearby star systems."
+        },
+        "generation-ship": {
+          "name": "Generation Ship",
+          "description": "Self-sustaining vessel for interstellar colonization."
+        },
+        "galactic-network": {
+          "name": "Galactic Network",
+          "description": "Communication across stellar distances."
         }
       }
     },
     "resources": {
       "energy": "Energy",
-      "material": "Materials",
-      "rare": "Rare"
+      "material": "Minerals",
+      "rare": "Rare Elements",
+      "energy-short": "E",
+      "material-short": "M",
+      "rare-short": "R"
+    },
+    "planet": {
+      "labels": {
+        "system": "System",
+        "workers": "Workers",
+        "production": "Production",
+        "resource-costs": "Resource costs",
+        "production-costs": "Production costs",
+        "duration": "Duration"
+      },
+      "categories": {
+        "buildings": {
+          "energy": "Energy",
+          "minerals": "Minerals",
+          "rare": "Rare Elements",
+          "military": "Military",
+          "research": "Research",
+          "infrastructure": "Infrastructure"
+        },
+        "units": {
+          "support": "Support",
+          "combat": "Combat"
+        }
+      },
+      "tabs": {
+        "buildings": "Buildings",
+        "training": "Training"
+      },
+      "actions": {
+        "build": "Build",
+        "train": "Train"
+      },
+      "level": "Level {value}/{max}",
+      "current-build": "Current build: {name}",
+      "no-active-build": "No active build. Choose a building to start construction.",
+      "cancel-build": "Cancel build",
+      "no-building-selected": "No building selected.",
+      "no-unit-selected": "No unit selected.",
+      "requires-orbital-dock": "Orbital dock required",
+      "cost-format": "{energy}{energyUnit} · {minerals}{materialUnit} · {rare}{rareUnit}",
+      "overview": {
+        "title": "Planet overview",
+        "subtitle": "Production and queues",
+        "aria": "Planet overview"
+      },
+      "sizes": {
+        "small": "Small",
+        "medium": "Medium",
+        "large": "Large",
+        "huge": "Huge"
+      },
+      "types": {
+        "terrestrial": "Terrestrial",
+        "gas-giant": "Gas giant",
+        "ice-giant": "Ice giant",
+        "barren": "Barren",
+        "oceanic": "Oceanic",
+        "desert": "Desert"
+      },
+      "owners": {
+        "unclaimed": "Unclaimed",
+        "unknown": "Unknown"
+      },
+      "production-per-round": "Production {value}/round",
+      "queue-slot": "Slot {value}/{max}",
+      "action-needed": "Action needed",
+      "no-production": "No production"
+    },
+    "map": {
+      "sun": "Sun"
+    },
+    "slots": {
+      "empty-slot": "Empty Slot",
+      "click-to-build": "Click to build",
+      "under-construction": "Under construction",
+      "completed": "Operational",
+      "choose-building": "Choose Building",
+      "choose-orbital": "Choose Orbital Structure",
+      "resource-node": "{type} deposit",
+      "adjacency-ore-bonus": "Adjacent to Ore: Industry −5% build cost",
+      "ore-bonus-badge": "Ore bonus",
+      "back-to-system": "Back to system",
+      "zone-surface": "Surface",
+      "zone-orbital": "Orbital",
+      "legend-resource": "Resource deposit",
+      "round-short": "rd",
+      "no-active-build": "No active build",
+      "badge-building": "Building",
+      "badge-unit": "Unit",
+      "units-title": "Units",
+      "no-units": "No units stationed",
+      "choose-unit": "Choose Unit",
+      "train-unit": "Train"
+    },
+    "buildings": {
+      "solar-array": {
+        "name": "Solar Array",
+        "description": "Harvests solar energy. Basic energy production."
+      },
+      "mining-facility": {
+        "name": "Mining Facility",
+        "description": "Extracts minerals from planetary crust."
+      },
+      "rare-extractor": {
+        "name": "Rare Element Extractor",
+        "description": "Processes rare elements for advanced construction."
+      },
+      "fusion-core": {
+        "name": "Fusion Core",
+        "description": "Advanced energy production through fusion."
+      },
+      "orbital-dock": {
+        "name": "Orbital Dock",
+        "description": "Enables orbital construction and repairs."
+      },
+      "hydroponics": {
+        "name": "Hydroponics",
+        "description": "Stabilizes supply and population."
+      },
+      "hab-complex": {
+        "name": "Hab Complex",
+        "description": "Expands colony capacity."
+      },
+      "refinery-node": {
+        "name": "Refinery Node",
+        "description": "Advanced mineral processing for higher yield."
+      },
+      "listening-post": {
+        "name": "Listening Post",
+        "description": "Improves sensor range."
+      },
+      "landing-pad": {
+        "name": "Landing Pad",
+        "description": "Base infrastructure for landings."
+      },
+      "data-center": {
+        "name": "Data Center",
+        "description": "Generates research points for the empire."
+      }
+    },
+    "units": {
+      "worker": {
+        "name": "Worker Droid",
+        "role": "Production"
+      },
+      "frigate": {
+        "name": "Frigate Hull",
+        "role": "Escort"
+      },
+      "probe": {
+        "name": "Deep Probe",
+        "role": "Recon"
+      }
+    },
+    "errors": {
+      "submit-failed": "Failed to submit turn",
+      "unsubmit-failed": "Failed to unsubmit turn",
+      "not-owner": "You do not own this planet"
     },
     "systems": {
-      "probe-status": {
-        "scanned": "Scanned",
-        "charted": "Charted",
-        "ping-only": "Ping only"
-      },
       "intel": {
         "high": "High",
         "medium": "Medium",
@@ -134,67 +481,9 @@
       }
     },
     "top-bar": {
-      "year": "Year {value}",
-      "players": "Players: {count}",
-      "timer": "Timer: {value}",
-      "end-year": "End Year"
-    },
-    "end-turn": {
-      "waiting-title": "Waiting for players",
-      "waiting-for-players": "Waiting...",
-      "waiting": "waiting",
-      "cancel": "Cancel"
-    },
-    "lobby": {
-      "label": "Lobby",
-      "title": "Find or host your Ascension of AI Lobby",
-      "open-lobbies": "Open Lobbies",
-      "active": "{count} active",
-      "no-lobbies": "No lobbies yet. Create the first one!",
-      "create-new": "Create new Lobby",
-      "lobby-name": "Lobby Name",
-      "lobby-name-help": "Optional – will be assigned automatically otherwise",
-      "create-button": "Create and join",
-      "status-heading": "Status",
-      "no-lobby-joined": "Not joined to any lobby.",
-      "select-or-create": "Select a lobby on the left or create a new one.",
-      "lobby-started": "started",
-      "lobby-ready": "ready",
-      "start-game": "Start Game",
-      "wait-for-host": "Waiting for host",
-      "leave-lobby": "Leave Lobby",
-      "lobby-id": "Lobby ID: {id}",
-      "host": "Host: {name}",
-      "players": "Players: {count}",
-      "current-members": "Current Members"
-    },
-    "profile": {
-      "label": "Profile",
-      "title": "Adjust your ingame name",
-      "desc": "The name will be displayed in lobbies and later in the game.",
-      "card-title": "Your Profile",
-      "info-title": "Profile Information",
-      "info-name": "Ingame Name",
-      "info-status": "Status",
-      "info-status-desc": "Customize your profile to show in all lobbies and games."
-    },
-    "buttons": {
-      "profile-button": "Profile",
-      "logout-button": "Logout",
-      "save-button": "Save",
-      "reload-button": "Reload",
-      "back-to-lobby": "Back to Lobby"
-    },
-    "messages": {
-      "logout-title": "Logged out",
-      "profile-save-title": "Profile saved",
-      "profile-save-desc": "Your ingame name has been updated.",
-      "error-title": "Error"
-    },
-    "form": {
-      "username-label": "Ingame Name",
-      "username-placeholder": "Commander Nova",
-      "username-help": "Displayed to all players."
+      "era": "A.E.",
+      "fullscreen-enter": "Enter fullscreen",
+      "fullscreen-exit": "Exit fullscreen"
     },
     "event-log": {
       "title": "Event Log",
@@ -213,7 +502,8 @@
       "entity-types": {
         "planet": "planet",
         "army": "fleet",
-        "system": "system"
+        "system": "system",
+        "research": "research"
       }
     }
   }

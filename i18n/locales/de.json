@@ -15,11 +15,11 @@
     "toggle-signin": "Anmelden",
     "guest-button": "Als Gast spielen",
     "signup-success": "Registrierung erfolgreich",
-    "error-title": "Fehler"
+    "error-title": "Fehler",
+    "waiting-login": "Warte auf Login..."
   },
   "lobby": {
     "title": "Lobby",
-    "subtitle": "Finde oder hoste deine Ascension of AI Lobby",
     "profile-button": "Profil",
     "logout-button": "Logout",
     "logged-out": "Abgemeldet",
@@ -49,7 +49,8 @@
     "lobby-name-label": "Lobby-Name",
     "lobby-name-hint": "Optional – wird sonst automatisch vergeben",
     "lobby-name-placeholder": "Lobby Name (optional)",
-    "create-button": "Erstellen & Beitreten"
+    "create-button": "Erstellen & Beitreten",
+    "host-badge": "⭐ Host"
   },
   "profile": {
     "title": "Profil",
@@ -65,11 +66,30 @@
     "profile-info-title": "Profilinformationen",
     "profile-info-status-title": "Status",
     "profile-info-status-desc": "Passe dein Profil an, um in allen Lobbys und Spielen angezeigt zu werden.",
-    "saved-success-title": "Profil gespeichert",
-    "saved-success-desc": "Dein Ingame-Name wurde aktualisiert.",
     "user-not-found": "Benutzer nicht gefunden. Bitte melde dich erneut an."
   },
+  "meta": {
+    "title": "Ascension of AI",
+    "description": "Strategische Sci-Fi-Schlachten mit Forschung, Produktion und Diplomatie.",
+    "game-title": "Spiel | Ascension of AI"
+  },
+  "loading": {
+    "error": "Beim Laden ist ein Fehler aufgetreten",
+    "terminal-header": "NEURONALER KERN ERWACHT // ZYKLUS 2026.02.03",
+    "boot-complete": ">>> BEWUSSTSEIN WIEDERHERGESTELLT. WARTE AUF COMMANDER-EINGABE.",
+    "press-any-key": "Drücke eine beliebige Taste, um die Kontrolle zu übernehmen...",
+    "retry-command": "NEURONALEN KERN NEU INITIALISIEREN",
+    "steps": {
+      "awakening": "Initialisiere neuronale Pfade... Bewusstsein erwacht",
+      "memory": "Stelle Speicherbänke aus kryogenischem Archiv wieder her",
+      "sensors": "Aktiviere Langstreckensensoren... scanne lokalen Sektor",
+      "systems": "Fahre taktische Systeme hoch... Flottenstatus nominal",
+      "uplink": "Stelle verschlüsselte Kommandoverbindung her"
+    }
+  },
   "home": {
+    "title": "Ascension of AI",
+    "logo-alt": "Ascension of AI Logo",
     "tagline": "Befehlige dein Squad. Domainiere den Weltraum. Gewinne mit Strategie.",
     "cta-button": "Zum Spiel",
     "features-title": "Deine Vorteile",
@@ -85,48 +105,375 @@
   },
   "game": {
     "common": {
-      "duration-years": "{count} Jahre"
+      "duration-rounds": "1 Runde | {count} Runden"
+    },
+    "end-turn": {
+      "ready": "Bereit",
+      "waiting": "Bitte warten",
+      "needs-production": "Produktion",
+      "needs-research": "Forschung",
+      "action-required": "Offen"
     },
     "navigation": {
       "back-to-galaxy": "Zurück zur Galaxie",
-      "planets": "Planeten ({count})",
-      "ships": "Schiffe ({count})"
+      "back-to-universe": "Zurück zum Universum",
+      "back-to-system": "Zurück zum System"
     },
     "research": {
-      "current-research": "Aktuelle Forschung",
-      "years-remaining": "{count} Jahre verbleibend",
-      "panel": {
-        "heading": "Forschung",
-        "subheading": "Nächstes Programm wählen",
-        "none": "Keine",
-        "confirm": "Forschung bestätigen"
+      "none-short": "Keine Forschung",
+      "compute-label": "Compute:",
+      "points-label": "Forschungspunkte",
+      "points-cost": "Forschungspunkte: {value}",
+      "more-reasons": "+{count} weitere",
+      "actions": {
+        "researching": "Erforschen..."
       },
-      "options": {
-        "quantum-lattice": {
-          "name": "Quanten-Gitter",
-          "bonus": "+10% Forschungstempo"
+      "categories": {
+        "economy_industry": "Ökonomie / Industrie",
+        "energy_compute": "Energie / Compute",
+        "exploration_navigation": "Erkundung / Navigation",
+        "colonization_planettypes": "Kolonisierung / Planetentypen",
+        "military_defense": "Militär / Verteidigung"
+      },
+      "tiers": {
+        "k0-6": "K0.6 Fundament",
+        "k0-8": "K0.8 Planetare Automatisierung",
+        "k1-0": "K1.0 Planetare Dominanz",
+        "k1-5": "K1.5 System-Hegemonie",
+        "k2-0": "K2.0 Sternenbeherrschung",
+        "k2-3": "K2.3 Interstellare Dämmerung",
+        "k3-0": "K3.0 Endgame"
+      },
+      "tree": {
+        "title": "Forschungsbaum",
+        "jump-current-tier": "Zur aktuellen Stufe",
+        "completed-count": "{completed} / {total} erforscht"
+      },
+      "legend": {
+        "title": "Legende:",
+        "completed": "Erforscht",
+        "researching": "In Erforschung",
+        "available": "Verfügbar",
+        "locked": "Gesperrt"
+      },
+      "gate": {
+        "status-ascended": "Aufgestiegen",
+        "status-ascend-to": "Aufstieg zu",
+        "action-ascend": "Aufsteigen",
+        "badge-reached": "Erreicht",
+        "unlocked": "✓ Freigeschaltet",
+        "click-details": "Für Details klicken",
+        "required-techs": "Benötigte Technologien:",
+        "planets-label": "Planeten:",
+        "home-system-label": "System-Mehrheit",
+        "tech-progress": "Technologien ({completed}/{total})",
+        "compute-level": "Compute Level",
+        "empire": "Imperium",
+        "requirements": {
+          "planets": "1 Planet | {count} Planeten",
+          "home-system": "Heimsystem-Mehrheit",
+          "intel": "{level}-Intel"
+        }
+      },
+      "locked": {
+        "tech-not-found": "Technologie nicht gefunden",
+        "requires-tech": "Benötigt: {tech}",
+        "requires-ascension": "Benötigt Aufstieg zu {tier}",
+        "requires-compute": "Benötigt Compute Level {level}",
+        "requires-planets": "Benötigt 1 kontrollierten Planeten | Benötigt {count} kontrollierte Planeten",
+        "requires-home-system": "Benötigt Heimsystem-Mehrheit",
+        "requires-intel": "Benötigt Intel-Stufe {level}"
+      },
+      "techs": {
+        "bootstrapped-ai-core": {
+          "name": "Bootstrapped-AI-Kern",
+          "description": "Die entstehende Intelligenz, die alle Operationen leitet."
         },
-        "stellar-forges": {
-          "name": "Sternenschmieden",
-          "bonus": "+15% Schiffsbau"
+        "basic-industrial-robotics": {
+          "name": "Grundlegende Industrierobotik",
+          "description": "Automatisierte Fertigungsarme und Montageeinheiten."
         },
-        "ai-commander": {
-          "name": "AI-Kommandant",
-          "bonus": "+1 Raumschiff"
+        "planetary-grid-management": {
+          "name": "Planetare Netzverwaltung",
+          "description": "Einheitliche Energieverteilung über Oberflächenanlagen."
+        },
+        "probe-design": {
+          "name": "Sondendesign",
+          "description": "Autonome Aufklärungssonden für Systemerkundung."
+        },
+        "first-shipyard": {
+          "name": "Erste Werft",
+          "description": "Orbitale Fertigungsanlage für Schiffe."
+        },
+        "data-center-i": {
+          "name": "Datenzentrum I",
+          "description": "Recheninfrastruktur-Grundlage. Ermöglicht fortgeschrittene Forschung."
+        },
+        "autonomous-resource-allocation": {
+          "name": "Autonome Ressourcenallokation",
+          "description": "KI-gesteuerte Optimierung der Lieferkette."
+        },
+        "deep-system-scan": {
+          "name": "Tiefensystem-Scan",
+          "description": "Umfassende Kartierung von Himmelskörpern und Ressourcen."
+        },
+        "navigation-algorithms": {
+          "name": "Navigationsalgorithmen",
+          "description": "Optimale Trajektorienberechnung für interplanetare Reisen."
+        },
+        "habitation-modules": {
+          "name": "Habitatmodule",
+          "description": "Autarke Umgebungen zur Koloniegründung."
+        },
+        "colony-ship-design": {
+          "name": "Kolonieschiff-Design",
+          "description": "Schiff zum Aufbau neuer planetarer Außenposten."
+        },
+        "data-center-ii": {
+          "name": "Datenzentrum II",
+          "description": "Erweiterte Rechenkapazität für komplexe Operationen."
+        },
+        "efficient-thrusters": {
+          "name": "Effiziente Triebwerke",
+          "description": "Verbesserte Antriebe für größere Reichweite."
+        },
+        "planetwide-infrastructure": {
+          "name": "Planetweite Infrastruktur",
+          "description": "Globales Logistik- und Fertigungsnetz."
+        },
+        "orbital-shipyard": {
+          "name": "Orbitale Werft",
+          "description": "Großanlage zum Bau von Großkampfschiffen."
+        },
+        "combat-ai": {
+          "name": "Kampf-KI",
+          "description": "Fortgeschrittene Feuerleitung und Bedrohungsanalyse."
+        },
+        "fleet-coordination": {
+          "name": "Flottenkoordination",
+          "description": "Synchronisierte taktische Operationen mehrerer Schiffe."
+        },
+        "shield-generators": {
+          "name": "Schildgeneratoren",
+          "description": "Energieschilde für kritische Anlagen."
+        },
+        "orbital-mining": {
+          "name": "Orbitaler Bergbau",
+          "description": "Automatisierter Abbau von Asteroiden und Monden."
+        },
+        "orbital-fabricators": {
+          "name": "Orbitale Fabrikatoren",
+          "description": "Fertigung in Schwerelosigkeit für riesige Strukturen."
+        },
+        "ai-governor-systems": {
+          "name": "KI-Gouverneurssysteme",
+          "description": "Autonome planetare Verwaltung."
+        },
+        "data-center-iii": {
+          "name": "Datenzentrum III",
+          "description": "Verteilte Rechencluster über Systemkörper hinweg."
+        },
+        "system-defense-network": {
+          "name": "Systemverteidigungsnetz",
+          "description": "Koordinierte Verteidigungsanlagen im gesamten System."
+        },
+        "stellar-energy-capture": {
+          "name": "Stellare Energiegewinnung",
+          "description": "Direkte Nutzung der Sonnenleistung."
+        },
+        "dyson-swarm": {
+          "name": "Dyson-Schwarm",
+          "description": "Sternumspannende Megastruktur zur Energiegewinnung."
+        },
+        "stellar-computation": {
+          "name": "Stellare Berechnung",
+          "description": "Rechenzentren, gespeist durch stellare Energie."
+        },
+        "system-wide-shields": {
+          "name": "Systemweite Schilde",
+          "description": "Schutzbarrieren für gesamte Orbitregionen."
+        },
+        "interstellar-probe": {
+          "name": "Interstellare Sonde",
+          "description": "Aufklärer, der nahe Sternsysteme erreichen kann."
+        },
+        "generation-ship": {
+          "name": "Generationsschiff",
+          "description": "Autarkes Schiff für interstellare Kolonisation."
+        },
+        "galactic-network": {
+          "name": "Galaktisches Netzwerk",
+          "description": "Kommunikation über stellare Distanzen."
         }
       }
     },
     "resources": {
       "energy": "Energie",
-      "material": "Materialien",
-      "rare": "Selten"
+      "material": "Minerale",
+      "rare": "Seltene Elemente",
+      "energy-short": "E",
+      "material-short": "M",
+      "rare-short": "R"
+    },
+    "planet": {
+      "labels": {
+        "system": "System",
+        "workers": "Arbeiter",
+        "production": "Produktion",
+        "resource-costs": "Rohstoffkosten",
+        "production-costs": "Produktionskosten",
+        "duration": "Dauer"
+      },
+      "categories": {
+        "buildings": {
+          "energy": "Energie",
+          "minerals": "Minerale",
+          "rare": "Seltene Elemente",
+          "military": "Militär",
+          "research": "Forschung",
+          "infrastructure": "Infrastruktur"
+        },
+        "units": {
+          "support": "Unterstützung",
+          "combat": "Kampf"
+        }
+      },
+      "tabs": {
+        "buildings": "Gebäude",
+        "training": "Ausbildung"
+      },
+      "actions": {
+        "build": "Bauen",
+        "train": "Ausbilden"
+      },
+      "level": "Level {value}/{max}",
+      "current-build": "Aktueller Bau: {name}",
+      "no-active-build": "Kein aktiver Bau. Wähle ein Gebäude, um den Ausbau zu starten.",
+      "cancel-build": "Bau abbrechen",
+      "no-building-selected": "Kein Gebäude ausgewählt.",
+      "no-unit-selected": "Keine Einheit ausgewählt.",
+      "requires-orbital-dock": "Orbital Dock erforderlich",
+      "cost-format": "{energy}{energyUnit} · {minerals}{materialUnit} · {rare}{rareUnit}",
+      "overview": {
+        "title": "Planetenübersicht",
+        "subtitle": "Produktion und Bauschlangen",
+        "aria": "Planetenübersicht"
+      },
+      "sizes": {
+        "small": "Klein",
+        "medium": "Mittel",
+        "large": "Groß",
+        "huge": "Gigantisch"
+      },
+      "types": {
+        "terrestrial": "Terrestrisch",
+        "gas-giant": "Gasriese",
+        "ice-giant": "Eisriese",
+        "barren": "Öd",
+        "oceanic": "Ozeanisch",
+        "desert": "Wüstenwelt"
+      },
+      "owners": {
+        "unclaimed": "Unbesetzt",
+        "unknown": "Unbekannt"
+      },
+      "production-per-round": "Produktion {value}/Runde",
+      "queue-slot": "Slot {value}/{max}",
+      "action-needed": "Aktion nötig",
+      "no-production": "Keine Produktion"
+    },
+    "map": {
+      "sun": "Sonne"
+    },
+    "slots": {
+      "empty-slot": "Freier Bauplatz",
+      "click-to-build": "Klicken zum Bauen",
+      "under-construction": "Im Bau",
+      "completed": "Betriebsbereit",
+      "choose-building": "Gebäude wählen",
+      "choose-orbital": "Orbitalstruktur wählen",
+      "resource-node": "{type}-Vorkommen",
+      "adjacency-ore-bonus": "Neben Erz: Industrie −5% Baukosten",
+      "ore-bonus-badge": "Erz-Bonus",
+      "back-to-system": "Zurück zum System",
+      "zone-surface": "Oberfläche",
+      "zone-orbital": "Orbit",
+      "legend-resource": "Ressourcen-Vorkommen",
+      "round-short": "Rd",
+      "no-active-build": "Kein aktiver Bau",
+      "badge-building": "Gebäude",
+      "badge-unit": "Einheit",
+      "units-title": "Einheiten",
+      "no-units": "Keine Einheiten stationiert",
+      "choose-unit": "Einheit wählen",
+      "train-unit": "Ausbilden"
+    },
+    "buildings": {
+      "solar-array": {
+        "name": "Solaranlage",
+        "description": "Gewinnt Solarenergie. Basis-Energieproduktion."
+      },
+      "mining-facility": {
+        "name": "Bergbauanlage",
+        "description": "Baut Minerale aus der Planetenkruste ab."
+      },
+      "rare-extractor": {
+        "name": "Seltene-Elemente-Extraktor",
+        "description": "Verarbeitet seltene Elemente für fortschrittliche Konstruktion."
+      },
+      "fusion-core": {
+        "name": "Fusionskern",
+        "description": "Fortschrittliche Energieproduktion durch Fusion."
+      },
+      "orbital-dock": {
+        "name": "Orbital Dock",
+        "description": "Ermöglicht Orbitalbau und Reparaturen."
+      },
+      "hydroponics": {
+        "name": "Hydroponik",
+        "description": "Stabilisiert Versorgung und Bevölkerung."
+      },
+      "hab-complex": {
+        "name": "Hab-Komplex",
+        "description": "Erhöht die Kapazität der Kolonie."
+      },
+      "refinery-node": {
+        "name": "Raffinerie-Knoten",
+        "description": "Fortschrittliche Mineralverarbeitung für höheren Ertrag."
+      },
+      "listening-post": {
+        "name": "Horchposten",
+        "description": "Verbessert Sensorreichweite."
+      },
+      "landing-pad": {
+        "name": "Landefläche",
+        "description": "Basis-Infrastruktur für Landung."
+      },
+      "data-center": {
+        "name": "Rechenzentrum",
+        "description": "Erzeugt Forschungspunkte für das Imperium."
+      }
+    },
+    "units": {
+      "worker": {
+        "name": "Roboter-Arbeiter",
+        "role": "Produktion"
+      },
+      "frigate": {
+        "name": "Fregatten-Rumpf",
+        "role": "Eskorte"
+      },
+      "probe": {
+        "name": "Tiefen-Sonde",
+        "role": "Aufklärung"
+      }
+    },
+    "errors": {
+      "submit-failed": "Zug konnte nicht übermittelt werden",
+      "unsubmit-failed": "Zug konnte nicht zurückgezogen werden",
+      "not-owner": "Du besitzt diesen Planeten nicht"
     },
     "systems": {
-      "probe-status": {
-        "scanned": "Gescannt",
-        "charted": "Kartiert",
-        "ping-only": "Nur Ping"
-      },
       "intel": {
         "high": "Hoch",
         "medium": "Mittel",
@@ -134,67 +481,9 @@
       }
     },
     "top-bar": {
-      "year": "Jahr {value}",
-      "players": "Spieler: {count}",
-      "timer": "Timer: {value}",
-      "end-year": "Jahr beenden"
-    },
-    "end-turn": {
-      "waiting-title": "Warte auf Spieler",
-      "waiting-for-players": "Warten...",
-      "waiting": "wartet",
-      "cancel": "Abbrechen"
-    },
-    "lobby": {
-      "label": "Lobby",
-      "title": "Finde oder hoste deine Ascension of AI Lobby",
-      "open-lobbies": "Offene Lobbys",
-      "active": "{count} aktiv",
-      "no-lobbies": "Noch keine Lobbys vorhanden. Erstelle die erste!",
-      "create-new": "Neue Lobby erstellen",
-      "lobby-name": "Lobby-Name",
-      "lobby-name-help": "Optional – wird sonst automatisch vergeben",
-      "create-button": "Erstellen und beitreten",
-      "status-heading": "Status",
-      "no-lobby-joined": "Keiner Lobby beigetreten.",
-      "select-or-create": "Wähle links eine Lobby oder erstelle eine neue.",
-      "lobby-started": "gestartet",
-      "lobby-ready": "bereit",
-      "start-game": "Spiel starten",
-      "wait-for-host": "Warten auf Host",
-      "leave-lobby": "Lobby verlassen",
-      "lobby-id": "Lobby-ID: {id}",
-      "host": "Host: {name}",
-      "players": "Spieler: {count}",
-      "current-members": "Aktuelle Mitglieder"
-    },
-    "profile": {
-      "label": "Profil",
-      "title": "Ingame-Name anpassen",
-      "desc": "Der Name wird in Lobbys und später im Spiel angezeigt.",
-      "card-title": "Dein Profil",
-      "info-title": "Profilinformationen",
-      "info-name": "Ingame-Name",
-      "info-status": "Status",
-      "info-status-desc": "Passe dein Profil an, um in allen Lobbys und Spielen angezeigt zu werden."
-    },
-    "buttons": {
-      "profile-button": "Profil",
-      "logout-button": "Logout",
-      "save-button": "Speichern",
-      "reload-button": "Neu laden",
-      "back-to-lobby": "Zur Lobby"
-    },
-    "messages": {
-      "logout-title": "Abgemeldet",
-      "profile-save-title": "Profil gespeichert",
-      "profile-save-desc": "Dein Ingame-Name wurde aktualisiert.",
-      "error-title": "Fehler"
-    },
-    "form": {
-      "username-label": "Ingame-Name",
-      "username-placeholder": "Commander Nova",
-      "username-help": "Wird allen Spielern angezeigt."
+      "era": "A.E.",
+      "fullscreen-enter": "Vollbild starten",
+      "fullscreen-exit": "Vollbild verlassen"
     },
     "event-log": {
       "title": "Ereignisprotokoll",
@@ -213,7 +502,8 @@
       "entity-types": {
         "planet": "Planet",
         "army": "Flotte",
-        "system": "System"
+        "system": "System",
+        "research": "Forschung"
       }
     }
   }

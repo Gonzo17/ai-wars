@@ -11,12 +11,20 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'start-research', techId: string): void
-  (e: 'highlight-prereq', techId: string): void
+  (e: 'start-research' | 'highlight-prereq', techId: string): void
   (e: 'clear-highlight'): void
 }>()
 
 const store = useResearchStore()
+const { t, te } = useI18n()
+
+const techNameKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.name`
+const techDescriptionKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.description`
+const getTechName = (tech: TechDef) => (te(techNameKey(tech.id)) ? t(techNameKey(tech.id)) : tech.name)
+const getTechDescription = (tech: TechDef) => {
+  if (!tech.description) return ''
+  return te(techDescriptionKey(tech.id)) ? t(techDescriptionKey(tech.id)) : tech.description
+}
 
 const categoryIcon = computed(() => RESEARCH_CATEGORY_ICONS[props.tech.category])
 const categoryColor = computed(() => RESEARCH_CATEGORY_COLORS[props.tech.category])
@@ -41,23 +49,28 @@ const prereqTechs = computed(() => {
     const tech = store.allTechs.find(t => t.id === id)
     return {
       id,
-      name: tech?.name ?? id,
+      name: tech ? getTechName(tech) : id,
       completed: store.isTechCompleted(id)
     }
   })
 })
 
-const remainingYears = computed(() => {
-  if (props.status !== 'researching' || !props.progress) return null
-  const remaining = props.tech.timeYears * (1 - props.progress / 100)
-  return Math.ceil(remaining)
+const requiredPoints = computed(() => store.getTechPointsRequired(props.tech.id))
+const remainingRounds = computed(() => {
+  if (store.researchPointsPerTurn <= 0) return 0
+  if (props.status === 'researching') {
+    return store.getRemainingTurns(props.tech.id)
+  }
+  return Math.max(1, Math.ceil(requiredPoints.value / store.researchPointsPerTurn))
 })
+const canSelect = computed(() => props.status === 'available' || props.status === 'researching')
 </script>
 
 <template>
   <div
     class="relative rounded-lg border p-3 transition-all duration-200"
-    :class="[statusClasses, highlighted ? 'ring-2 ring-primary-500/50' : '']"
+    :class="[statusClasses, highlighted ? 'ring-2 ring-primary-500/50' : '', canSelect ? 'cursor-pointer hover:ring-1 hover:ring-info-400/40' : '']"
+    @click="canSelect && emit('start-research', tech.id)"
   >
     <!-- Status Icon Overlay -->
     <div
@@ -93,7 +106,7 @@ const remainingYears = computed(() => {
       </div>
       <div class="flex-1 min-w-0">
         <h4 class="text-sm font-medium text-neutral-100 truncate">
-          {{ tech.name }}
+          {{ getTechName(tech) }}
         </h4>
         <UBadge
           :color="categoryColor as any"
@@ -101,7 +114,7 @@ const remainingYears = computed(() => {
           size="xs"
           class="mt-0.5"
         >
-          {{ tech.category.replace('_', ' / ') }}
+          {{ t(`game.research.categories.${tech.category}`) }}
         </UBadge>
       </div>
     </div>
@@ -111,16 +124,25 @@ const remainingYears = computed(() => {
       v-if="tech.description"
       class="text-xs text-neutral-400 mb-2 line-clamp-2"
     >
-      {{ tech.description }}
+      {{ getTechDescription(tech) }}
     </p>
 
     <!-- Research Time -->
-    <div class="flex items-center gap-1 text-xs text-neutral-500 mb-2">
-      <UIcon
-        name="i-lucide-clock"
-        class="w-3 h-3"
-      />
-      <span>{{ tech.timeYears }} {{ tech.timeYears === 1 ? 'Jahr' : 'Jahre' }}</span>
+    <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-500 mb-2">
+      <div class="flex items-center gap-1">
+        <UIcon
+          name="i-lucide-clock"
+          class="w-3 h-3"
+        />
+        <span>{{ $t('game.common.duration-rounds', { count: remainingRounds }) }}</span>
+      </div>
+      <div class="flex items-center gap-1">
+        <UIcon
+          name="i-lucide-flask-conical"
+          class="w-3 h-3"
+        />
+        <span>{{ $t('game.research.points-cost', { value: requiredPoints }) }}</span>
+      </div>
     </div>
 
     <!-- Prerequisites -->
@@ -148,12 +170,16 @@ const remainingYears = computed(() => {
 
     <!-- Progress Bar (Researching) -->
     <div
-      v-if="status === 'researching' && progress !== undefined"
+      v-if="progress !== undefined && progress > 0 && status !== 'completed'"
       class="mb-2"
     >
       <div class="flex items-center justify-between text-xs mb-1">
-        <span class="text-info-400">Erforschen...</span>
-        <span class="text-neutral-400">{{ remainingYears }}J verbleibend</span>
+        <span class="text-info-400">
+          {{ status === 'researching'
+            ? $t('game.research.actions.researching')
+            : $t('game.research.points-label') }}
+        </span>
+        <span class="text-neutral-400">{{ $t('game.common.duration-rounds', { count: remainingRounds ?? 0 }) }}</span>
       </div>
       <UProgress
         :model-value="progress"
@@ -182,25 +208,8 @@ const remainingYears = computed(() => {
         v-if="lockedReasons.length > 2"
         class="text-xs text-neutral-500"
       >
-        +{{ lockedReasons.length - 2 }} weitere
+        {{ $t('game.research.more-reasons', { count: lockedReasons.length - 2 }) }}
       </div>
     </div>
-
-    <!-- Action Button -->
-    <UButton
-      v-if="status === 'available'"
-      color="primary"
-      variant="soft"
-      size="xs"
-      block
-      class="mt-2"
-      @click="emit('start-research', tech.id)"
-    >
-      <UIcon
-        name="i-lucide-flask-conical"
-        class="w-3 h-3 mr-1"
-      />
-      Erforschen
-    </UButton>
   </div>
 </template>

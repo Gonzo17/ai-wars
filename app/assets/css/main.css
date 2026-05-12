@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "@nuxt/ui";
 
@@ -11,7 +12,8 @@
 }
 
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  --font-sans: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
   --color-green-50: #EFFDF5;
   --color-green-100: #D9FBE8;
@@ -24,4 +26,28 @@
   --color-green-800: #016538;
   --color-green-900: #0A5331;
   --color-green-950: #052E16;
+}
+
+/* Global scrollbar styling (keep default size) */
+* {
+  scrollbar-color: var(--ui-primary) var(--ui-bg-muted);
+}
+
+*::-webkit-scrollbar {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--ui-bg-muted);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--ui-primary);
+  border-radius: 999px;
+  border: 2px solid var(--ui-bg-muted);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-primary) 85%, white 15%);
 }
