@@ -45,7 +45,7 @@ Key invariant: **a snapshot at turn N is what the world looks like at the START 
 | [shared/validation/](shared/validation/) | Pure functions usable on both sides. |
 | [supabase/migrations/](supabase/migrations/) | Database schema. Numbered, append-only. |
 | [tests/](tests/) | Vitest tests. `tests/server/` uses `InMemoryGameRepository`. |
-| [scripts/](scripts/) | Dev/test harnesses (seed users, playtest runner, etc.). |
+| [scripts/](scripts/) | Dev helper scripts (seed users, etc.). |
 | [memory/](memory/) | Claude's project memory. Read before making design decisions. |
 
 ## Conventions
@@ -127,7 +127,7 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 
 - **Unit tests** (`tests/...`) for pure functions in `shared/` — fast, no setup.
 - **Integration tests** (`tests/server/...`) drive full turn cycles through `InMemoryGameRepository`. This is where most game-logic regressions get caught. Mirror the patterns in [tests/server/turn-cycle.test.ts](tests/server/turn-cycle.test.ts).
-- **e2e/playtest** (`pnpm playtest`, specs in [scripts/playtest/](scripts/playtest/)) runs the real Nuxt app with two Playwright browser contexts as alice + bob through the full UI (login → lobby → game → end turn → resolution). Requires local Supabase running + seeded test users. Reuses a running `pnpm dev` server, otherwise starts one. Slow — reserve for golden paths. UI elements are addressed via `data-testid` attributes; when adding UI that the playtest must touch, add a testid rather than text selectors.
+- **e2e/playtest** (`pnpm playtest`, specs in [tests/browser/](tests/browser/)) runs the real Nuxt app with two Playwright browser contexts as alice + bob through the full UI (login → lobby → game → end turn → resolution). Requires local Supabase running + seeded test users. Reuses a running `pnpm dev` server, otherwise starts one. Slow — reserve for golden paths. UI elements are addressed via `data-testid` attributes; when adding UI that the playtest must touch, add a testid rather than text selectors.
 
 When adding game mechanics, write integration tests first using `InMemoryGameRepository`. The pattern: seed initial repo state, call `submitTurn` for each player, call `resolveTurn`, assert on the resulting snapshot.
 
