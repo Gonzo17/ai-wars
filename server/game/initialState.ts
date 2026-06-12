@@ -2,32 +2,10 @@ import { toPlayerId } from './playerId'
 import {
   TECH_DEFS
 } from '~~/shared/defs/research-tree'
-import { getBuildingDef } from '~~/shared/defs/production'
-import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, ResourceNodeType } from '~~/shared/types/game'
+import { calculateResourceProduction } from '~~/shared/utils/economy'
+import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType } from '~~/shared/types/game'
 import type { PlayerResearchState } from '~~/shared/types/research'
 import { createPlanetSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
-
-function calculateResourceProduction(planets: Planet[], playerId: string): { energy: number, minerals: number, rare: number } {
-  let energy = 0
-  let minerals = 0
-  let rare = 0
-
-  for (const planet of planets) {
-    if (planet.owner !== playerId) continue
-    for (const slot of planet.slots) {
-      if (!slot.buildingId || slot.isConstructing) continue
-      const def = getBuildingDef(slot.buildingId)
-      if (def?.resourceProduction) {
-        const level = Math.max(1, slot.buildingLevel)
-        energy += (def.resourceProduction.energy ?? 0) * level
-        minerals += (def.resourceProduction.minerals ?? 0) * level
-        rare += (def.resourceProduction.rare ?? 0) * level
-      }
-    }
-  }
-
-  return { energy, minerals, rare }
-}
 
 /**
  * Place a building into a planet's slot array, picking the next free slot
@@ -45,58 +23,71 @@ function placeBuilding(slots: PlanetSlotData[], id: BuildingId, level: number): 
   }
 }
 
-export function initialState(userIds: string[], turn = 1): GameSnapshot {
-  const availableResearchIds = TECH_DEFS.filter(t => t.prerequisites.length === 0).map(t => t.id as ResearchId)
-  const playerIds = userIds.map(userId => toPlayerId(userId))
-  const primaryOwner = playerIds[0] ?? toPlayerId('unknown')
-  const baseResources: Resource[] = [
-    { key: 'res:energy', current: 500, max: 2000, delta: 0 },
-    { key: 'res:material', current: 100, max: 2000, delta: 0 },
-    { key: 'res:rare', current: 0, max: 500, delta: 0 }
-  ]
-
-  const players: PlayerSnapshot[] = userIds.map((userId) => {
-    const research: PlayerResearchState = {
-      ascensionTierReached: 'k0.6',
-      computeLevel: 1,
-      empireState: {
-        planetsControlled: 1,
-        homeSystemMajority: true,
-        intelLevel: 'low'
-      },
-      completedTechIds: [],
-      activeResearch: undefined,
-      progressMemory: {}
-    }
-    return {
-      id: toPlayerId(userId),
-      userId,
-      planets: [],
-      fleets: [],
-      research,
-      availableResearchIds,
-      resources: structuredClone(baseResources),
-      events: []
-    }
-  })
-
-  const makeSlots = (
-    buildings: Array<{ id: BuildingId, level: number }>,
-    resourceNodes: Map<number, ResourceNodeType> = new Map()
-  ): PlanetSlotData[] => {
-    const slots = createPlanetSlots(resourceNodes)
-    for (const { id, level } of buildings) {
-      placeBuilding(slots, id, level)
-    }
-    return slots
+function makeSlots(
+  buildings: Array<{ id: BuildingId, level: number }>,
+  resourceNodes: Map<number, ResourceNodeType> = new Map()
+): PlanetSlotData[] {
+  const slots = createPlanetSlots(resourceNodes)
+  for (const { id, level } of buildings) {
+    placeBuilding(slots, id, level)
   }
+  return slots
+}
 
-  const planets: Planet[] = [
+/**
+ * Flavor names for player home systems. Every player gets the same starting
+ * setup (buildings, resource nodes, planet types) — only names and map
+ * positions differ. Past four players we fall back to generated names.
+ */
+const HOME_TEMPLATES = [
+  { systemId: 'sys:lyra', systemName: 'Lyra', primaryId: 'pl:aurora', primaryName: 'Aurora Prime', secondaryId: 'pl:borealis', secondaryName: 'Borealis', location: { x: 22, y: 35 } },
+  { systemId: 'sys:vega', systemName: 'Vega', primaryId: 'pl:meridian', primaryName: 'Meridian Prime', secondaryId: 'pl:australis', secondaryName: 'Australis', location: { x: 78, y: 65 } },
+  { systemId: 'sys:cygnus', systemName: 'Cygnus', primaryId: 'pl:zenith', primaryName: 'Zenith Prime', secondaryId: 'pl:umbra', secondaryName: 'Umbra', location: { x: 22, y: 65 } },
+  { systemId: 'sys:orion', systemName: 'Orion', primaryId: 'pl:solace', primaryName: 'Solace Prime', secondaryId: 'pl:vesper', secondaryName: 'Vesper', location: { x: 78, y: 35 } }
+] as const
+
+type HomeTemplate = {
+  systemId: SolarSystemId
+  systemName: string
+  primaryId: PlanetId
+  primaryName: string
+  secondaryId: PlanetId
+  secondaryName: string
+  location: { x: number, y: number }
+}
+
+function homeTemplate(index: number): HomeTemplate {
+  const template = HOME_TEMPLATES[index]
+  if (template) {
+    return {
+      systemId: template.systemId,
+      systemName: template.systemName,
+      primaryId: template.primaryId,
+      primaryName: template.primaryName,
+      secondaryId: template.secondaryId,
+      secondaryName: template.secondaryName,
+      location: template.location
+    }
+  }
+  const n = index + 1
+  return {
+    systemId: `sys:home-${n}`,
+    systemName: `Home ${n}`,
+    primaryId: `pl:home-${n}-prime`,
+    primaryName: `Home ${n} Prime`,
+    secondaryId: `pl:home-${n}-minor`,
+    secondaryName: `Home ${n} Minor`,
+    location: { x: 50 + (n % 2 ? -30 : 30), y: 20 + ((n * 13) % 60) }
+  }
+}
+
+function makeHomePlanets(template: HomeTemplate, owner: Planet['owner']): Planet[] {
+  return [
     {
-      id: 'pl:aurora',
-      systemId: 'sys:lyra',
-      name: 'Aurora Prime',
-      owner: primaryOwner,
+      id: template.primaryId,
+      systemId: template.systemId,
+      name: template.primaryName,
+      owner,
       type: 'terrestrial',
       size: 'large',
       workers: 1,
@@ -116,10 +107,10 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       location: { x: 28, y: 44 }
     },
     {
-      id: 'pl:borealis',
-      systemId: 'sys:lyra',
-      name: 'Borealis',
-      owner: primaryOwner,
+      id: template.secondaryId,
+      systemId: template.systemId,
+      name: template.secondaryName,
+      owner,
       type: 'ice-giant',
       size: 'medium',
       workers: 1,
@@ -134,50 +125,98 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       progressMemory: {},
       productionCarryover: 0,
       location: { x: 52, y: 62 }
-    },
-    {
-      id: 'pl:nadir-outpost',
-      systemId: 'sys:nadir',
-      name: 'Nadir Outpost',
-      owner: 'unclaimed',
-      type: 'barren',
-      size: 'small',
-      workers: 1,
-      productionPerWorker: 20,
-      slots: makeSlots([
-        { id: 'bld:landing-pad' as BuildingId, level: 1 }
-      ]),
-      queues: { build: [], shipyard: [] },
-      progressMemory: {},
-      productionCarryover: 0,
-      location: { x: 74, y: 38 }
     }
   ]
+}
+
+export function initialState(userIds: string[], turn = 1): GameSnapshot {
+  const availableResearchIds = TECH_DEFS.filter(t => t.prerequisites.length === 0).map(t => t.id as ResearchId)
+  const baseResources: Resource[] = [
+    { key: 'res:energy', current: 500, max: 2000, delta: 0 },
+    { key: 'res:material', current: 100, max: 2000, delta: 0 },
+    { key: 'res:rare', current: 0, max: 500, delta: 0 }
+  ]
+
+  const players: PlayerSnapshot[] = userIds.map((userId) => {
+    const research: PlayerResearchState = {
+      ascensionTierReached: 'k0.6',
+      computeLevel: 1,
+      empireState: {
+        planetsControlled: 2,
+        homeSystemMajority: true,
+        intelLevel: 'low'
+      },
+      completedTechIds: [],
+      activeResearch: undefined,
+      progressMemory: {}
+    }
+    return {
+      id: toPlayerId(userId),
+      userId,
+      planets: [],
+      fleets: [],
+      research,
+      availableResearchIds,
+      resources: structuredClone(baseResources),
+      events: []
+    }
+  })
+
+  // One identical home system per player, all linked to a neutral central system.
+  const planets: Planet[] = []
+  const homeSystems: SolarSystem[] = []
+  const neutralSystemId: SolarSystemId = 'sys:nadir'
+
+  players.forEach((player, index) => {
+    const template = homeTemplate(index)
+    const homePlanets = makeHomePlanets(template, player.id)
+    planets.push(...homePlanets)
+    player.planets = homePlanets.map(planet => planet.id)
+    homeSystems.push({
+      id: template.systemId,
+      name: template.systemName,
+      intel: 'high',
+      connections: [neutralSystemId],
+      planets: homePlanets.map(planet => planet.id),
+      location: template.location
+    })
+  })
+
+  planets.push({
+    id: 'pl:nadir-outpost',
+    systemId: neutralSystemId,
+    name: 'Nadir Outpost',
+    owner: 'unclaimed',
+    type: 'barren',
+    size: 'small',
+    workers: 1,
+    productionPerWorker: 20,
+    slots: makeSlots([
+      { id: 'bld:landing-pad' as BuildingId, level: 1 }
+    ]),
+    queues: { build: [], shipyard: [] },
+    progressMemory: {},
+    productionCarryover: 0,
+    location: { x: 74, y: 38 }
+  })
 
   const systems: SolarSystem[] = [
+    ...homeSystems,
     {
-      id: 'sys:lyra',
-      name: 'Lyra',
-      intel: 'high',
-      connections: ['sys:nadir', 'sys:helix'],
-      planets: ['pl:aurora', 'pl:borealis'],
-      location: { x: 22, y: 35 }
-    },
-    {
-      id: 'sys:nadir',
+      id: neutralSystemId,
       name: 'Nadir',
       intel: 'medium',
-      connections: ['sys:lyra'],
+      connections: [...homeSystems.map(system => system.id), 'sys:helix'],
       planets: ['pl:nadir-outpost'],
-      location: { x: 58, y: 48 }
+      location: { x: 50, y: 50 }
     },
     {
       id: 'sys:helix',
       name: 'Helix',
       intel: 'low',
-      connections: ['sys:lyra'],
+      connections: [neutralSystemId],
       planets: [],
-      location: { x: 42, y: 68 }
+      location: { x: 42, y: 80 }
     }
   ]
 
@@ -187,7 +226,7 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       name: 'Aurora',
       intel: 'high',
       connections: ['galaxy:veil'],
-      solarSystems: ['sys:lyra', 'sys:nadir'],
+      solarSystems: [...homeSystems.map(system => system.id), neutralSystemId],
       location: { x: 30, y: 42 }
     },
     {
@@ -200,11 +239,8 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     }
   ]
 
+  // Initial resource deltas based on each player's starting buildings
   for (const player of players) {
-    if (player.id === primaryOwner) {
-      player.planets = planets.filter(planet => planet.owner === primaryOwner).map(planet => planet.id)
-    }
-    // Calculate initial resource deltas based on buildings
     const production = calculateResourceProduction(planets, player.id)
     const energyRes = player.resources.find(r => r.key === 'res:energy')
     const mineralRes = player.resources.find(r => r.key === 'res:material')

@@ -107,6 +107,7 @@ import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getUnitDef
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
+import { getResearchPointsPerTurn } from '~~/shared/utils/economy'
 
 type MapViewMode = 'universe' | 'galaxy' | 'system' | 'planet'
 type SelectionType = 'planet' | 'army' | 'system' | 'galaxy' | 'research'
@@ -393,7 +394,7 @@ const loadSnapshot = async () => {
     if (player) {
       researchStore.hydrateFromSnapshot(player)
       eventLogStore.setEventsFromSnapshot(player.events ?? [])
-      const points = getResearchPointsPerTurn(snapshot.value, player.id)
+      const points = getResearchPointsPerTurn(snapshot.value.planets, player.id)
       researchStore.setResearchPointsPerTurn(points)
       const nextMemory = Object.fromEntries(
         snapshot.value.planets.map(planet => [planet.id, planet.progressMemory ?? {}])
@@ -608,21 +609,6 @@ const buildingNameKey = (id: string) => `game.buildings.${id.replace('bld:', '')
 const buildingDescriptionKey = (id: string) => `game.buildings.${id.replace('bld:', '')}.description`
 const unitNameKey = (id: string) => `game.units.${id.replace('unit:', '')}.name`
 const unitRoleKey = (id: string) => `game.units.${id.replace('unit:', '')}.role`
-
-const getResearchPointsPerTurn = (state: GameSnapshot, playerId: string) => {
-  let total = 0
-  for (const planet of state.planets) {
-    if (planet.owner !== playerId) continue
-    for (const slot of planet.slots) {
-      if (!slot.buildingId || slot.isConstructing) continue
-      const def = getBuildingDef(slot.buildingId)
-      if (def?.researchPoints) {
-        total += def.researchPoints * Math.max(1, slot.buildingLevel)
-      }
-    }
-  }
-  return total
-}
 
 const research = computed(() => {
   const active = researchStore.activeResearch

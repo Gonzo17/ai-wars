@@ -1,0 +1,283 @@
+import { describe, expect, it } from 'vitest'
+import { submitTurn } from '../../server/game/turn'
+import { resolveTurn } from '../../server/game/resolveTurn'
+import { initialState } from '../../server/game/initialState'
+import { InMemoryGameRepository } from '../../server/game/inMemoryRepository'
+import { toPlayerId } from '../../server/game/playerId'
+import type { GameSnapshot, PlayerSnapshot, ResourceId } from '../../shared/types/game'
+import type { TurnPlan } from '../../shared/types/turn'
+
+const U1 = 'u1'
+const U2 = 'u2'
+const EMPTY: TurnPlan = { commands: [] }
+
+function seedTwoPlayerGame(repo?: InMemoryGameRepository) {
+  return repo ?? new InMemoryGameRepository({
+    games: [{ id: 'g1', turn: 1, phase: 'planning', status: 'active', resolving_turn: null } as never],
+    game_players: [
+      { game_id: 'g1', user_id: U1 },
+      { game_id: 'g1', user_id: U2 }
+    ],
+    game_state: [{ game_id: 'g1', turn: 1, state_json: initialState([U1, U2], 1) }]
+  })
+}
+
+/** Submit a plan for both players on the given turn; resolution runs on the second submit. */
+async function playTurn(repo: InMemoryGameRepository, turn: number, plans: Partial<Record<string, TurnPlan>> = {}) {
+  await submitTurn(repo, U1, 'g1', turn, plans[U1] ?? EMPTY)
+  const result = await submitTurn(repo, U2, 'g1', turn, plans[U2] ?? EMPTY)
+  expect(result.resolved).toBe(true)
+}
+
+function getSnapshot(repo: InMemoryGameRepository, turn: number): GameSnapshot {
+  const row = repo.data.game_state.find(r => r.game_id === 'g1' && r.turn === turn)
+  expect(row).toBeDefined()
+  return row!.state_json
+}
+
+function getPlayer(snapshot: GameSnapshot, userId: string): PlayerSnapshot {
+  const player = snapshot.players.find(p => p.id === toPlayerId(userId))
+  expect(player).toBeDefined()
+  return player!
+}
+
+function getResource(player: PlayerSnapshot, key: ResourceId): number {
+  return player.resources.find(r => r.key === key)?.current ?? Number.NaN
+}
+
+describe('initial state', () => {
+  it('gives every player a symmetric home world', () => {
+    const snapshot = initialState([U1, U2], 1)
+
+    for (const userId of [U1, U2]) {
+      const player = getPlayer(snapshot, userId)
+      expect(player.planets).toHaveLength(2)
+
+      const owned = snapshot.planets.filter(p => p.owner === player.id)
+      expect(owned.map(p => p.id).sort()).toEqual([...player.planets].sort())
+
+      const buildings = owned
+        .flatMap(p => p.slots)
+        .filter(s => s.buildingId)
+        .map(s => `${s.buildingId}@${s.buildingLevel}`)
+        .sort()
+      expect(buildings).toEqual([
+        'bld:data-center@1',
+        'bld:fusion-core@2',
+        'bld:hydroponics@3',
+        'bld:listening-post@1',
+        'bld:orbital-dock@1',
+        'bld:refinery-node@1'
+      ])
+    }
+
+    const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
+    expect(p1.resources).toEqual(p2.resources)
+    expect(p1.planets.some(id => p2.planets.includes(id))).toBe(false)
+
+    // Home systems are linked through the neutral system
+    const neutral = snapshot.systems.find(s => s.id === 'sys:nadir')
+    expect(neutral).toBeDefined()
+    for (const player of snapshot.players) {
+      const homeSystemIds = snapshot.planets
+        .filter(p => p.owner === player.id)
+        .map(p => p.systemId)
+      for (const systemId of new Set(homeSystemIds)) {
+        expect(neutral!.connections).toContain(systemId)
+      }
+    }
+  })
+
+  it('players resolve empty turns to identical resources', async () => {
+    const repo = seedTwoPlayerGame()
+    await playTurn(repo, 1)
+    await playTurn(repo, 2)
+
+    const snapshot = getSnapshot(repo, 3)
+    const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
+    expect(p1.resources).toEqual(p2.resources)
+    // 2 turns of fusion-core L2 (100/turn) and refinery L1 (25/turn)
+    expect(getResource(p1, 'res:energy')).toBe(700)
+    expect(getResource(p1, 'res:material')).toBe(150)
+  })
+})
+
+describe('building construction cycle', () => {
+  it('deducts cost once, applies ore adjacency, completes, and carries over overflow', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      // Slot 2 on the primary planet is empty and has an ore node →
+      // mining facility gets the −5 % adjusted production cost (40 → 38).
+      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:mining-facility', slotIndex: 2 }]
+    }
+
+    await playTurn(repo, 1, { [U1]: plan })
+
+    const turn2 = getSnapshot(repo, 2)
+    const p1 = getPlayer(turn2, U1)
+    // 500 start − 30 build cost + 100 production
+    expect(getResource(p1, 'res:energy')).toBe(570)
+    const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[2]!
+    expect(slot.buildingId).toBe('bld:mining-facility')
+    expect(slot.isConstructing).toBe(true)
+    // 38 adjusted cost − 20 production this turn
+    expect(slot.constructionTimeLeft).toBe(18)
+
+    await playTurn(repo, 2)
+
+    const turn3 = getSnapshot(repo, 3)
+    const planet = turn3.planets.find(p => p.id === 'pl:aurora')!
+    expect(planet.slots[2]!.isConstructing).toBe(false)
+    // 20 production − 18 remaining = 2 overflow into next turn
+    expect(planet.productionCarryover).toBe(2)
+
+    const events = getPlayer(turn3, U1).events
+    expect(events.some(e => e.type === 'building-complete')).toBe(true)
+
+    // Completed mine (15) + refinery (25) show up in the mineral delta
+    const mineralRes = getPlayer(turn3, U1).resources.find(r => r.key === 'res:material')
+    expect(mineralRes?.delta).toBe(40)
+  })
+
+  it('resuming the same build in the same slot does not charge again', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:solar-array', slotIndex: 3 }]
+    }
+
+    await playTurn(repo, 1, { [U1]: plan })
+    // Re-submit the identical command next turn — must be treated as a resume
+    await playTurn(repo, 2, { [U1]: plan })
+
+    const turn3 = getSnapshot(repo, 3)
+    const p1 = getPlayer(turn3, U1)
+    // 100 start − 50 (charged exactly once) + 2 × 25 refinery production
+    expect(getResource(p1, 'res:material')).toBe(100)
+    expect(turn3.planets.find(p => p.id === 'pl:aurora')!.slots[3]!.isConstructing).toBe(false)
+  })
+
+  it('rejects building on a planet the player does not own', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      // pl:meridian is player 2's home world
+      commands: [{ type: 'buildStructure', planetId: 'pl:meridian', buildingId: 'bld:solar-array', slotIndex: 3 }]
+    }
+
+    await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({ statusCode: 400 })
+  })
+})
+
+describe('research cycle', () => {
+  it('progresses by research points per turn and completes', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
+    }
+
+    // 100 points required, data-center L1 yields 10/turn → 10 turns
+    await playTurn(repo, 1, { [U1]: plan })
+
+    const turn2 = getSnapshot(repo, 2)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(10)
+
+    for (let turn = 2; turn <= 10; turn++) {
+      await playTurn(repo, turn)
+    }
+
+    const final = getSnapshot(repo, 11)
+    const p1 = getPlayer(final, U1)
+    expect(p1.research.completedTechIds).toContain('tech:bootstrapped-ai-core')
+    expect(p1.research.activeResearch).toBeUndefined()
+    // Children of the completed tech become available
+    expect(p1.availableResearchIds).toEqual(expect.arrayContaining([
+      'tech:basic-industrial-robotics',
+      'tech:planetary-grid-management',
+      'tech:probe-design'
+    ]))
+    expect(p1.events.some(e => e.type === 'research-complete')).toBe(true)
+
+    // Player 2 never researched anything
+    expect(getPlayer(final, U2).research.completedTechIds).toHaveLength(0)
+  })
+})
+
+describe('unit production cycle', () => {
+  it('a finished worker increases the planet worker count', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:worker' }]
+    }
+
+    await playTurn(repo, 1, { [U1]: plan })
+
+    const turn2 = getSnapshot(repo, 2)
+    expect(turn2.planets.find(p => p.id === 'pl:aurora')!.workers).toBe(2)
+  })
+
+  it('a finished ship joins the global fleet list', async () => {
+    const repo = seedTwoPlayerGame()
+    // Probes cost 8 rare; players start with 0 → grant some up front
+    const seedState = getSnapshot(repo, 1)
+    getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
+
+    const plan: TurnPlan = {
+      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:probe' }]
+    }
+
+    // Probe costs 60 production at 20/turn → finishes after 3 resolves
+    await playTurn(repo, 1, { [U1]: plan })
+    await playTurn(repo, 2)
+    await playTurn(repo, 3)
+
+    const final = getSnapshot(repo, 4)
+    expect(final.fleets).toHaveLength(1)
+    expect(final.fleets[0]).toMatchObject({
+      id: 'unit:probe',
+      ownerId: toPlayerId(U1),
+      location: 'pl:aurora',
+      status: 'idle'
+    })
+    expect(final.planets.find(p => p.id === 'pl:aurora')!.queues.shipyard).toHaveLength(0)
+  })
+})
+
+describe('resolve failure handling', () => {
+  class FailingRepository extends InMemoryGameRepository {
+    failNextSnapshotInsert = false
+
+    override async insertGameState(gameId: string, turn: number, snapshot: GameSnapshot): Promise<void> {
+      if (this.failNextSnapshotInsert) {
+        this.failNextSnapshotInsert = false
+        throw new Error('simulated db failure')
+      }
+      return super.insertGameState(gameId, turn, snapshot)
+    }
+  }
+
+  it('releases the resolve lock when resolution throws', async () => {
+    const repo = new FailingRepository({
+      games: [{ id: 'g1', turn: 1, phase: 'planning', status: 'active', resolving_turn: null } as never],
+      game_players: [
+        { game_id: 'g1', user_id: U1 },
+        { game_id: 'g1', user_id: U2 }
+      ],
+      game_state: [{ game_id: 'g1', turn: 1, state_json: initialState([U1, U2], 1) }]
+    })
+
+    await submitTurn(repo, U1, 'g1', 1, EMPTY)
+    repo.failNextSnapshotInsert = true
+
+    await expect(submitTurn(repo, U2, 'g1', 1, EMPTY)).rejects.toThrow('simulated db failure')
+
+    // The game must NOT be stuck in `resolving`
+    const game = repo.data.games[0]!
+    expect(game.phase).toBe('planning')
+    expect(game.resolving_turn).toBeNull()
+    expect(game.turn).toBe(1)
+
+    // Both plans are still submitted, so a retry resolves cleanly
+    const retry = await resolveTurn(repo, 'g1', 1)
+    expect(retry.resolved).toBe(true)
+    expect(repo.data.games[0]!.turn).toBe(2)
+  })
+})

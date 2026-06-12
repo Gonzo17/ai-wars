@@ -6,6 +6,7 @@ import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
 import type { GameEvent } from '~~/shared/types/events'
 import type { BuildingId, PlanetId, PlayerId, ResearchId, Resource, Unit, UnitId } from '~~/shared/types/game'
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
+import { calculateResourceProduction, getResearchPointsPerTurn } from '~~/shared/utils/economy'
 
 type ResolveResult = {
   resolved: boolean
@@ -31,28 +32,6 @@ function deductResourceCosts(player: PlayerSnapshot, costs: ResourceCosts) {
   modifyResource(player, 'res:rare', -costs.rare)
 }
 
-function calculateResourceProduction(snapshot: GameSnapshot, playerId: PlayerId): ResourceCosts {
-  let energy = 0
-  let minerals = 0
-  let rare = 0
-
-  for (const planet of snapshot.planets) {
-    if (planet.owner !== playerId) continue
-    for (const slot of planet.slots) {
-      if (!slot.buildingId || slot.isConstructing) continue
-      const def = getBuildingDef(slot.buildingId)
-      if (def?.resourceProduction) {
-        const level = Math.max(1, slot.buildingLevel)
-        energy += (def.resourceProduction.energy ?? 0) * level
-        minerals += (def.resourceProduction.minerals ?? 0) * level
-        rare += (def.resourceProduction.rare ?? 0) * level
-      }
-    }
-  }
-
-  return { energy, minerals, rare }
-}
-
 function applyResourceProduction(player: PlayerSnapshot, production: ResourceCosts) {
   modifyResource(player, 'res:energy', production.energy)
   modifyResource(player, 'res:material', production.minerals)
@@ -61,7 +40,7 @@ function applyResourceProduction(player: PlayerSnapshot, production: ResourceCos
 
 function updateResourceDeltas(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
-    const production = calculateResourceProduction(snapshot, player.id)
+    const production = calculateResourceProduction(snapshot.planets, player.id)
     const energyRes = getPlayerResource(player, 'res:energy')
     const mineralRes = getPlayerResource(player, 'res:material')
     const rareRes = getPlayerResource(player, 'res:rare')
@@ -203,21 +182,6 @@ function addEvent(snapshot: GameSnapshot, playerId: PlayerId, event: GameEvent) 
   player.events = [...(player.events ?? []), event]
 }
 
-function getResearchPointsPerTurn(snapshot: GameSnapshot, playerId: PlayerId): number {
-  let total = 0
-  for (const planet of snapshot.planets) {
-    if (planet.owner !== playerId) continue
-    for (const slot of planet.slots) {
-      if (!slot.buildingId || slot.isConstructing) continue
-      const def = getBuildingDef(slot.buildingId)
-      if (def?.researchPoints) {
-        total += def.researchPoints * Math.max(1, slot.buildingLevel)
-      }
-    }
-  }
-  return total
-}
-
 function advanceResearch(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
   for (const player of snapshot.players) {
     const active = player.research.activeResearch
@@ -228,7 +192,7 @@ function advanceResearch(snapshot: GameSnapshot, turn: number, nextEventId: () =
     const tech = TECH_DEFS.find(t => t.id === active.techId)
     if (!tech) continue
     const requiredPoints = tech.researchPoints ?? 0
-    const increment = getResearchPointsPerTurn(snapshot, player.id)
+    const increment = getResearchPointsPerTurn(snapshot.planets, player.id)
     active.progressPoints = Math.min(requiredPoints, active.progressPoints + increment)
     if (active.progressPoints >= requiredPoints) {
       player.research.completedTechIds.push(active.techId)
@@ -378,81 +342,88 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     return { resolved: false, reason: 'lock' }
   }
 
-  const playerIds = await repo.listGamePlayers(gameId)
-  let snapshot = await repo.getGameState(gameId, turn)
-  if (!snapshot) {
-    snapshot = initialState(playerIds, turn)
-    await repo.insertGameState(gameId, turn, snapshot)
-  }
-
-  const plans = await repo.listSubmittedPlans(gameId, turn)
-
-  if ((plans ?? []).length !== playerIds.length) {
-    await repo.releaseResolveLock(gameId)
-    return { resolved: false, reason: 'not-ready' }
-  }
-
-  const sortedPlans = (plans ?? []).slice().sort((a, b) => a.user_id.localeCompare(b.user_id))
-  let nextSnapshot = snapshot
-
-  // Step 1: Apply plans (queue builds) and deduct resource costs for new builds
-  for (const planRow of sortedPlans) {
-    const plan = planRow.plan_json as TurnPlan
-    const playerId = toPlayerId(planRow.user_id)
-    const player = nextSnapshot.players.find((p: PlayerSnapshot) => p.id === playerId)
-    if (!player) continue
-
-    // Deduct costs for new builds before applying the plan
-    for (const command of plan.commands) {
-      if (command.type === 'buildStructure') {
-        const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
-        if (!planet) continue
-        const def = getBuildingDef(command.buildingId)
-        if (!def) continue
-        // Only charge if this is a new build (slot doesn't already have this building under construction)
-        const slot = planet.slots[command.slotIndex]
-        const isResume = slot && slot.buildingId === command.buildingId && slot.isConstructing
-        if (!isResume) {
-          deductResourceCosts(player, def.resourceCosts)
-        }
-      }
-      if (command.type === 'buildUnit') {
-        const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
-        if (!planet) continue
-        const def = getUnitDef(command.unitId)
-        if (!def) continue
-        // Only charge if this is a new build (not continuing an existing one)
-        const inShipyard = planet.queues.shipyard.some(u => u.id === command.unitId)
-        const memory = planet.progressMemory?.[command.unitId]
-        if (!inShipyard && !memory?.resourcePaid) {
-          deductResourceCosts(player, def.resourceCosts)
-        }
-      }
+  // From here on the game is in phase `resolving`. Any thrown error must
+  // release the lock, otherwise the game is stuck in `resolving` forever.
+  try {
+    const playerIds = await repo.listGamePlayers(gameId)
+    let snapshot = await repo.getGameState(gameId, turn)
+    if (!snapshot) {
+      snapshot = initialState(playerIds, turn)
+      await repo.insertGameState(gameId, turn, snapshot)
     }
 
-    nextSnapshot = applyPlan(nextSnapshot, player, plan)
+    const plans = await repo.listSubmittedPlans(gameId, turn)
+
+    if ((plans ?? []).length !== playerIds.length) {
+      await repo.releaseResolveLock(gameId)
+      return { resolved: false, reason: 'not-ready' }
+    }
+
+    const sortedPlans = (plans ?? []).slice().sort((a, b) => a.user_id.localeCompare(b.user_id))
+    let nextSnapshot = snapshot
+
+    // Step 1: Apply plans (queue builds) and deduct resource costs for new builds
+    for (const planRow of sortedPlans) {
+      const plan = planRow.plan_json as TurnPlan
+      const playerId = toPlayerId(planRow.user_id)
+      const player = nextSnapshot.players.find((p: PlayerSnapshot) => p.id === playerId)
+      if (!player) continue
+
+      // Deduct costs for new builds before applying the plan
+      for (const command of plan.commands) {
+        if (command.type === 'buildStructure') {
+          const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
+          if (!planet) continue
+          const def = getBuildingDef(command.buildingId)
+          if (!def) continue
+          // Only charge if this is a new build (slot doesn't already have this building under construction)
+          const slot = planet.slots[command.slotIndex]
+          const isResume = slot && slot.buildingId === command.buildingId && slot.isConstructing
+          if (!isResume) {
+            deductResourceCosts(player, def.resourceCosts)
+          }
+        }
+        if (command.type === 'buildUnit') {
+          const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
+          if (!planet) continue
+          const def = getUnitDef(command.unitId)
+          if (!def) continue
+          // Only charge if this is a new build (not continuing an existing one)
+          const inShipyard = planet.queues.shipyard.some(u => u.id === command.unitId)
+          const memory = planet.progressMemory?.[command.unitId]
+          if (!inShipyard && !memory?.resourcePaid) {
+            deductResourceCosts(player, def.resourceCosts)
+          }
+        }
+      }
+
+      nextSnapshot = applyPlan(nextSnapshot, player, plan)
+    }
+
+    // Step 2: Add resource production from existing buildings (before completing new ones)
+    for (const player of nextSnapshot.players) {
+      const production = calculateResourceProduction(nextSnapshot.planets, player.id)
+      applyResourceProduction(player, production)
+    }
+
+    let eventIndex = 0
+    const nextEventId = () => `evt-${turn}-${eventIndex++}`
+
+    // Step 3: Advance research and complete buildings/units
+    advanceResearch(nextSnapshot, turn, nextEventId)
+    advanceQueues(nextSnapshot, turn, nextEventId)
+
+    // Step 4: Update resource deltas for display (production for next turn)
+    updateResourceDeltas(nextSnapshot)
+
+    nextSnapshot = { ...nextSnapshot, turn: turn + 1 }
+
+    await repo.insertGameState(gameId, turn + 1, nextSnapshot)
+    await repo.updateGameTurn(gameId, turn + 1)
+
+    return { resolved: true }
+  } catch (error) {
+    await repo.releaseResolveLock(gameId)
+    throw error
   }
-
-  // Step 2: Add resource production from existing buildings (before completing new ones)
-  for (const player of nextSnapshot.players) {
-    const production = calculateResourceProduction(nextSnapshot, player.id)
-    applyResourceProduction(player, production)
-  }
-
-  let eventIndex = 0
-  const nextEventId = () => `evt-${turn}-${eventIndex++}`
-
-  // Step 3: Advance research and complete buildings/units
-  advanceResearch(nextSnapshot, turn, nextEventId)
-  advanceQueues(nextSnapshot, turn, nextEventId)
-
-  // Step 4: Update resource deltas for display (production for next turn)
-  updateResourceDeltas(nextSnapshot)
-
-  nextSnapshot = { ...nextSnapshot, turn: turn + 1 }
-
-  await repo.insertGameState(gameId, turn + 1, nextSnapshot)
-  await repo.updateGameTurn(gameId, turn + 1)
-
-  return { resolved: true }
 }
