@@ -25,3 +25,9 @@ logs
 
 # VsCode settings
 .vscode/settings.json
+
+# Claude memory — per-user, lives in ~/.claude/projects/<slug>/memory/
+memory/
+
+# Claude Code personal settings (machine-local permission grants)
+.claude/settings.local.json

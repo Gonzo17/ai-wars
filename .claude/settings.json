@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm test *)",
+      "Bash(pnpm supabase status)",
+      "Bash(pnpm --version)",
+      "Bash(pnpm config get *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm typecheck)",
+      "PowerShell(pnpm test *)",
+      "PowerShell(pnpm supabase status)",
+      "PowerShell(pnpm --version)",
+      "PowerShell(pnpm config get *)",
+      "PowerShell(pnpm lint)",
+      "PowerShell(pnpm typecheck)"
+    ]
+  }
+}

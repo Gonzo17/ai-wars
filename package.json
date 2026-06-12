@@ -11,7 +11,8 @@
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
     "supabase": "supabase",
-    "supabase:types": "supabase gen types typescript --local > app/types/database.types.ts && eslint --fix app/types/database.types.ts"
+    "supabase:types": "supabase gen types typescript --local > app/types/database.types.ts && eslint --fix app/types/database.types.ts",
+    "seed:test-users": "node scripts/seed-test-users.mjs"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.82",
@@ -26,11 +27,11 @@
     "@nuxt/test-utils": "^3.22.0",
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.39.2",
-    "happy-dom": "^20.0.11",
+    "happy-dom": "^20.9.0",
     "supabase": "2.72.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "vue-tsc": "^3.2.2"
   },
-  "packageManager": "pnpm@10.28.2"
+  "packageManager": "pnpm@10.33.4"
 }

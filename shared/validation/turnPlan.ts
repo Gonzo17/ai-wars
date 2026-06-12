@@ -2,7 +2,7 @@ import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/
 import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, getBuildingDef, getUnitDef } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
-import { adjustedProductionCost, isBuildingAllowedInZone, TOTAL_SLOT_COUNT } from '../types/planetSlots'
+import { isBuildingAllowedInZone, TOTAL_SLOT_COUNT } from '../types/planetSlots'
 
 interface ResourceCosts {
   energy: number

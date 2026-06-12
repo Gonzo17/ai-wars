@@ -83,17 +83,6 @@ const HEX_GAP = 6
 const ORBITAL_RING_RADIUS = PLANET_RADIUS + 70
 const ORBITAL_SLOT_SIZE = 44
 
-// ── Resource nodes from server slot data ──────────────────────────────
-const resourceNodeMap = computed<Map<number, ResourceNodeType>>(() => {
-  const map = new Map<number, ResourceNodeType>()
-  for (const slot of props.planet.slots) {
-    if (slot.resourceNode) {
-      map.set(props.planet.slots.indexOf(slot), slot.resourceNode as ResourceNodeType)
-    }
-  }
-  return map
-})
-
 // ── Local slot → building assignments (for current turn plan) ─────────
 const surfaceAssignments = ref(new Map<number, string>())
 const orbitalAssignments = ref(new Map<number, string>())
