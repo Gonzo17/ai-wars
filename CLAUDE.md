@@ -141,6 +141,10 @@ When adding game mechanics, write integration tests first using `InMemoryGameRep
 
 ## Current focus: roadmap to strategic depth
 
+The long-term product vision (inspirations, format, hard rules, known design debt,
+megastructures) lives in [docs/VISION.md](docs/VISION.md) — read it before proposing
+or planning features. The list below is the agreed *next steps* toward that vision.
+
 The MVP works (auth, lobby, turn engine, economy, research tree, multi-zoom map) but feels like an economy sim — there are no real stakes. Five moves, in order of leverage, before scope expands:
 
 1. **Wire tech → unlocks.** `Building.requirements.research` is defined but unenforced. Map existing techs onto existing buildings (`tech:data-center-i` → `bld:data-center`, `tech:first-shipyard` → `bld:orbital-dock`, etc.) and enforce in validation. Cheapest fix, highest payoff — the tech tree becomes a real choice.
