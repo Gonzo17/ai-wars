@@ -472,6 +472,7 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
           variant="ghost"
           size="sm"
           class="ml-4"
+          data-testid="slot-view-close"
           @click="emit('close')"
         />
       </div>
@@ -600,6 +601,8 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
         >
           <button
             type="button"
+            :data-testid="`surface-slot-${slotPos.index}`"
+            :data-state="slotPos.state"
             class="w-full h-full transition-all duration-200 relative"
             :class="[
               slotPos.state === 'empty' ? 'cursor-pointer' : 'cursor-default',
@@ -892,6 +895,7 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                 v-for="building in activeBuildCatalog"
                 :key="building.id"
                 type="button"
+                :data-testid="`build-option-${building.id}`"
                 class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
                 :class="{ 'opacity-40 cursor-not-allowed': !isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts) }"
                 :disabled="!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts)"

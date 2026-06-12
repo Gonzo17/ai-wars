@@ -127,7 +127,7 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 
 - **Unit tests** (`tests/...`) for pure functions in `shared/` — fast, no setup.
 - **Integration tests** (`tests/server/...`) drive full turn cycles through `InMemoryGameRepository`. This is where most game-logic regressions get caught. Mirror the patterns in [tests/server/turn-cycle.test.ts](tests/server/turn-cycle.test.ts).
-- **e2e/playtest** (`scripts/playtest.*`) — PLANNED, not built yet. Will run the real Nuxt app with two Playwright browser contexts as alice + bob. Slow — reserve for golden paths.
+- **e2e/playtest** (`pnpm playtest`, specs in [scripts/playtest/](scripts/playtest/)) runs the real Nuxt app with two Playwright browser contexts as alice + bob through the full UI (login → lobby → game → end turn → resolution). Requires local Supabase running + seeded test users. Reuses a running `pnpm dev` server, otherwise starts one. Slow — reserve for golden paths. UI elements are addressed via `data-testid` attributes; when adding UI that the playtest must touch, add a testid rather than text selectors.
 
 When adding game mechanics, write integration tests first using `InMemoryGameRepository`. The pattern: seed initial repo state, call `submitTurn` for each player, call `resolveTurn`, assert on the resulting snapshot.
 

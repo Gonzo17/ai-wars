@@ -107,6 +107,8 @@ const needsAction = (planet: PlanetOverviewItem) => planet.buildQueue.length < p
           v-for="planet in planets"
           :key="planet.id"
           type="button"
+          :data-testid="`overview-planet-${planet.id}`"
+          :data-needs-action="needsAction(planet)"
           class="relative w-full rounded-lg border border-neutral-700/50 bg-neutral-900/70 px-4 py-3 text-left transition hover:border-neutral-600/70"
           @click="emit('open-planet', planet.id)"
         >

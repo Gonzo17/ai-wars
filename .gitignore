@@ -31,3 +31,7 @@ memory/
 
 # Claude Code personal settings (machine-local permission grants)
 .claude/settings.local.json
+
+# Playwright playtest output
+test-results/
+playwright-report/

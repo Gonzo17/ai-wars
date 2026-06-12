@@ -430,6 +430,7 @@ watch(currentLobby, (value) => {
                 color="primary"
                 icon="i-lucide-rocket"
                 :disabled="memberCount < 1"
+                data-testid="start-game-button"
                 @click="startLobby"
               >
                 {{ t('lobby.start-game-button') }}
@@ -447,6 +448,7 @@ watch(currentLobby, (value) => {
                 color="neutral"
                 variant="ghost"
                 icon="i-lucide-log-out"
+                data-testid="leave-lobby-button"
                 @click="leaveCurrentLobby"
               >
                 {{ t('lobby.leave-lobby-button') }}
@@ -491,6 +493,8 @@ watch(currentLobby, (value) => {
                   <div
                     v-for="lobby in lobbies"
                     :key="lobby.id"
+                    data-testid="lobby-row"
+                    :data-lobby-name="lobby.name"
                     class="flex flex-col gap-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 p-4 md:flex-row md:items-center md:justify-between transition-colors"
                   >
                     <div class="space-y-2 flex-1">
@@ -518,6 +522,7 @@ watch(currentLobby, (value) => {
                       :loading="joining === lobby.id"
                       icon="i-lucide-door-open"
                       size="sm"
+                      data-testid="join-lobby-button"
                       @click="joinLobby(lobby.id)"
                     >
                       {{ t('lobby.join-button') }}
@@ -549,6 +554,7 @@ watch(currentLobby, (value) => {
               <div class="space-y-4">
                 <UInput
                   v-model="lobbyName"
+                  data-testid="lobby-name-input"
                   :placeholder="t('lobby.lobby-name-placeholder')"
                 />
                 <UButton
@@ -556,6 +562,7 @@ watch(currentLobby, (value) => {
                   color="primary"
                   icon="i-lucide-rocket"
                   :loading="creating"
+                  data-testid="create-lobby-button"
                   @click="createLobby"
                 >
                   {{ t('lobby.create-button') }}

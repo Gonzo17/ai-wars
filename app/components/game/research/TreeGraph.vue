@@ -476,6 +476,7 @@ onMounted(() => {
           color="neutral"
           variant="ghost"
           size="sm"
+          data-testid="research-close"
           @click="emit('close')"
         />
       </div>
@@ -785,6 +786,8 @@ onMounted(() => {
           <div
             v-for="pos in nodePositions.values()"
             :key="pos.tech.id"
+            :data-testid="`tech-node-${pos.tech.id}`"
+            :data-status="store.getTechStatus(pos.tech.id)"
             class="absolute cursor-pointer transition-all duration-300 ease-out"
             :style="{
               left: `${pos.x - viewBoxDimensions.minX}px`,

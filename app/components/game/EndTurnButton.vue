@@ -125,6 +125,8 @@ const labelKey = computed(() => {
         variant="ghost"
         color="neutral"
         :padded="false"
+        data-testid="end-turn-button"
+        :data-state="state"
         class="group relative flex items-center justify-center w-24 h-24 rounded-full shadow-2xl transition-all duration-300 overflow-hidden hover:scale-105"
         :class="{
           'bg-linear-to-br from-neutral-400 via-neutral-500 to-neutral-600 text-neutral-950 hover:shadow-[0_0_40px_rgba(148,163,184,0.5)]': isWaiting,

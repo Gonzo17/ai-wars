@@ -220,7 +220,10 @@ const currentStepText = computed(() => {
                 <div class="text-success-500 mb-3">
                   {{ t('loading.boot-complete') }}
                 </div>
-                <div class="text-primary-400 animate-pulse flex items-center">
+                <div
+                  data-testid="loading-ready"
+                  class="text-primary-400 animate-pulse flex items-center"
+                >
                   <span>{{ t('loading.press-any-key') }}</span>
                   <span
                     v-if="showCursor"

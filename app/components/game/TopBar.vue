@@ -165,6 +165,7 @@ onBeforeUnmount(() => {
           >
             <span
               :key="props.year"
+              data-testid="year-display"
               class="year-display year-display--muted"
               :class="{ 'year-pulse': props.animateYear }"
             >
