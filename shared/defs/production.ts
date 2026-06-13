@@ -67,6 +67,7 @@ export const UNIT_DEFS: UnitDefinition[] = [
   // Support units
   { id: 'unit:worker', category: 'support', resourceCosts: { energy: 20, minerals: 10, rare: 0 }, productionCost: 20, buildTime: 1, requirements: {}, unitType: 'colonizer', strength: 1, icon: 'i-lucide-bot' },
   { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 8 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:probe-design'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
+  { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 10 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
   // Combat units
   { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 20 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' }
 ]

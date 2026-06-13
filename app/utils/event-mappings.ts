@@ -6,6 +6,7 @@ export const gameIcons = {
   shipyard: 'i-lucide-ship',
   movement: 'i-lucide-navigation',
   combat: 'i-lucide-swords',
+  colony: 'i-lucide-flag',
   discovery: 'i-lucide-compass',
   diplomatic: 'i-lucide-handshake',
   planet: 'i-lucide-earth'
@@ -17,6 +18,7 @@ export const eventTypeIcons: Record<GameEventType, string> = {
   'ship-complete': gameIcons.ship,
   'army-arrived': gameIcons.movement,
   'combat': gameIcons.combat,
+  'colony-established': gameIcons.colony,
   'discovery': gameIcons.discovery,
   'diplomatic': gameIcons.diplomatic
 }

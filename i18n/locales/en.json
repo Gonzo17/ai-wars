@@ -469,6 +469,10 @@
       "probe": {
         "name": "Deep Probe",
         "role": "Recon"
+      },
+      "colony-ship": {
+        "name": "Colony Ship",
+        "role": "Colonization"
       }
     },
     "errors": {
@@ -500,7 +504,8 @@
         "ships": "Ships",
         "movements": "Movements",
         "discovery": "Discovery",
-        "unread": "Unread"
+        "unread": "Unread",
+        "colony": "Colonies"
       },
       "entity-types": {
         "planet": "planet",

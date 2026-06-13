@@ -8,6 +8,7 @@ import type { BuildingId, PlanetId, PlayerId, ResearchId, Resource, SolarSystemI
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
 import { calculateResourceProduction, getResearchPointsPerTurn } from '~~/shared/utils/economy'
 import { findLanePath, getSystemIdForLocation } from '~~/shared/utils/starlanes'
+import { resolveFleetCombat } from '~~/shared/utils/combat'
 
 type ResolveResult = {
   resolved: boolean
@@ -280,6 +281,144 @@ function advanceFleets(snapshot: GameSnapshot, turn: number, nextEventId: () => 
   }
 }
 
+/**
+ * Resolve combat in every system where 2+ owners have fleets present.
+ * Defense is at system granularity (vision): a fleet anywhere in the system
+ * fights. Destroyed fleets are removed from the snapshot.
+ */
+function resolveCombat(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
+  const systemFleets = new Map<SolarSystemId, Unit[]>()
+  for (const fleet of snapshot.fleets) {
+    const systemId = getSystemIdForLocation(snapshot, fleet.location)
+    if (!systemId) continue
+    const list = systemFleets.get(systemId) ?? []
+    list.push(fleet)
+    systemFleets.set(systemId, list)
+  }
+
+  const destroyedIds = new Set<string>()
+
+  for (const [systemId, fleets] of systemFleets) {
+    const byOwner = new Map<PlayerId, Unit[]>()
+    for (const fleet of fleets) {
+      const list = byOwner.get(fleet.ownerId) ?? []
+      list.push(fleet)
+      byOwner.set(fleet.ownerId, list)
+    }
+    if (byOwner.size < 2) continue // no opposing fleets → no battle
+
+    const result = resolveFleetCombat(byOwner)
+    const systemName = snapshot.systems.find(s => s.id === systemId)?.name ?? systemId
+    const totalDestroyed = result.sides.reduce((sum, side) => sum + side.destroyed.length, 0)
+
+    for (const side of result.sides) {
+      for (const lost of side.destroyed) destroyedIds.add(lost.id)
+      const won = result.winnerId === side.ownerId
+      const outcome = result.winnerId === null
+        ? 'events.values.draw'
+        : won ? 'events.values.victory' : 'events.values.defeat'
+      const ourLosses = side.destroyed.length
+      addEvent(snapshot, side.ownerId, {
+        id: nextEventId(),
+        type: 'combat',
+        severity: won ? 'success' : result.winnerId === null ? 'warning' : 'critical',
+        year: turn,
+        titleKey: 'events.types.combat.title',
+        titleParams: { location: systemName },
+        descriptionKey: 'events.types.combat.description',
+        descriptionParams: { outcome },
+        details: [
+          { labelKey: 'events.details.enemy-losses', value: String(totalDestroyed - ourLosses), icon: 'i-lucide-skull' },
+          { labelKey: 'events.details.our-losses', value: String(ourLosses), icon: 'i-lucide-shield-x' }
+        ],
+        relatedEntityId: systemId,
+        relatedEntityType: 'system',
+        read: false,
+        timestamp: Date.now()
+      })
+    }
+  }
+
+  if (destroyedIds.size > 0) {
+    snapshot.fleets = snapshot.fleets.filter(fleet => !destroyedIds.has(fleet.id))
+  }
+}
+
+/**
+ * Idle colonizer fleets capture a planet in their system when no enemy fleet
+ * contests it. Unclaimed planets and undefended enemy planets are both valid
+ * targets; the colonizer is consumed on capture.
+ */
+function resolveColonization(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
+  const colonizers = snapshot.fleets.filter(fleet =>
+    fleet.status !== 'en-route' && getUnitDef(fleet.defId ?? fleet.id)?.unitType === 'colonizer')
+
+  const consumedFleetIds = new Set<string>()
+  const capturedPlanetIds = new Set<string>()
+
+  for (const colonizer of colonizers) {
+    const systemId = getSystemIdForLocation(snapshot, colonizer.location)
+    if (!systemId) continue
+
+    const enemyPresent = snapshot.fleets.some(fleet =>
+      fleet.ownerId !== colonizer.ownerId
+      && !consumedFleetIds.has(fleet.id)
+      && getSystemIdForLocation(snapshot, fleet.location) === systemId)
+    if (enemyPresent) continue
+
+    const target = snapshot.planets.find(planet =>
+      planet.systemId === systemId
+      && planet.owner !== colonizer.ownerId
+      && planet.owner !== 'unknown'
+      && !capturedPlanetIds.has(planet.id))
+    if (!target) continue
+
+    const previousOwner = target.owner
+    target.owner = colonizer.ownerId
+    target.queues = { build: [], shipyard: [] }
+    if (target.workers < 1) target.workers = 1
+
+    for (const player of snapshot.players) {
+      player.planets = player.planets.filter(id => id !== target.id)
+    }
+    const newOwner = snapshot.players.find(p => p.id === colonizer.ownerId)
+    if (newOwner && !newOwner.planets.includes(target.id)) newOwner.planets.push(target.id)
+
+    capturedPlanetIds.add(target.id)
+    consumedFleetIds.add(colonizer.id)
+
+    addEvent(snapshot, colonizer.ownerId, {
+      id: nextEventId(),
+      type: 'colony-established',
+      severity: 'success',
+      year: turn,
+      titleKey: previousOwner === 'unclaimed'
+        ? 'events.types.colony-established.title'
+        : 'events.types.colony-established.title-captured',
+      titleParams: { name: target.name },
+      descriptionKey: previousOwner === 'unclaimed'
+        ? 'events.types.colony-established.description'
+        : 'events.types.colony-established.description-captured',
+      descriptionParams: { location: target.name },
+      relatedEntityId: target.id,
+      relatedEntityType: 'planet',
+      read: false,
+      timestamp: Date.now()
+    })
+  }
+
+  if (consumedFleetIds.size > 0) {
+    snapshot.fleets = snapshot.fleets.filter(fleet => !consumedFleetIds.has(fleet.id))
+  }
+}
+
+/** Keep each player's empireState.planetsControlled in sync with ownership. */
+function updatePlanetsControlled(snapshot: GameSnapshot) {
+  for (const player of snapshot.players) {
+    player.research.empireState.planetsControlled = snapshot.planets.filter(p => p.owner === player.id).length
+  }
+}
+
 function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
   for (const planet of snapshot.planets) {
     if (planet.queues.build.length > 0) {
@@ -466,17 +605,22 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     // Step 2: Move fleets one star lane along their routes
     advanceFleets(nextSnapshot, turn, nextEventId)
 
-    // Step 3: Add resource production from existing buildings (before completing new ones)
+    // Step 3: Resolve combat where fleets meet, then colonize undefended planets
+    resolveCombat(nextSnapshot, turn, nextEventId)
+    resolveColonization(nextSnapshot, turn, nextEventId)
+    updatePlanetsControlled(nextSnapshot)
+
+    // Step 4: Add resource production from existing buildings (before completing new ones)
     for (const player of nextSnapshot.players) {
       const production = calculateResourceProduction(nextSnapshot.planets, player.id)
       applyResourceProduction(player, production)
     }
 
-    // Step 4: Advance research and complete buildings/units
+    // Step 5: Advance research and complete buildings/units
     advanceResearch(nextSnapshot, turn, nextEventId)
     advanceQueues(nextSnapshot, turn, nextEventId)
 
-    // Step 5: Update resource deltas for display (production for next turn)
+    // Step 6: Update resource deltas for display (production for next turn)
     updateResourceDeltas(nextSnapshot)
 
     nextSnapshot = { ...nextSnapshot, turn: turn + 1 }

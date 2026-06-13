@@ -28,6 +28,12 @@
       "diplomatic": {
         "title": "Diplomatic Event",
         "description": "{faction} has {action}"
+      },
+      "colony-established": {
+        "title": "Colony Established",
+        "title-captured": "Planet Captured",
+        "description": "New colony founded on {location}",
+        "description-captured": "Seized control of {location}"
       }
     },
     "details": {

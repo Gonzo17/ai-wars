@@ -469,6 +469,10 @@
       "probe": {
         "name": "Tiefen-Sonde",
         "role": "Aufklärung"
+      },
+      "colony-ship": {
+        "name": "Kolonieschiff",
+        "role": "Kolonisierung"
       }
     },
     "errors": {
@@ -500,7 +504,8 @@
         "ships": "Schiffe",
         "movements": "Bewegungen",
         "discovery": "Entdeckung",
-        "unread": "Ungelesen"
+        "unread": "Ungelesen",
+        "colony": "Kolonien"
       },
       "entity-types": {
         "planet": "Planet",

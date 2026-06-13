@@ -16,6 +16,7 @@ const filterOptions = computed(() => [
   { key: 'building-complete' as const, label: t('game.event-log.filters.buildings'), icon: eventTypeIcons['building-complete'] },
   { key: 'ship-complete' as const, label: t('game.event-log.filters.ships'), icon: eventTypeIcons['ship-complete'] },
   { key: 'army-arrived' as const, label: t('game.event-log.filters.movements'), icon: eventTypeIcons['army-arrived'] },
+  { key: 'colony-established' as const, label: t('game.event-log.filters.colony'), icon: eventTypeIcons['colony-established'] },
   { key: 'discovery' as const, label: t('game.event-log.filters.discovery'), icon: eventTypeIcons.discovery }
 ])
 
