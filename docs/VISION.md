@@ -87,21 +87,53 @@ every star", to avoid denial-by-hidden-outpost endgames. The existing
 `AscensionGateDef.requiresEmpire` is the intended mechanism; extend
 `EmpireRequirement` with star/megastructure fields when implementing.
 
-**Three victory conditions (v1 scope):**
+**Three victory conditions, distinct by *type* not just ingredients (refined June 2026).**
+The point is three different *verbs* — hold / build / eliminate — so none feels
+like "build a wonder with different prerequisites". All three need a base of
+late-game research, then diverge into expansion vs. research vs. military.
 
-1. **Ascension (research victory)** — pass the final K3.0 gate. The gate
-   demands held stars + megastructure infrastructure + a final research push.
-   Passing the gate wins immediately; nothing must be held afterwards.
-2. **Domination** — eliminate all opponents (capture/destroy home worlds).
-3. **Wonder (AoE2-style)** — one *exclusive* late-game megastructure
-   (working title: Transcendence Beacon; high tier gate, enormous cost).
-   Starting it is announced to all players; progress/countdown is globally
-   visible; it is fully destructible while building. All-in gamble that
-   forces confrontation.
+1. **Expansion — a *control* victory (hold a threshold).** Control ≥ N solar
+   systems and hold them for K turns. Crossing the threshold (while the base
+   prerequisites are met) starts a galaxy-wide, fully visible **dominance
+   countdown**; opponents must take a system away to pause/reset it. This makes
+   the sprawling empire the target everyone gangs up on — structurally
+   different from defending a build site. Win trigger = a maintained *state*,
+   not a finished object.
+   - *"Control a system"* (pin down when implementing): own the star + planet
+     majority + no contesting enemy fleet. Ties to system-granular control and
+     "stars as build sites" above.
+2. **Research — a *completion* victory (Temporal Ascension).** Build the
+   time-travel capstone: thematically a *different* ascension — transcending
+   causality, not scale/energy. Requires a deep tech line + an exotic resource,
+   reachable "tall" without wide territory → the underdog / comeback path. The
+   grandfather paradox is irrelevant to the game (it just ends on a win); the
+   fiction hand-wave is that the AI ascends *out of* the timeline (a-temporal),
+   so it doesn't erase its own origin. Completion = instant win.
+3. **Military — an *elimination* victory.** Eliminate all opponents. Enabled
+   late-game by a **planet-cracker mega-unit** (Death Star-like): expensive,
+   slow, *mobile*, destroys enemy planets so domination doesn't stall against
+   well-defended worlds. Deliberately asymmetric: you build the *weapon*, then
+   *use* it — not "build → win". Military must require actually fighting.
 
-Dyson swarm itself is **non-exclusive and staged** (every player can build
-their own, per star, in stages); some *expansions/extensions* of it may be
-exclusive.
+**Every path telegraphs before it wins — no no-warning snowball.** What differs
+is the notification model and the counter-shape:
+
+| Path | Win trigger | Notification | Counter-shape |
+|---|---|---|---|
+| Expansion | hold N systems for K turns | vague "approaching" early warning (you know territorial danger, *not* whether hidden conditions are met) → hard visible countdown once they qualify | peel a system off (many locations) |
+| Research | finish the capstone | globally announced, visible completion countdown | destroy the structure (one location) |
+| Military | eliminate opponents | intel on planet-cracker construction start + completion, but its location fogged until it strikes (cat-and-mouse) | hunt/destroy the mobile weapon, or out-defend |
+
+The mystery lives in the *approach*; the actual imminent win is always clearly
+telegraphed (multiplayer fairness). The planet-cracker doubles as the universal
+disruptor of the two peaceful wins (crack the lynchpin planet) — but
+*conventional* fleets must also be able to damage a wonder, so military is never
+*mandatory* to stop a win.
+
+Dyson swarm is **economy infrastructure, not a victory trigger** —
+non-exclusive and staged (every player can build their own, per star, in
+stages); some *expansions/extensions* of it may be exclusive. It fuels whichever
+path the player is pursuing.
 
 **Pacing target: ~80–120 turns ≈ 1–2h.** Simultaneous turns are short —
 median ~30s (one build queue per planet, one research, few fleet stacks),
