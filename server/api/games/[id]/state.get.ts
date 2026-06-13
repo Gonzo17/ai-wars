@@ -3,6 +3,8 @@ import { serverSupabaseServiceRole } from '#supabase/server'
 import { SupabaseGameRepository } from '~~/server/game/supabaseRepository'
 import { resolveUserId } from '~~/server/utils/resolveUserId'
 import { initialState } from '~~/server/game/initialState'
+import { redactSnapshotFor } from '~~/server/game/redactSnapshot'
+import { toPlayerId } from '~~/server/game/playerId'
 import type { GameSnapshot } from '~~/shared/types/game'
 
 export default defineEventHandler(async (event) => {
@@ -35,6 +37,11 @@ export default defineEventHandler(async (event) => {
   const playerIds = await repo.listGamePlayers(gameId)
   let snapshot = await repo.getGameState(gameId, turn)
   if (!snapshot) {
+    // Only bootstrap the opening snapshot. Never create state for an arbitrary
+    // (client-supplied) turn — that would let a request write phantom snapshots.
+    if (turn !== 1) {
+      throw createError({ statusCode: 404, statusMessage: 'No snapshot for turn' })
+    }
     snapshot = initialState(playerIds, turn)
     await repo.insertGameState(gameId, turn, snapshot)
   }
@@ -51,5 +58,8 @@ export default defineEventHandler(async (event) => {
     }))
   }
 
-  return { turn, snapshot: patchedSnapshot }
+  // Fog of war: never ship another player's private state to the client.
+  const redacted = redactSnapshotFor(patchedSnapshot, toPlayerId(userId))
+
+  return { turn, snapshot: redacted }
 })

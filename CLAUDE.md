@@ -121,9 +121,10 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 4. **`productionCarryover`** rolls excess production from a completed build into the next turn's production pool on that planet.
 5. **Fleet movement runs on the star-lane graph** (since June 2026): `advanceFleets()` in resolveTurn moves en-route fleets one lane per turn along the BFS shortest path (`shared/utils/starlanes.ts`); validation rejects unreachable targets. Fleets get a unique instance `id` on completion — the definition lookup key is `Unit.defId`. `Galaxy.connections` is still unused.
 6. **Combat & colonization run after movement** (since June 2026): `resolveCombat()` clashes fleets where 2+ owners share a *system* (defense is system-granular, vision); pure math in `shared/utils/combat.ts` (offense = strength × type weight, weakest ships die first, ties = mutual destruction). `resolveColonization()` then lets an idle `unitType: 'colonizer'` fleet (`unit:colony-ship`) capture an unclaimed or undefended-enemy planet in its system, consuming the ship. `empireState.planetsControlled` is recomputed each resolve.
-7. **Game phase `resolving` is a transient lock.** Clients cannot submit or unsubmit while phase is `resolving`. Resolution is fast and atomic — phase flips back to `planning` after the snapshot is written.
-8. **The `~~/` alias resolves at build time only**. Don't expect it inside string-based dynamic imports.
-9. **Two `toPlayerId` implementations** exist (client + server) — keep them identical.
+7. **Fog of war is applied on read** (since June 2026): the DB stores the full snapshot, but `state.get` runs `redactSnapshotFor(snapshot, viewerId)` ([server/game/redactSnapshot.ts](server/game/redactSnapshot.ts)) before returning — enemy planet contents, enemy private state (resources/research/events) and out-of-sight enemy fleets are stripped. Server game logic (resolveTurn) always works on the full snapshot; only the API response is redacted. `turn_plans` SELECT is restricted to own rows via RLS so opponents can't read submitted plans pre-resolution.
+8. **Game phase `resolving` is a transient lock.** Clients cannot submit or unsubmit while phase is `resolving`. Resolution is fast and atomic — phase flips back to `planning` after the snapshot is written.
+9. **The `~~/` alias resolves at build time only**. Don't expect it inside string-based dynamic imports.
+10. **Two `toPlayerId` implementations** exist (client + server) — keep them identical.
 
 ## Testing strategy
 
