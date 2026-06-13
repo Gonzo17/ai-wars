@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BuildingId, ResourceNodeType } from '~~/shared/types/game'
+import type { BuildingId, Planet, ResourceNodeType } from '~~/shared/types/game'
 import type { AdjacencyBonus, PlanetSlot, SlotZone } from '~~/shared/types/planetSlots'
 import {
   ORBITAL_BUILDING_IDS,
@@ -8,6 +8,7 @@ import {
   computeAdjacencyBonuses,
   isSurfaceBuilding
 } from '~~/shared/types/planetSlots'
+import { activeSynergies } from '~~/shared/utils/synergies'
 
 interface BuildCosts {
   energy: number
@@ -307,6 +308,20 @@ const buildMenuPosition = computed(() => {
 const previewBonuses = (buildingId: string, slotIndex: number): AdjacencyBonus[] => {
   if (buildMenuZone.value === 'orbital') return []
   return computeAdjacencyBonuses(slotIndex, buildingId as BuildingId, surfaceSlots.value)
+}
+
+const synergyLabelKeys: Record<string, string> = {
+  'ore-extraction': 'game.slots.synergy-ore',
+  'power-grid': 'game.slots.synergy-power',
+  'compute-uplink': 'game.slots.synergy-compute'
+}
+
+// Which production synergies a building would trigger if placed in this slot.
+const previewSynergies = (buildingId: string, slotIndex: number): string[] => {
+  const planet = { slots: props.planet.slots } as unknown as Planet
+  return activeSynergies(planet, slotIndex, buildingId as BuildingId)
+    .map(type => synergyLabelKeys[type])
+    .filter((key): key is string => Boolean(key))
 }
 
 const canAfford = (costs: BuildCosts): boolean => {
@@ -960,12 +975,23 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                     <span class="truncate">{{ $t('game.slots.requires-research', { tech: building.lockedByTechName ?? '?' }) }}</span>
                   </div>
                 </div>
-                <!-- Ore bonus badge preview (surface only) -->
-                <div
-                  v-if="buildMenuZone === 'surface' && previewBonuses(building.id, buildMenuSlotIndex!).length > 0"
-                  class="shrink-0"
-                >
+                <!-- Synergy + ore-cost badge previews -->
+                <div class="flex flex-col items-end gap-1 shrink-0">
                   <UBadge
+                    v-for="synergyKey in previewSynergies(building.id, buildMenuSlotIndex!)"
+                    :key="synergyKey"
+                    color="primary"
+                    variant="subtle"
+                    size="xs"
+                  >
+                    <UIcon
+                      name="i-lucide-zap"
+                      class="w-3 h-3 mr-0.5"
+                    />
+                    {{ $t(synergyKey) }}
+                  </UBadge>
+                  <UBadge
+                    v-if="buildMenuZone === 'surface' && previewBonuses(building.id, buildMenuSlotIndex!).length > 0"
                     color="success"
                     variant="subtle"
                     size="xs"

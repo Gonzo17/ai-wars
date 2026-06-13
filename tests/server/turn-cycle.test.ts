@@ -134,9 +134,10 @@ describe('building construction cycle', () => {
     const events = getPlayer(turn3, U1).events
     expect(events.some(e => e.type === 'building-complete')).toBe(true)
 
-    // Completed mine (15) + refinery (25) show up in the mineral delta
+    // Mine sits on the ore node → ore-extraction synergy doubles its 15 to 30,
+    // plus the home refinery's 25 → 55 in the mineral delta
     const mineralRes = getPlayer(turn3, U1).resources.find(r => r.key === 'res:material')
-    expect(mineralRes?.delta).toBe(40)
+    expect(mineralRes?.delta).toBe(55)
   })
 
   it('resuming the same build in the same slot does not charge again', async () => {
@@ -174,11 +175,12 @@ describe('research cycle', () => {
       commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
     }
 
-    // 100 points required, data-center L1 yields 20/turn → 5 turns
+    // 100 points required. Data-center L1 yields 20, +25% compute-uplink from
+    // the home fusion-core → 25/turn.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(20)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(25)
 
     for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)

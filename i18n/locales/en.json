@@ -409,7 +409,10 @@
       "choose-unit": "Choose Unit",
       "train-unit": "Train",
       "requires-research": "Requires: {tech}",
-      "locked": "Locked"
+      "locked": "Locked",
+      "synergy-ore": "×2 Minerals",
+      "synergy-power": "+25% Energy",
+      "synergy-compute": "+Research"
     },
     "buildings": {
       "solar-array": {

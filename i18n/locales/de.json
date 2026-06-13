@@ -409,7 +409,10 @@
       "choose-unit": "Einheit wählen",
       "train-unit": "Ausbilden",
       "requires-research": "Benötigt: {tech}",
-      "locked": "Gesperrt"
+      "locked": "Gesperrt",
+      "synergy-ore": "×2 Mineralien",
+      "synergy-power": "+25% Energie",
+      "synergy-compute": "+Forschung"
     },
     "buildings": {
       "solar-array": {
