@@ -26,6 +26,8 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  locked?: boolean
+  lockedByTechName?: string | null
 }
 
 interface UnitDefinition {
@@ -37,6 +39,8 @@ interface UnitDefinition {
   productionCost: number
   icon: string
   requiresFacility: boolean
+  locked?: boolean
+  lockedByTechName?: string | null
 }
 
 interface PlanetData {
@@ -897,8 +901,8 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                 type="button"
                 :data-testid="`build-option-${building.id}`"
                 class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                :class="{ 'opacity-40 cursor-not-allowed': !isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts) }"
-                :disabled="!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts)"
+                :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts)) }"
+                :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts))"
                 @click="handleBuild(building.id, buildMenuSlotIndex!)"
               >
                 <div class="flex h-8 w-8 items-center justify-center rounded-md bg-neutral-800/80 shrink-0">
@@ -944,6 +948,16 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                     </span>
                     <span class="text-neutral-600">·</span>
                     <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(building.productionCost) }) }}</span>
+                  </div>
+                  <div
+                    v-if="building.locked"
+                    class="flex items-center gap-1 mt-0.5 text-[10px] text-info-300"
+                  >
+                    <UIcon
+                      name="i-lucide-lock"
+                      class="w-2.5 h-2.5"
+                    />
+                    <span class="truncate">{{ $t('game.slots.requires-research', { tech: building.lockedByTechName ?? '?' }) }}</span>
                   </div>
                 </div>
                 <!-- Ore bonus badge preview (surface only) -->
@@ -1036,8 +1050,8 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                   :key="unit.id"
                   type="button"
                   class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                  :class="{ 'opacity-40 cursor-not-allowed': !canTrainUnit(unit) || !canAfford(unit.resourceCosts) }"
-                  :disabled="!canTrainUnit(unit) || !canAfford(unit.resourceCosts)"
+                  :class="{ 'opacity-40 cursor-not-allowed': unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) }"
+                  :disabled="unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts)"
                   @click="handleTrainUnit(unit.id)"
                 >
                   <div class="flex h-8 w-8 items-center justify-center rounded-md bg-sky-900/50 shrink-0">
@@ -1086,7 +1100,23 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                     </div>
                   </div>
                   <div
-                    v-if="!canTrainUnit(unit)"
+                    v-if="unit.locked"
+                    class="shrink-0"
+                  >
+                    <UBadge
+                      color="info"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      <UIcon
+                        name="i-lucide-lock"
+                        class="w-3 h-3 mr-0.5"
+                      />
+                      {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
+                    </UBadge>
+                  </div>
+                  <div
+                    v-else-if="!canTrainUnit(unit)"
                     class="shrink-0"
                   >
                     <UBadge

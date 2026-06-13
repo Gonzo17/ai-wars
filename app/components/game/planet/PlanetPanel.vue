@@ -17,6 +17,8 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  locked?: boolean
+  lockedByTechName?: string | null
 }
 
 interface UnitDefinition {
@@ -28,6 +30,8 @@ interface UnitDefinition {
   productionCost: number
   icon: string
   requiresFacility: boolean
+  locked?: boolean
+  lockedByTechName?: string | null
 }
 
 interface PlanetData {
@@ -252,10 +256,12 @@ const isAlreadyPaid = (buildId: string): boolean => {
 }
 
 const canBuildBuilding = (building: BuildingDefinition): boolean => {
+  if (building.locked) return false
   return isAlreadyPaid(building.id) || canAfford(building.resourceCosts)
 }
 
 const canBuildUnit = (unit: UnitDefinition): boolean => {
+  if (unit.locked) return false
   return isAlreadyPaid(unit.id) || canAfford(unit.resourceCosts)
 }
 </script>
@@ -433,10 +439,26 @@ const canBuildUnit = (unit: UnitDefinition): boolean => {
                     />
                   </div>
                   <div class="relative z-10 flex-1">
-                    <p class="text-sm font-semibold text-neutral-100">
+                    <p
+                      class="text-sm font-semibold"
+                      :class="building.locked ? 'text-neutral-400' : 'text-neutral-100'"
+                    >
                       {{ building.name }}
                     </p>
-                    <p class="text-[11px] text-neutral-500">
+                    <p
+                      v-if="building.locked"
+                      class="flex items-center gap-1 text-[11px] text-info-300"
+                    >
+                      <UIcon
+                        name="i-lucide-lock"
+                        class="w-3 h-3"
+                      />
+                      {{ $t('game.slots.requires-research', { tech: building.lockedByTechName ?? '?' }) }}
+                    </p>
+                    <p
+                      v-else
+                      class="text-[11px] text-neutral-500"
+                    >
                       {{ $t('game.planet.level', { value: builtLevels.get(building.id) ?? 0, max: building.maxLevel }) }}
                     </p>
                   </div>
@@ -589,10 +611,26 @@ const canBuildUnit = (unit: UnitDefinition): boolean => {
                       />
                     </div>
                     <div class="relative z-10 flex-1">
-                      <p class="text-sm font-semibold text-neutral-100">
+                      <p
+                        class="text-sm font-semibold"
+                        :class="unit.locked ? 'text-neutral-400' : 'text-neutral-100'"
+                      >
                         {{ unit.name }}
                       </p>
-                      <p class="text-[11px] text-neutral-500">
+                      <p
+                        v-if="unit.locked"
+                        class="flex items-center gap-1 text-[11px] text-info-300"
+                      >
+                        <UIcon
+                          name="i-lucide-lock"
+                          class="w-3 h-3"
+                        />
+                        {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
+                      </p>
+                      <p
+                        v-else
+                        class="text-[11px] text-neutral-500"
+                      >
                         {{ unit.role }}
                       </p>
                     </div>

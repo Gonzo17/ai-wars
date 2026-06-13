@@ -6,6 +6,8 @@ import {
   RESEARCH_CATEGORY_ICONS
 } from '~~/shared/types/research'
 import { TECH_DEFS, ASCENSION_GATES, getTechById } from '~~/shared/defs/research-tree'
+import { getUnlocksForTech } from '~~/shared/defs/production'
+import type { ResearchId } from '~~/shared/types/game'
 
 const emit = defineEmits<{
   'close': []
@@ -399,6 +401,24 @@ const getTierColor = (tier: AscensionTier): string => {
   const tierIndex = ASCENSION_TIER_ORDER.indexOf(tier)
   const colors = ['success', 'info', 'blue', 'primary', 'purple', 'pink', 'critical']
   return colors[tierIndex] || 'neutral'
+}
+
+// --- Unlocks (buildings/units gated behind a tech) ---
+const buildingUnlockName = (id: string) => {
+  const key = `game.buildings.${id.replace('bld:', '')}.name`
+  return te(key) ? t(key) : id
+}
+const unitUnlockName = (id: string) => {
+  const key = `game.units.${id.replace('unit:', '')}.name`
+  return te(key) ? t(key) : id
+}
+
+const getTechUnlocks = (techId: string): Array<{ id: string, icon: string, name: string }> => {
+  const unlocks = getUnlocksForTech(techId as ResearchId)
+  return [
+    ...unlocks.buildings.map(def => ({ id: def.id, icon: def.icon ?? 'i-lucide-hammer', name: buildingUnlockName(def.id) })),
+    ...unlocks.units.map(def => ({ id: def.id, icon: def.icon ?? 'i-lucide-rocket', name: unitUnlockName(def.id) }))
+  ]
 }
 
 // --- Event Handlers ---
@@ -864,6 +884,27 @@ onMounted(() => {
 
                 <!-- Spacer -->
                 <div class="flex-1" />
+
+                <!-- Unlocked buildings/units -->
+                <div
+                  v-if="getTechUnlocks(pos.tech.id).length > 0"
+                  class="mt-1 flex items-center gap-1"
+                >
+                  <span class="text-[9px] uppercase tracking-wide text-success-400/80 shrink-0">
+                    {{ $t('game.research.unlocks-label') }}
+                  </span>
+                  <span
+                    v-for="unlock in getTechUnlocks(pos.tech.id)"
+                    :key="unlock.id"
+                    :title="unlock.name"
+                    class="flex items-center"
+                  >
+                    <UIcon
+                      :name="unlock.icon"
+                      class="w-3 h-3 text-neutral-300"
+                    />
+                  </span>
+                </div>
 
                 <!-- Progress bar -->
                 <div

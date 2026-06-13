@@ -103,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getUnitDef } from '~~/shared/defs/production'
+import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitDef } from '~~/shared/defs/production'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -162,6 +162,8 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  locked: boolean
+  lockedByTechName: string | null
 }
 
 interface UnitDefinition {
@@ -173,6 +175,8 @@ interface UnitDefinition {
   productionCost: number
   icon: string
   requiresFacility: boolean
+  locked: boolean
+  lockedByTechName: string | null
 }
 
 definePageMeta({
@@ -609,6 +613,20 @@ const buildingNameKey = (id: string) => `game.buildings.${id.replace('bld:', '')
 const buildingDescriptionKey = (id: string) => `game.buildings.${id.replace('bld:', '')}.description`
 const unitNameKey = (id: string) => `game.units.${id.replace('unit:', '')}.name`
 const unitRoleKey = (id: string) => `game.units.${id.replace('unit:', '')}.role`
+const techNameKey = (id: string) => `game.research.techs.${id.replace('tech:', '')}.name`
+
+const techDisplayName = (techId: string) => {
+  const key = techNameKey(techId)
+  if (te(key)) return t(key)
+  return TECH_DEFS.find(tech => tech.id === techId)?.name ?? techId
+}
+
+const completedTechIds = computed((): string[] => {
+  if (!snapshot.value || !currentUserId.value) return []
+  const playerId = toPlayerId(currentUserId.value)
+  const player = snapshot.value.players.find(p => p.id === playerId || p.userId === currentUserId.value)
+  return player?.research.completedTechIds ?? []
+})
 
 const research = computed(() => {
   const active = researchStore.activeResearch
@@ -657,27 +675,37 @@ const getSizeLabel = (size: PlanetSize) => {
   return te(key) ? t(key) : size
 }
 
-const buildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.map(def => ({
-  id: def.id,
-  name: te(buildingNameKey(def.id)) ? t(buildingNameKey(def.id)) : def.id,
-  description: te(buildingDescriptionKey(def.id)) ? t(buildingDescriptionKey(def.id)) : '',
-  category: def.category,
-  maxLevel: def.maxLevel ?? 1,
-  resourceCosts: def.resourceCosts,
-  productionCost: def.productionCost,
-  icon: def.icon ?? 'i-lucide-hammer'
-})))
+const buildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.map((def) => {
+  const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
+  return {
+    id: def.id,
+    name: te(buildingNameKey(def.id)) ? t(buildingNameKey(def.id)) : def.id,
+    description: te(buildingDescriptionKey(def.id)) ? t(buildingDescriptionKey(def.id)) : '',
+    category: def.category,
+    maxLevel: def.maxLevel ?? 1,
+    resourceCosts: def.resourceCosts,
+    productionCost: def.productionCost,
+    icon: def.icon ?? 'i-lucide-hammer',
+    locked: missingResearch.length > 0,
+    lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
+  }
+}))
 
-const unitCatalog = computed((): UnitDefinition[] => UNIT_DEFS.map(def => ({
-  id: def.id,
-  name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
-  role: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
-  category: def.category,
-  resourceCosts: def.resourceCosts,
-  productionCost: def.productionCost,
-  icon: def.icon ?? 'i-lucide-rocket',
-  requiresFacility: (def.requirements.buildings?.length ?? 0) > 0
-})))
+const unitCatalog = computed((): UnitDefinition[] => UNIT_DEFS.map((def) => {
+  const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
+  return {
+    id: def.id,
+    name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
+    role: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
+    category: def.category,
+    resourceCosts: def.resourceCosts,
+    productionCost: def.productionCost,
+    icon: def.icon ?? 'i-lucide-rocket',
+    requiresFacility: (def.requirements.buildings?.length ?? 0) > 0,
+    locked: missingResearch.length > 0,
+    lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
+  }
+}))
 
 const getStationedUnits = (planet: Planet): Array<{ unitDefId: string, count: number }> => {
   const result: Array<{ unitDefId: string, count: number }> = []

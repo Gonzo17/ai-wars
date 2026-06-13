@@ -114,7 +114,7 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 
 ## Gotchas (things that have bitten me)
 
-1. **Tech tree currently unlocks nothing**. `BuildingDefinition.requirements.research` exists in the type but every entry in `BUILDING_DEFS` has `requirements: {}`. Research is decorative right now — known gap, on the roadmap.
+1. **Tech gating is live** (since June 2026): several buildings/units in `BUILDING_DEFS`/`UNIT_DEFS` carry `requirements.research`, enforced server-side in `validateTurnPlan` and surfaced in the UI via the `locked`/`lockedByTechName` catalog fields built in `game.vue`. When adding a building/unit, decide which tech gates it; `getUnlocksForTech()` drives the "Unlocks" display in the research tree.
 2. **`isResume` semantics in resolve**: building the same building in the same slot keeps existing construction progress and does NOT re-deduct resources. Switching pays again. See `applyPlan()` in [resolveTurn.ts](server/game/resolveTurn.ts).
 3. **`progressMemory`** stores per-build production progress so a cancelled or replaced build doesn't lose what was already invested. Lives on `Planet.progressMemory` (per-planet, per-buildId) and on `PlayerSnapshot.research.progressMemory` (per-tech).
 4. **`productionCarryover`** rolls excess production from a completed build into the next turn's production pool on that planet.

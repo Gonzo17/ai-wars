@@ -305,7 +305,8 @@
           "name": "Galaktisches Netzwerk",
           "description": "Kommunikation über stellare Distanzen."
         }
-      }
+      },
+      "unlocks-label": "Schaltet frei"
     },
     "resources": {
       "energy": "Energie",
@@ -406,7 +407,9 @@
       "units-title": "Einheiten",
       "no-units": "Keine Einheiten stationiert",
       "choose-unit": "Einheit wählen",
-      "train-unit": "Ausbilden"
+      "train-unit": "Ausbilden",
+      "requires-research": "Benötigt: {tech}",
+      "locked": "Gesperrt"
     },
     "buildings": {
       "solar-array": {

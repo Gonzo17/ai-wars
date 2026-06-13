@@ -174,17 +174,17 @@ describe('research cycle', () => {
       commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
     }
 
-    // 100 points required, data-center L1 yields 10/turn → 10 turns
+    // 100 points required, data-center L1 yields 20/turn → 5 turns
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(10)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(20)
 
-    for (let turn = 2; turn <= 10; turn++) {
+    for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)
     }
 
-    const final = getSnapshot(repo, 11)
+    const final = getSnapshot(repo, 6)
     const p1 = getPlayer(final, U1)
     expect(p1.research.completedTechIds).toContain('tech:bootstrapped-ai-core')
     expect(p1.research.activeResearch).toBeUndefined()
@@ -216,9 +216,11 @@ describe('unit production cycle', () => {
 
   it('a finished ship joins the global fleet list', async () => {
     const repo = seedTwoPlayerGame()
-    // Probes cost 8 rare; players start with 0 → grant some up front
+    // Probes cost 8 rare; players start with 0 → grant some up front.
+    // Probes also require tech:probe-design since tech gating landed.
     const seedState = getSnapshot(repo, 1)
     getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
+    getPlayer(seedState, U1).research.completedTechIds.push('tech:probe-design')
 
     const plan: TurnPlan = {
       commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:probe' }]
@@ -238,6 +240,59 @@ describe('unit production cycle', () => {
       status: 'idle'
     })
     expect(final.planets.find(p => p.id === 'pl:aurora')!.queues.shipyard).toHaveLength(0)
+  })
+})
+
+describe('tech gating', () => {
+  it('rejects a building whose research requirement is not met', async () => {
+    const repo = seedTwoPlayerGame()
+    const plan: TurnPlan = {
+      // rare-extractor requires tech:autonomous-resource-allocation
+      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:rare-extractor', slotIndex: 3 }]
+    }
+
+    await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({
+      statusCode: 400,
+      data: { errors: [{ code: 'INVALID_STATE', message: 'Research requirements not met' }] }
+    })
+  })
+
+  it('allows the same building once the research is completed', async () => {
+    const repo = seedTwoPlayerGame()
+    const seedState = getSnapshot(repo, 1)
+    getPlayer(seedState, U1).research.completedTechIds.push('tech:autonomous-resource-allocation')
+
+    const plan: TurnPlan = {
+      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:rare-extractor', slotIndex: 3 }]
+    }
+
+    await playTurn(repo, 1, { [U1]: plan })
+
+    const turn2 = getSnapshot(repo, 2)
+    const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[3]!
+    expect(slot.buildingId).toBe('bld:rare-extractor')
+    expect(slot.isConstructing).toBe(true)
+  })
+
+  it('rejects a unit whose research requirement is not met even if the facility exists', async () => {
+    const repo = seedTwoPlayerGame()
+    // Home world has an orbital dock from the start; grant rare so only research blocks
+    const seedState = getSnapshot(repo, 1)
+    getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
+
+    const plan: TurnPlan = {
+      // frigate requires tech:first-shipyard
+      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:frigate' }]
+    }
+
+    await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({
+      statusCode: 400,
+      data: {
+        errors: expect.arrayContaining([
+          expect.objectContaining({ code: 'INVALID_STATE', message: 'Research requirements not met' })
+        ])
+      }
+    })
   })
 })
 

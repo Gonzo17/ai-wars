@@ -305,7 +305,8 @@
           "name": "Galactic Network",
           "description": "Communication across stellar distances."
         }
-      }
+      },
+      "unlocks-label": "Unlocks"
     },
     "resources": {
       "energy": "Energy",
@@ -406,7 +407,9 @@
       "units-title": "Units",
       "no-units": "No units stationed",
       "choose-unit": "Choose Unit",
-      "train-unit": "Train"
+      "train-unit": "Train",
+      "requires-research": "Requires: {tech}",
+      "locked": "Locked"
     },
     "buildings": {
       "solar-array": {
