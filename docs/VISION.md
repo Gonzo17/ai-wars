@@ -62,16 +62,55 @@ These are the areas David explicitly flags as "not strategically interesting yet
   unlocking whole capability classes, specialization points, repeatable research
   to deepen a buff. Techs must gate real unlocks (roadmap item 1).
 
-## Megastructures (mid/endgame)
+## Megastructures, stars & victory (refined June 2026)
 
-Civ-style wonders are a must for the mid- and endgame. Open design area; current
-thinking:
+**Stars become first-class map objects in the late game.** Each system has one
+star as a build site for star-anchored megastructures (Dyson swarm stages,
+later e.g. stellar engine). This gives the map a phase arc: planets matter
+early (economy), lanes/chokepoints matter mid (position), stars matter late
+(victory). Planet ownership and star control in the same system are separate —
+an enemy colony can sit in a system whose star you are harvesting; space
+control (fleet combat) decides who may build at or damage the star.
 
-- **Dyson sphere** is the obvious one — but since every civilization eventually
-  wants it, it may be *non-exclusive* (each player can build their own).
-- Other megastructures may be *exclusive*, wonder-race style (first to finish).
-- Likely the natural hook for the **victory condition**: an ascension project that
-  ends the game fits the theme and bounds session length.
+**Defense stays at system granularity.** A fleet stationed in a system defends
+everything in it; optional stationary orbital-defense buildings as an
+alternative. No separate guard micromanagement. Megastructures are *damaged*
+by raids (stages knocked offline, repairable), never instantly destroyed —
+except the victory wonder, where destructibility is the counterplay.
+
+**Kardashev tiers are game abstractions, not astronomy.** A "galaxy" is a
+cluster of ~5–8 systems. Each player starts in their own home galaxy
+(Civ-continents pattern) with a contested neutral region between them.
+Ascension gates use *threshold* empire requirements (e.g. majority of your
+galaxy's stars, N Dyson stages, specific megastructure built) — never "own
+every star", to avoid denial-by-hidden-outpost endgames. The existing
+`AscensionGateDef.requiresEmpire` is the intended mechanism; extend
+`EmpireRequirement` with star/megastructure fields when implementing.
+
+**Three victory conditions (v1 scope):**
+
+1. **Ascension (research victory)** — pass the final K3.0 gate. The gate
+   demands held stars + megastructure infrastructure + a final research push.
+   Passing the gate wins immediately; nothing must be held afterwards.
+2. **Domination** — eliminate all opponents (capture/destroy home worlds).
+3. **Wonder (AoE2-style)** — one *exclusive* late-game megastructure
+   (working title: Transcendence Beacon; high tier gate, enormous cost).
+   Starting it is announced to all players; progress/countdown is globally
+   visible; it is fully destructible while building. All-in gamble that
+   forces confrontation.
+
+Dyson swarm itself is **non-exclusive and staged** (every player can build
+their own, per star, in stages); some *expansions/extensions* of it may be
+exclusive.
+
+**Pacing target: ~80–120 turns ≈ 1–2h.** Simultaneous turns are short —
+median ~30s (one build queue per planet, one research, few fleet stacks),
+with occasional late-game spikes of minutes. No hard turn limit. Implications:
+build times of 2–4 turns, research 5–12 turns, lane travel 2–4 turns, Dyson
+stages and the wonder countdown ~10–15 turns each are all acceptable at this
+turn count. Empty "just end turn" turns are fine as long as they are
+frictionless. Future lever (not v1): optional soft turn timer as a lobby
+setting, since the slowest player drives session length.
 
 ## UI
 
