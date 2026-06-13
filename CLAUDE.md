@@ -147,12 +147,14 @@ The long-term product vision (inspirations, format, hard rules, known design deb
 megastructures) lives in [docs/VISION.md](docs/VISION.md) — read it before proposing
 or planning features. The list below is the agreed *next steps* toward that vision.
 
-The MVP works (auth, lobby, turn engine, economy, research tree, multi-zoom map) but feels like an economy sim — there are no real stakes. Five moves, in order of leverage, before scope expands:
+The MVP works (auth, lobby, turn engine, economy, research tree, multi-zoom map). The original five-move plan to add stakes is now mostly done:
 
-1. **Wire tech → unlocks.** `Building.requirements.research` is defined but unenforced. Map existing techs onto existing buildings (`tech:data-center-i` → `bld:data-center`, `tech:first-shipyard` → `bld:orbital-dock`, etc.) and enforce in validation. Cheapest fix, highest payoff — the tech tree becomes a real choice.
-2. **Star-lane fleet movement.** Use the already-defined-but-unused `SolarSystem.connections` for graph-based travel. ETA = number of lanes; decrement per turn. No tactical/hex layer.
-3. **Minimal combat.** When opposing fleets share a location: aggregate strength clash with a soft RPS multiplier between unit types. Loser destroyed, winner reduced. Conquest = capture undefended planet with a colonizer unit.
-4. **Building synergies.** Use the existing surface/orbital slot zones plus `resourceNode` to add ~3–4 strong interactions (e.g. mining facility on ore node = 2× output, solar array adjacent to data center = +1 research). Not a full system.
-5. **Dumb AI opponent.** Random-valid-move or simple heuristic. Unblocks solo playtesting — without it, every feature change needs two humans coordinating.
+1. ✅ **Tech → unlocks** (commit c9a542b). `requirements.research` enforced; locked-building UI; research tree shows unlocks.
+2. ✅ **Star-lane fleet movement** (commit aa5bc69). `SolarSystem.connections` BFS, one lane/turn, fleet panel UI.
+3. ✅ **Minimal combat + conquest** (commit 2837269). System-granular fleet clash + colony-ship planet capture.
+4. ✅ **Building synergies** (commit a34e304). Ore ×2, power grid, compute uplink via `slotOutput()`.
+5. ⛔ **Dumb AI opponent — dropped as a product feature.** Per [docs/VISION.md](docs/VISION.md), the game is multiplayer-only with no bots; the dev-testing need this was meant to solve is covered by the Playwright playtest harness. Only revisit as an explicit dev tool if asked.
 
-**Explicitly out of scope right now:** hex map (the genre-idiomatic answer is the star-lane graph, which is already half-built), asymmetric factions, diplomacy, trade, expanding the tech tree, animations/polish, and any move off the Nuxt browser stack. Do not propose features outside the five above without checking first.
+**Next candidates** (toward the vision, confirm before starting): the three victory conditions + late-game megastructures/Dyson stages + stars as build sites (see VISION.md), planet terrain types for deeper placement, and the known design-debt items in the June 2026 audit (snapshot redaction for the turn-plan/enemy info leak, `state.get` writing snapshots at arbitrary turns).
+
+**Explicitly out of scope right now:** hex map (the star-lane graph is the genre-idiomatic answer), asymmetric factions, diplomacy, trade, animations/polish, and any move off the Nuxt browser stack. Do not propose features outside the vision without checking first.
