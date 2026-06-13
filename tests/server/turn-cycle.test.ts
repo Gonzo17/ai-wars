@@ -4,6 +4,7 @@ import { resolveTurn } from '../../server/game/resolveTurn'
 import { initialState } from '../../server/game/initialState'
 import { InMemoryGameRepository } from '../../server/game/inMemoryRepository'
 import { toPlayerId } from '../../server/game/playerId'
+import { findLanePath } from '../../shared/utils/starlanes'
 import type { GameSnapshot, PlayerSnapshot, ResourceId } from '../../shared/types/game'
 import type { TurnPlan } from '../../shared/types/turn'
 
@@ -75,16 +76,14 @@ describe('initial state', () => {
     expect(p1.resources).toEqual(p2.resources)
     expect(p1.planets.some(id => p2.planets.includes(id))).toBe(false)
 
-    // Home systems are linked through the neutral system
-    const neutral = snapshot.systems.find(s => s.id === 'sys:nadir')
-    expect(neutral).toBeDefined()
+    // Each player gets their own galaxy; a shared Frontier links them all
+    expect(snapshot.galaxies.filter(g => g.id !== 'galaxy:frontier')).toHaveLength(2)
+    const frontier = snapshot.systems.find(s => s.id === 'sys:frontier')
+    expect(frontier).toBeDefined()
     for (const player of snapshot.players) {
-      const homeSystemIds = snapshot.planets
-        .filter(p => p.owner === player.id)
-        .map(p => p.systemId)
-      for (const systemId of new Set(homeSystemIds)) {
-        expect(neutral!.connections).toContain(systemId)
-      }
+      const homeSystemId = snapshot.planets.find(p => p.owner === player.id)!.systemId
+      // home and Frontier are in different galaxies, but reachable by lane
+      expect(findLanePath(snapshot.systems, homeSystemId, 'sys:frontier')).not.toBeNull()
     }
   })
 

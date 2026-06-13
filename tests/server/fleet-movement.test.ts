@@ -11,8 +11,9 @@ const U2 = 'u2'
 const EMPTY: TurnPlan = { commands: [] }
 const FLEET_ID = 'unit:probe@pl:aurora@t0' as UnitId
 
-// Map topology (initialState): sys:lyra (u1 home) ↔ sys:nadir ↔ sys:vega (u2 home),
-// sys:helix ↔ sys:nadir. So lyra→nadir = 1 lane, lyra→vega = 2 lanes.
+// Map topology (initialState): each player has their own galaxy chain
+// home ↔ reach ↔ gate ↔ sys:frontier. For u1: sys:lyra ↔ sys:lyra-reach ↔
+// sys:lyra-gate ↔ sys:frontier. So lyra→lyra-reach = 1 lane, lyra→lyra-gate = 2.
 
 function seedGame() {
   const repo = new InMemoryGameRepository({
@@ -58,11 +59,11 @@ describe('star-lane fleet movement', () => {
   it('moves to an adjacent system in one turn and emits an arrival event', async () => {
     const repo = seedGame()
 
-    await playTurn(repo, 1, { [U1]: moveTo('sys:nadir') })
+    await playTurn(repo, 1, { [U1]: moveTo('sys:lyra-reach') })
 
     const next = getSnapshot(repo, 2)
     const fleet = next.fleets.find(f => f.id === FLEET_ID)!
-    expect(fleet.location).toBe('sys:nadir')
+    expect(fleet.location).toBe('sys:lyra-reach')
     expect(fleet.status).toBe('idle')
     expect(fleet.destination).toBeUndefined()
 
@@ -73,14 +74,14 @@ describe('star-lane fleet movement', () => {
   it('travels one lane per turn over longer routes', async () => {
     const repo = seedGame()
 
-    // lyra → vega is two lanes (via nadir)
-    await playTurn(repo, 1, { [U1]: moveTo('sys:vega') })
+    // lyra → lyra-gate is two lanes (via lyra-reach)
+    await playTurn(repo, 1, { [U1]: moveTo('sys:lyra-gate') })
 
     const mid = getSnapshot(repo, 2)
     const enRoute = mid.fleets.find(f => f.id === FLEET_ID)!
-    expect(enRoute.location).toBe('sys:nadir')
+    expect(enRoute.location).toBe('sys:lyra-reach')
     expect(enRoute.status).toBe('en-route')
-    expect(enRoute.destination).toBe('sys:vega')
+    expect(enRoute.destination).toBe('sys:lyra-gate')
     expect(enRoute.eta).toBe(1)
 
     // No new order — fleet keeps moving on its own
@@ -88,20 +89,21 @@ describe('star-lane fleet movement', () => {
 
     const done = getSnapshot(repo, 3)
     const arrived = done.fleets.find(f => f.id === FLEET_ID)!
-    expect(arrived.location).toBe('sys:vega')
+    expect(arrived.location).toBe('sys:lyra-gate')
     expect(arrived.status).toBe('idle')
   })
 
   it('can be redirected mid-route', async () => {
     const repo = seedGame()
 
-    await playTurn(repo, 1, { [U1]: moveTo('sys:vega') })
-    // Fleet now sits at sys:nadir en-route to vega — redirect to helix (1 lane from nadir)
-    await playTurn(repo, 2, { [U1]: moveTo('sys:helix') })
+    // Head for the Frontier (3 lanes); after turn 1 the fleet sits at lyra-reach
+    await playTurn(repo, 1, { [U1]: moveTo('sys:frontier') })
+    // Redirect to lyra-gate (1 lane from lyra-reach)
+    await playTurn(repo, 2, { [U1]: moveTo('sys:lyra-gate') })
 
     const result = getSnapshot(repo, 3)
     const fleet = result.fleets.find(f => f.id === FLEET_ID)!
-    expect(fleet.location).toBe('sys:helix')
+    expect(fleet.location).toBe('sys:lyra-gate')
     expect(fleet.status).toBe('idle')
   })
 
@@ -117,7 +119,7 @@ describe('star-lane fleet movement', () => {
   it('rejects moving an enemy fleet', async () => {
     const repo = seedGame()
 
-    await expect(submitTurn(repo, U2, 'g1', 1, moveTo('sys:nadir'))).rejects.toMatchObject({
+    await expect(submitTurn(repo, U2, 'g1', 1, moveTo('sys:lyra-reach'))).rejects.toMatchObject({
       statusCode: 400,
       data: { errors: [{ code: 'NOT_OWNER' }] }
     })

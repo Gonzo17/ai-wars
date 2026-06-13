@@ -52,9 +52,9 @@ describe('fleet combat', () => {
     const repo = seedGame()
     const state = getSnapshot(repo, 1)
     // Both meet at the neutral hub
-    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:nadir')
-    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:nadir') // offense 8
-    placeFleet(state, U2, 'unit:frigate', 'battleship', 4, 'sys:nadir') // offense 4
+    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:frontier')
+    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:frontier') // offense 8
+    placeFleet(state, U2, 'unit:frigate', 'battleship', 4, 'sys:frontier') // offense 4
 
     await playTurn(repo, 1)
 
@@ -73,7 +73,7 @@ describe('fleet combat', () => {
   it('leaves fleets untouched when only one owner is present', async () => {
     const repo = seedGame()
     const state = getSnapshot(repo, 1)
-    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:nadir')
+    placeFleet(state, U1, 'unit:frigate', 'battleship', 4, 'sys:frontier')
 
     await playTurn(repo, 1)
 
@@ -86,15 +86,15 @@ describe('colonization', () => {
   it('captures an unclaimed planet with a colony ship', async () => {
     const repo = seedGame()
     const state = getSnapshot(repo, 1)
-    // pl:nadir-outpost is unclaimed in sys:nadir
-    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:nadir')
+    // pl:frontier-alpha is unclaimed in sys:frontier
+    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:frontier')
 
     await playTurn(repo, 1)
 
     const next = getSnapshot(repo, 2)
-    const outpost = next.planets.find(p => p.id === 'pl:nadir-outpost')!
+    const outpost = next.planets.find(p => p.id === 'pl:frontier-alpha')!
     expect(outpost.owner).toBe(toPlayerId(U1))
-    expect(next.players.find(p => p.id === toPlayerId(U1))!.planets).toContain('pl:nadir-outpost')
+    expect(next.players.find(p => p.id === toPlayerId(U1))!.planets).toContain('pl:frontier-alpha')
     // colony ship consumed
     expect(next.fleets.filter(f => f.defId === 'unit:colony-ship')).toHaveLength(0)
     // planetsControlled updated for ascension gates
@@ -107,13 +107,13 @@ describe('colonization', () => {
   it('does not colonize a planet contested by an enemy fleet', async () => {
     const repo = seedGame()
     const state = getSnapshot(repo, 1)
-    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:nadir')
-    placeFleet(state, U2, 'unit:frigate', 'battleship', 4, 'sys:nadir') // contests the system
+    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:frontier')
+    placeFleet(state, U2, 'unit:frigate', 'battleship', 4, 'sys:frontier') // contests the system
 
     await playTurn(repo, 1)
 
     const next = getSnapshot(repo, 2)
-    const outpost = next.planets.find(p => p.id === 'pl:nadir-outpost')!
+    const outpost = next.planets.find(p => p.id === 'pl:frontier-alpha')!
     expect(outpost.owner).toBe('unclaimed')
     // colony ship is destroyed in combat (weak), enemy frigate survives
     expect(next.fleets.some(f => f.ownerId === toPlayerId(U2))).toBe(true)

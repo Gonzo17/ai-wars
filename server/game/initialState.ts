@@ -8,6 +8,17 @@ import type { PlayerResearchState } from '~~/shared/types/research'
 import { createPlanetSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
 
 /**
+ * Map layout (vision: Civ-continents). Each player gets their OWN galaxy with
+ * three systems — home (2 owned planets), a reach system and a gateway system
+ * (both with one unclaimed planet to expand into). Every gateway links by a
+ * long lane to a single shared, contested **Frontier** galaxy in the middle.
+ * So players expand inside their own galaxy and clash over the Frontier.
+ */
+
+const FRONTIER_GALAXY = 'galaxy:frontier'
+const FRONTIER_SYSTEM: SolarSystemId = 'sys:frontier'
+
+/**
  * Place a building into a planet's slot array, picking the next free slot
  * in the appropriate zone (surface or orbital).
  */
@@ -34,58 +45,53 @@ function makeSlots(
   return slots
 }
 
-/**
- * Flavor names for player home systems. Every player gets the same starting
- * setup (buildings, resource nodes, planet types) — only names and map
- * positions differ. Past four players we fall back to generated names.
- */
-const HOME_TEMPLATES = [
-  { systemId: 'sys:lyra', systemName: 'Lyra', primaryId: 'pl:aurora', primaryName: 'Aurora Prime', secondaryId: 'pl:borealis', secondaryName: 'Borealis', location: { x: 22, y: 35 } },
-  { systemId: 'sys:vega', systemName: 'Vega', primaryId: 'pl:meridian', primaryName: 'Meridian Prime', secondaryId: 'pl:australis', secondaryName: 'Australis', location: { x: 78, y: 65 } },
-  { systemId: 'sys:cygnus', systemName: 'Cygnus', primaryId: 'pl:zenith', primaryName: 'Zenith Prime', secondaryId: 'pl:umbra', secondaryName: 'Umbra', location: { x: 22, y: 65 } },
-  { systemId: 'sys:orion', systemName: 'Orion', primaryId: 'pl:solace', primaryName: 'Solace Prime', secondaryId: 'pl:vesper', secondaryName: 'Vesper', location: { x: 78, y: 35 } }
-] as const
-
 type HomeTemplate = {
-  systemId: SolarSystemId
+  key: string
+  galaxyName: string
   systemName: string
   primaryId: PlanetId
   primaryName: string
   secondaryId: PlanetId
   secondaryName: string
-  location: { x: number, y: number }
 }
+
+const HOME_TEMPLATES: HomeTemplate[] = [
+  { key: 'lyra', galaxyName: 'Lyra Reach', systemName: 'Lyra', primaryId: 'pl:aurora', primaryName: 'Aurora Prime', secondaryId: 'pl:borealis', secondaryName: 'Borealis' },
+  { key: 'vega', galaxyName: 'Vega Expanse', systemName: 'Vega', primaryId: 'pl:meridian', primaryName: 'Meridian Prime', secondaryId: 'pl:australis', secondaryName: 'Australis' },
+  { key: 'cygnus', galaxyName: 'Cygnus Drift', systemName: 'Cygnus', primaryId: 'pl:zenith', primaryName: 'Zenith Prime', secondaryId: 'pl:umbra', secondaryName: 'Umbra' },
+  { key: 'orion', galaxyName: 'Orion Verge', systemName: 'Orion', primaryId: 'pl:solace', primaryName: 'Solace Prime', secondaryId: 'pl:vesper', secondaryName: 'Vesper' }
+]
 
 function homeTemplate(index: number): HomeTemplate {
   const template = HOME_TEMPLATES[index]
-  if (template) {
-    return {
-      systemId: template.systemId,
-      systemName: template.systemName,
-      primaryId: template.primaryId,
-      primaryName: template.primaryName,
-      secondaryId: template.secondaryId,
-      secondaryName: template.secondaryName,
-      location: template.location
-    }
-  }
+  if (template) return template
   const n = index + 1
   return {
-    systemId: `sys:home-${n}`,
+    key: `sector-${n}`,
+    galaxyName: `Sector ${n}`,
     systemName: `Home ${n}`,
-    primaryId: `pl:home-${n}-prime`,
+    primaryId: `pl:home-${n}-prime` as PlanetId,
     primaryName: `Home ${n} Prime`,
-    secondaryId: `pl:home-${n}-minor`,
-    secondaryName: `Home ${n} Minor`,
-    location: { x: 50 + (n % 2 ? -30 : 30), y: 20 + ((n * 13) % 60) }
+    secondaryId: `pl:home-${n}-minor` as PlanetId,
+    secondaryName: `Home ${n} Minor`
   }
 }
 
-function makeHomePlanets(template: HomeTemplate, owner: Planet['owner']): Planet[] {
+/** Universe-map position for a home galaxy: spread on a circle around the centre Frontier. */
+function galaxyLocation(index: number, total: number): { x: number, y: number } {
+  const angle = (index / Math.max(1, total)) * Math.PI * 2 - Math.PI / 2
+  const radius = 32
+  return {
+    x: Math.round(50 + radius * Math.cos(angle)),
+    y: Math.round(50 + radius * Math.sin(angle))
+  }
+}
+
+function makeHomePlanets(template: HomeTemplate, systemId: SolarSystemId, owner: Planet['owner']): Planet[] {
   return [
     {
       id: template.primaryId,
-      systemId: template.systemId,
+      systemId,
       name: template.primaryName,
       owner,
       type: 'terrestrial',
@@ -108,7 +114,7 @@ function makeHomePlanets(template: HomeTemplate, owner: Planet['owner']): Planet
     },
     {
       id: template.secondaryId,
-      systemId: template.systemId,
+      systemId,
       name: template.secondaryName,
       owner,
       type: 'ice-giant',
@@ -127,6 +133,32 @@ function makeHomePlanets(template: HomeTemplate, owner: Planet['owner']): Planet
       location: { x: 52, y: 62 }
     }
   ]
+}
+
+/** An empty, unclaimed planet with an ore node — an expansion target worth taking. */
+function makeNeutralPlanet(
+  id: PlanetId,
+  systemId: SolarSystemId,
+  name: string,
+  type: Planet['type'],
+  size: Planet['size'],
+  location: { x: number, y: number }
+): Planet {
+  return {
+    id,
+    systemId,
+    name,
+    owner: 'unclaimed',
+    type,
+    size,
+    workers: 1,
+    productionPerWorker: 20,
+    slots: makeSlots([], new Map([[2, 'ore']])),
+    queues: { build: [], shipyard: [] },
+    progressMemory: {},
+    productionCarryover: 0,
+    location
+  }
 }
 
 export function initialState(userIds: string[], turn = 1): GameSnapshot {
@@ -162,82 +194,74 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     }
   })
 
-  // One identical home system per player, all linked to a neutral central system.
   const planets: Planet[] = []
-  const homeSystems: SolarSystem[] = []
-  const neutralSystemId: SolarSystemId = 'sys:nadir'
+  const systems: SolarSystem[] = []
+  const galaxies: Galaxy[] = []
+  const gatewaySystemIds: SolarSystemId[] = []
 
   players.forEach((player, index) => {
     const template = homeTemplate(index)
-    const homePlanets = makeHomePlanets(template, player.id)
-    planets.push(...homePlanets)
-    player.planets = homePlanets.map(planet => planet.id)
-    homeSystems.push({
-      id: template.systemId,
-      name: template.systemName,
+    const homeSystemId = `sys:${template.key}` as SolarSystemId
+    const reachSystemId = `sys:${template.key}-reach` as SolarSystemId
+    const gateSystemId = `sys:${template.key}-gate` as SolarSystemId
+    const galaxyId = `galaxy:${template.key}` as Galaxy['id']
+    gatewaySystemIds.push(gateSystemId)
+
+    // Home planets (owned)
+    const homePlanets = makeHomePlanets(template, homeSystemId, player.id)
+    player.planets = homePlanets.map(p => p.id)
+
+    // Expansion targets inside the player's own galaxy
+    const reachPlanet = makeNeutralPlanet(
+      `pl:${template.key}-reach` as PlanetId, reachSystemId,
+      `${template.systemName} II`, 'barren', 'small', { x: 40, y: 50 }
+    )
+    const gatePlanet = makeNeutralPlanet(
+      `pl:${template.key}-gate` as PlanetId, gateSystemId,
+      `${template.systemName} Gate`, 'desert', 'medium', { x: 46, y: 52 }
+    )
+    planets.push(...homePlanets, reachPlanet, gatePlanet)
+
+    systems.push(
+      { id: homeSystemId, name: template.systemName, intel: 'high', connections: [reachSystemId], planets: homePlanets.map(p => p.id), location: { x: 26, y: 50 } },
+      { id: reachSystemId, name: `${template.systemName} Reach`, intel: 'medium', connections: [homeSystemId, gateSystemId], planets: [reachPlanet.id], location: { x: 50, y: 50 } },
+      { id: gateSystemId, name: `${template.systemName} Gate`, intel: 'medium', connections: [reachSystemId, FRONTIER_SYSTEM], planets: [gatePlanet.id], location: { x: 74, y: 50 } }
+    )
+
+    galaxies.push({
+      id: galaxyId,
+      name: template.galaxyName,
       intel: 'high',
-      connections: [neutralSystemId],
-      planets: homePlanets.map(planet => planet.id),
-      location: template.location
+      connections: [FRONTIER_GALAXY],
+      solarSystems: [homeSystemId, reachSystemId, gateSystemId],
+      location: galaxyLocation(index, players.length)
     })
   })
 
-  planets.push({
-    id: 'pl:nadir-outpost',
-    systemId: neutralSystemId,
-    name: 'Nadir Outpost',
-    owner: 'unclaimed',
-    type: 'barren',
-    size: 'small',
-    workers: 1,
-    productionPerWorker: 20,
-    slots: makeSlots([
-      { id: 'bld:landing-pad' as BuildingId, level: 1 }
-    ]),
-    queues: { build: [], shipyard: [] },
-    progressMemory: {},
-    productionCarryover: 0,
-    location: { x: 74, y: 38 }
+  // Shared contested Frontier: the prize that links every player's galaxy.
+  const frontierPlanets = [
+    makeNeutralPlanet('pl:frontier-alpha' as PlanetId, FRONTIER_SYSTEM, 'Frontier Alpha', 'oceanic', 'large', { x: 38, y: 46 }),
+    makeNeutralPlanet('pl:frontier-beta' as PlanetId, FRONTIER_SYSTEM, 'Frontier Beta', 'desert', 'medium', { x: 62, y: 56 })
+  ]
+  planets.push(...frontierPlanets)
+
+  systems.push({
+    id: FRONTIER_SYSTEM,
+    name: 'The Frontier',
+    intel: 'low',
+    connections: [...gatewaySystemIds],
+    planets: frontierPlanets.map(p => p.id),
+    location: { x: 50, y: 50 }
   })
 
-  const systems: SolarSystem[] = [
-    ...homeSystems,
-    {
-      id: neutralSystemId,
-      name: 'Nadir',
-      intel: 'medium',
-      connections: [...homeSystems.map(system => system.id), 'sys:helix'],
-      planets: ['pl:nadir-outpost'],
-      location: { x: 50, y: 50 }
-    },
-    {
-      id: 'sys:helix',
-      name: 'Helix',
-      intel: 'low',
-      connections: [neutralSystemId],
-      planets: [],
-      location: { x: 42, y: 80 }
-    }
-  ]
-
-  const galaxies: Galaxy[] = [
-    {
-      id: 'galaxy:aurora',
-      name: 'Aurora',
-      intel: 'high',
-      connections: ['galaxy:veil'],
-      solarSystems: [...homeSystems.map(system => system.id), neutralSystemId],
-      location: { x: 30, y: 42 }
-    },
-    {
-      id: 'galaxy:veil',
-      name: 'Veil',
-      intel: 'medium',
-      connections: ['galaxy:aurora'],
-      solarSystems: ['sys:helix'],
-      location: { x: 68, y: 58 }
-    }
-  ]
+  galaxies.push({
+    id: FRONTIER_GALAXY,
+    name: 'The Frontier',
+    intel: 'low',
+    connections: galaxies.map(g => g.id),
+    solarSystems: [FRONTIER_SYSTEM],
+    location: { x: 50, y: 50 }
+  })
 
   // Initial resource deltas based on each player's starting buildings
   for (const player of players) {
