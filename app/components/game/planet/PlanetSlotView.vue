@@ -257,6 +257,18 @@ const hoveredSlotIndex = ref<number | null>(null)
 const buildMenuSlotIndex = ref<number | null>(null)
 const buildMenuZone = ref<SlotZone>('surface')
 
+// The component instance is reused when the user switches planets, so all local
+// (per-turn-plan) state must be reset on planet change — otherwise the previous
+// planet's pending builds and open menus bleed into the new one.
+watch(() => props.planet.id, () => {
+  surfaceAssignments.value = new Map()
+  orbitalAssignments.value = new Map()
+  unitAssignment.value = null
+  unitTrainingMenuOpen.value = false
+  buildMenuSlotIndex.value = null
+  hoveredSlotIndex.value = null
+})
+
 const hoveredSlot = computed(() => {
   if (hoveredSlotIndex.value === null) return null
   return allPositions.value.find(s => s.index === hoveredSlotIndex.value) ?? null

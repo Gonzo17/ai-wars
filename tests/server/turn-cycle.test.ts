@@ -107,7 +107,7 @@ describe('building construction cycle', () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
       // Slot 2 on the primary planet is empty and has an ore node →
-      // mining facility gets the −5 % adjusted production cost (40 → 38).
+      // mining facility gets the −5 % adjusted production cost (60 → 57).
       commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:mining-facility', slotIndex: 2 }]
     }
 
@@ -115,28 +115,30 @@ describe('building construction cycle', () => {
 
     const turn2 = getSnapshot(repo, 2)
     const p1 = getPlayer(turn2, U1)
-    // 500 start − 30 build cost + 100 production
+    // 500 start − 30 build cost (deducted once) + 100 production
     expect(getResource(p1, 'res:energy')).toBe(570)
     const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[2]!
     expect(slot.buildingId).toBe('bld:mining-facility')
     expect(slot.isConstructing).toBe(true)
-    // 38 adjusted cost − 20 production this turn
-    expect(slot.constructionTimeLeft).toBe(18)
+    // 57 adjusted cost − 20 production this turn
+    expect(slot.constructionTimeLeft).toBe(37)
 
+    // Mining facility takes 3 turns at 20 production/turn (57 → 37 → 17 → done)
     await playTurn(repo, 2)
+    await playTurn(repo, 3)
 
-    const turn3 = getSnapshot(repo, 3)
-    const planet = turn3.planets.find(p => p.id === 'pl:aurora')!
+    const turn4 = getSnapshot(repo, 4)
+    const planet = turn4.planets.find(p => p.id === 'pl:aurora')!
     expect(planet.slots[2]!.isConstructing).toBe(false)
-    // 20 production − 18 remaining = 2 overflow into next turn
-    expect(planet.productionCarryover).toBe(2)
+    // last turn: 20 production − 17 remaining = 3 overflow carried over
+    expect(planet.productionCarryover).toBe(3)
 
-    const events = getPlayer(turn3, U1).events
+    const events = getPlayer(turn4, U1).events
     expect(events.some(e => e.type === 'building-complete')).toBe(true)
 
     // Mine sits on the ore node → ore-extraction synergy doubles its 15 to 30,
     // plus the home refinery's 25 → 55 in the mineral delta
-    const mineralRes = getPlayer(turn3, U1).resources.find(r => r.key === 'res:material')
+    const mineralRes = getPlayer(turn4, U1).resources.find(r => r.key === 'res:material')
     expect(mineralRes?.delta).toBe(55)
   })
 
@@ -146,15 +148,17 @@ describe('building construction cycle', () => {
       commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:solar-array', slotIndex: 3 }]
     }
 
+    // Solar array costs 60 → 3 turns; re-submit the identical command each turn,
+    // which must be treated as a resume (charged once, progress kept)
     await playTurn(repo, 1, { [U1]: plan })
-    // Re-submit the identical command next turn — must be treated as a resume
     await playTurn(repo, 2, { [U1]: plan })
+    await playTurn(repo, 3, { [U1]: plan })
 
-    const turn3 = getSnapshot(repo, 3)
-    const p1 = getPlayer(turn3, U1)
-    // 100 start − 50 (charged exactly once) + 2 × 25 refinery production
-    expect(getResource(p1, 'res:material')).toBe(100)
-    expect(turn3.planets.find(p => p.id === 'pl:aurora')!.slots[3]!.isConstructing).toBe(false)
+    const turn4 = getSnapshot(repo, 4)
+    const p1 = getPlayer(turn4, U1)
+    // 100 start − 50 (charged exactly once) + 3 × 25 refinery production
+    expect(getResource(p1, 'res:material')).toBe(125)
+    expect(turn4.planets.find(p => p.id === 'pl:aurora')!.slots[3]!.isConstructing).toBe(false)
   })
 
   it('rejects building on a planet the player does not own', async () => {
@@ -175,8 +179,8 @@ describe('research cycle', () => {
       commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
     }
 
-    // 100 points required. Data-center L1 yields 20, +25% compute-uplink from
-    // the home fusion-core → 25/turn.
+    // 60 points required. Data-center L1 yields 20, +25% compute-uplink from
+    // the home fusion-core → 25/turn → completes in 3 turns.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)

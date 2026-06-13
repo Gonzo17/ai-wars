@@ -8,7 +8,10 @@ const props = defineProps<{
   planets: Array<{ id: string, name: string, location: { x: number, y: number }, systemId: string, size?: PlanetSize }>
   systems: Array<{ id: string, name: string, location: { x: number, y: number }, childCount: number }>
   galaxies: Array<{ id: string, name: string, location: { x: number, y: number }, childCount: number }>
+  ownedIds?: string[]
 }>()
+
+const ownedSet = computed(() => new Set(props.ownedIds ?? []))
 
 const emit = defineEmits<{
   (e: 'select-planet' | 'select-system' | 'select-galaxy', id: string): void
@@ -203,10 +206,24 @@ const handleZoomEnd = () => {
           :key="node.id"
           :class="[
             'absolute bg-center bg-cover rounded-full',
-            node.type === 'sun' ? 'pointer-events-none sun-glow' : 'pointer-events-auto'
+            node.type === 'sun' ? 'pointer-events-none sun-glow' : 'pointer-events-auto',
+            ownedSet.has(node.id) ? 'owned-node' : ''
           ]"
+          :data-testid="node.type !== 'sun' ? `map-node-${node.id}` : undefined"
+          :data-owned="ownedSet.has(node.id) ? 'true' : undefined"
           :style="nodeStyle(node)"
         >
+          <!-- Owner marker -->
+          <div
+            v-if="ownedSet.has(node.id)"
+            class="absolute -top-1 left-1/2 z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full bg-primary-500/90 px-2 py-0.5 text-[10px] font-semibold text-primary-950 shadow-lg whitespace-nowrap pointer-events-none"
+          >
+            <UIcon
+              name="i-lucide-circle-user"
+              class="h-3 w-3"
+            />
+            {{ $t('game.map.you') }}
+          </div>
           <UButton
             v-if="node.type !== 'sun'"
             :color="node.type === 'system' || node.type === 'galaxy' ? 'primary' : 'secondary'"
@@ -237,6 +254,10 @@ const handleZoomEnd = () => {
 
 .zoom-out {
   animation: zoomOut 1.2s cubic-bezier(.1,.8,.46,1);
+}
+
+.owned-node {
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.9), 0 0 22px rgba(139, 92, 246, 0.45);
 }
 
 .sun-glow {

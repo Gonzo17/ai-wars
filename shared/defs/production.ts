@@ -43,24 +43,29 @@ export const BUILD_QUEUE_LIMIT = 1
 export const SHIPYARD_QUEUE_LIMIT = 1
 export const PLANET_PRODUCTION_PER_TURN = 20
 
+// Production note: a planet makes PLANET_PRODUCTION_PER_TURN (20) production per
+// worker per turn. `productionCost` therefore sets build time in turns
+// (cost / 20). Buildings are deliberately multi-turn commitments (~2–6 turns)
+// so placement is a tactical choice, not a spam. `buildTime` mirrors that for
+// documentation but is not itself read by the engine.
 export const BUILDING_DEFS: BuildingDefinition[] = [
   // Energy production buildings
-  { id: 'bld:solar-array', category: 'energy', resourceCosts: { energy: 0, minerals: 50, rare: 0 }, productionCost: 40, buildTime: 1, requirements: {}, resourceProduction: { energy: 20 }, maxLevel: 5, icon: 'i-lucide-sun' },
-  { id: 'bld:fusion-core', category: 'energy', resourceCosts: { energy: 120, minerals: 80, rare: 10 }, productionCost: 80, buildTime: 1, requirements: { research: ['tech:planetary-grid-management'] }, resourceProduction: { energy: 50 }, maxLevel: 5, icon: 'i-lucide-zap' },
+  { id: 'bld:solar-array', category: 'energy', resourceCosts: { energy: 0, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 3, requirements: {}, resourceProduction: { energy: 20 }, maxLevel: 5, icon: 'i-lucide-sun' },
+  { id: 'bld:fusion-core', category: 'energy', resourceCosts: { energy: 120, minerals: 80, rare: 10 }, productionCost: 120, buildTime: 6, requirements: { research: ['tech:planetary-grid-management'] }, resourceProduction: { energy: 50 }, maxLevel: 5, icon: 'i-lucide-zap' },
   // Mineral production buildings
-  { id: 'bld:mining-facility', category: 'minerals', resourceCosts: { energy: 30, minerals: 0, rare: 0 }, productionCost: 40, buildTime: 1, requirements: {}, resourceProduction: { minerals: 15 }, maxLevel: 5, icon: 'i-lucide-pickaxe' },
-  { id: 'bld:refinery-node', category: 'minerals', resourceCosts: { energy: 55, minerals: 85, rare: 6 }, productionCost: 50, buildTime: 1, requirements: { research: ['tech:basic-industrial-robotics'] }, resourceProduction: { minerals: 25 }, maxLevel: 3, icon: 'i-lucide-factory' },
+  { id: 'bld:mining-facility', category: 'minerals', resourceCosts: { energy: 30, minerals: 0, rare: 0 }, productionCost: 60, buildTime: 3, requirements: {}, resourceProduction: { minerals: 15 }, maxLevel: 5, icon: 'i-lucide-pickaxe' },
+  { id: 'bld:refinery-node', category: 'minerals', resourceCosts: { energy: 55, minerals: 85, rare: 6 }, productionCost: 80, buildTime: 4, requirements: { research: ['tech:basic-industrial-robotics'] }, resourceProduction: { minerals: 25 }, maxLevel: 3, icon: 'i-lucide-factory' },
   // Rare element production buildings
-  { id: 'bld:rare-extractor', category: 'rare', resourceCosts: { energy: 80, minerals: 100, rare: 0 }, productionCost: 80, buildTime: 1, requirements: { research: ['tech:autonomous-resource-allocation'] }, resourceProduction: { rare: 5 }, maxLevel: 3, icon: 'i-lucide-atom' },
+  { id: 'bld:rare-extractor', category: 'rare', resourceCosts: { energy: 80, minerals: 100, rare: 0 }, productionCost: 100, buildTime: 5, requirements: { research: ['tech:autonomous-resource-allocation'] }, resourceProduction: { rare: 5 }, maxLevel: 3, icon: 'i-lucide-atom' },
   // Military buildings
-  { id: 'bld:orbital-dock', category: 'military', resourceCosts: { energy: 90, minerals: 110, rare: 15 }, productionCost: 60, buildTime: 1, requirements: { research: ['tech:first-shipyard'] }, maxLevel: 3, icon: 'i-lucide-anchor' },
-  { id: 'bld:listening-post', category: 'military', resourceCosts: { energy: 45, minerals: 35, rare: 4 }, productionCost: 35, buildTime: 1, requirements: { research: ['tech:deep-system-scan'] }, maxLevel: 2, icon: 'i-lucide-satellite-dish' },
+  { id: 'bld:orbital-dock', category: 'military', resourceCosts: { energy: 90, minerals: 110, rare: 15 }, productionCost: 80, buildTime: 4, requirements: { research: ['tech:first-shipyard'] }, maxLevel: 3, icon: 'i-lucide-anchor' },
+  { id: 'bld:listening-post', category: 'military', resourceCosts: { energy: 45, minerals: 35, rare: 4 }, productionCost: 60, buildTime: 3, requirements: { research: ['tech:deep-system-scan'] }, maxLevel: 2, icon: 'i-lucide-satellite-dish' },
   // Research buildings
-  { id: 'bld:data-center', category: 'research', resourceCosts: { energy: 80, minerals: 60, rare: 12 }, productionCost: 90, buildTime: 1, requirements: { research: ['tech:data-center-i'] }, researchPoints: 20, maxLevel: 3, icon: 'i-lucide-flask-conical' },
+  { id: 'bld:data-center', category: 'research', resourceCosts: { energy: 80, minerals: 60, rare: 12 }, productionCost: 120, buildTime: 6, requirements: { research: ['tech:data-center-i'] }, researchPoints: 20, maxLevel: 3, icon: 'i-lucide-flask-conical' },
   // Infrastructure buildings
-  { id: 'bld:hydroponics', category: 'infrastructure', resourceCosts: { energy: 60, minerals: 40, rare: 5 }, productionCost: 45, buildTime: 1, requirements: {}, maxLevel: 4, icon: 'i-lucide-leaf' },
-  { id: 'bld:hab-complex', category: 'infrastructure', resourceCosts: { energy: 70, minerals: 95, rare: 8 }, productionCost: 70, buildTime: 1, requirements: {}, maxLevel: 4, icon: 'i-lucide-home' },
-  { id: 'bld:landing-pad', category: 'infrastructure', resourceCosts: { energy: 40, minerals: 30, rare: 2 }, productionCost: 30, buildTime: 1, requirements: {}, maxLevel: 2, icon: 'i-lucide-plane-landing' }
+  { id: 'bld:hydroponics', category: 'infrastructure', resourceCosts: { energy: 60, minerals: 40, rare: 5 }, productionCost: 60, buildTime: 3, requirements: {}, maxLevel: 4, icon: 'i-lucide-leaf' },
+  { id: 'bld:hab-complex', category: 'infrastructure', resourceCosts: { energy: 70, minerals: 95, rare: 8 }, productionCost: 100, buildTime: 5, requirements: {}, maxLevel: 4, icon: 'i-lucide-home' },
+  { id: 'bld:landing-pad', category: 'infrastructure', resourceCosts: { energy: 40, minerals: 30, rare: 2 }, productionCost: 40, buildTime: 2, requirements: {}, maxLevel: 2, icon: 'i-lucide-plane-landing' }
 ]
 
 export const UNIT_DEFS: UnitDefinition[] = [

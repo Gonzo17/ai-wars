@@ -12,7 +12,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: [],
-    researchPoints: 100
+    researchPoints: 60
   },
   {
     id: 'tech:basic-industrial-robotics',
@@ -21,7 +21,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 200
+    researchPoints: 120
   },
   {
     id: 'tech:planetary-grid-management',
@@ -30,7 +30,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 200
+    researchPoints: 120
   },
   {
     id: 'tech:probe-design',
@@ -39,7 +39,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k0.6',
     prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 200
+    researchPoints: 120
   },
   {
     id: 'tech:first-shipyard',
@@ -48,7 +48,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.6',
     prerequisites: ['tech:basic-industrial-robotics'],
-    researchPoints: 300
+    researchPoints: 180
   },
   {
     id: 'tech:data-center-i',
@@ -57,7 +57,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.6',
     prerequisites: ['tech:planetary-grid-management'],
-    researchPoints: 300
+    researchPoints: 180
   },
 
   // ============================================

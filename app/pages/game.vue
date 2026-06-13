@@ -30,11 +30,26 @@
           :galaxies="galaxiesWithCounts"
           :systems="systemsInGalaxy"
           :planets="planetsInSystem"
+          :owned-ids="ownedMapIds"
           @select-planet="handleSelectPlanet"
           @select-system="handleSelectSystem"
           @select-galaxy="handleSelectGalaxy"
           @update:view-mode="handleViewModeChange"
         />
+
+        <!-- Jump to home system -->
+        <UButton
+          v-if="homeSystemId && viewMode !== 'planet'"
+          icon="i-lucide-house"
+          color="primary"
+          variant="solid"
+          size="sm"
+          data-testid="home-button"
+          class="absolute top-4 right-4 z-20 shadow-lg"
+          @click="goHome"
+        >
+          {{ $t('game.navigation.home') }}
+        </UButton>
 
         <GamePlanetPanel
           v-if="planetPanelOpen && selectedPlanetWithQueue"
@@ -1053,6 +1068,39 @@ const systemGalaxyMap = computed(() => {
   }
   return map
 })
+
+const myPlayerId = computed(() => (currentUserId.value ? toPlayerId(currentUserId.value) : null))
+
+// Ids of every map node (planet, its system, its galaxy) the player owns,
+// so the map can mark "yours".
+const ownedMapIds = computed(() => {
+  const ids: string[] = []
+  const playerId = myPlayerId.value
+  if (!playerId) return ids
+  for (const planet of planets.value) {
+    if (planet.owner !== playerId) continue
+    ids.push(planet.id, planet.systemId)
+    const galaxyId = systemGalaxyMap.value.get(planet.systemId)
+    if (galaxyId) ids.push(galaxyId)
+  }
+  return Array.from(new Set(ids))
+})
+
+const homeSystemId = computed(() => {
+  const playerId = myPlayerId.value
+  if (!playerId) return null
+  return planets.value.find(p => p.owner === playerId)?.systemId ?? null
+})
+
+const goHome = () => {
+  const systemId = homeSystemId.value
+  if (!systemId) return
+  const galaxyId = systemGalaxyMap.value.get(systemId)
+  if (galaxyId) activeGalaxyId.value = galaxyId
+  activeSystemId.value = systemId
+  viewMode.value = 'system'
+  setSelection('system', systemId)
+}
 
 watch([galaxies, systems], ([nextGalaxies, nextSystems]) => {
   if (!activeGalaxyId.value && nextGalaxies.length) {

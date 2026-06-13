@@ -117,7 +117,8 @@
     "navigation": {
       "back-to-galaxy": "Zurück zur Galaxie",
       "back-to-universe": "Zurück zum Universum",
-      "back-to-system": "Zurück zum System"
+      "back-to-system": "Zurück zum System",
+      "home": "Heim"
     },
     "research": {
       "none-short": "Keine Forschung",
@@ -384,7 +385,8 @@
       "no-production": "Keine Produktion"
     },
     "map": {
-      "sun": "Sonne"
+      "sun": "Sonne",
+      "you": "Du"
     },
     "slots": {
       "empty-slot": "Freier Bauplatz",
