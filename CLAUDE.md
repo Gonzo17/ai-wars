@@ -118,7 +118,7 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 2. **`isResume` semantics in resolve**: building the same building in the same slot keeps existing construction progress and does NOT re-deduct resources. Switching pays again. See `applyPlan()` in [resolveTurn.ts](server/game/resolveTurn.ts).
 3. **`progressMemory`** stores per-build production progress so a cancelled or replaced build doesn't lose what was already invested. Lives on `Planet.progressMemory` (per-planet, per-buildId) and on `PlayerSnapshot.research.progressMemory` (per-tech).
 4. **`productionCarryover`** rolls excess production from a completed build into the next turn's production pool on that planet.
-5. **`Galaxy.connections` and `SolarSystem.connections` are defined but unused for fleet movement today.** Movement currently teleports.
+5. **Fleet movement runs on the star-lane graph** (since June 2026): `advanceFleets()` in resolveTurn moves en-route fleets one lane per turn along the BFS shortest path (`shared/utils/starlanes.ts`); validation rejects unreachable targets. Fleets get a unique instance `id` on completion — the definition lookup key is `Unit.defId`. `Galaxy.connections` is still unused.
 6. **Game phase `resolving` is a transient lock.** Clients cannot submit or unsubmit while phase is `resolving`. Resolution is fast and atomic — phase flips back to `planning` after the snapshot is written.
 7. **The `~~/` alias resolves at build time only**. Don't expect it inside string-based dynamic imports.
 8. **Two `toPlayerId` implementations** exist (client + server) — keep them identical.

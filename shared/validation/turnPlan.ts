@@ -3,6 +3,7 @@ import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, getBuildingDef, getUnitDef } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone, TOTAL_SLOT_COUNT } from '../types/planetSlots'
+import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
 
 interface ResourceCosts {
   energy: number
@@ -216,6 +217,19 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       }
       if (fleet.ownerId !== playerId) {
         errors.push({ code: 'NOT_OWNER', message: 'Fleet not owned by player', path })
+        continue
+      }
+      if (!snapshot.systems.some(s => s.id === command.toSystemId)) {
+        errors.push({ code: 'NOT_FOUND', message: 'Target system not found', path })
+        continue
+      }
+      const fromSystemId = getSystemIdForLocation(snapshot, fleet.location)
+      if (!fromSystemId) {
+        errors.push({ code: 'INVALID_STATE', message: 'Fleet location unknown', path })
+        continue
+      }
+      if (findLanePath(snapshot.systems, fromSystemId, command.toSystemId) === null) {
+        errors.push({ code: 'INVALID_COMMAND', message: 'No star-lane route to target system', path })
       }
       continue
     }

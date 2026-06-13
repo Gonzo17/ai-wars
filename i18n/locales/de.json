@@ -508,6 +508,11 @@
         "system": "System",
         "research": "Forschung"
       }
+    },
+    "fleet": {
+      "title": "Flotten",
+      "idle": "Im Orbit",
+      "keep": "Befehl beibehalten"
     }
   }
 }

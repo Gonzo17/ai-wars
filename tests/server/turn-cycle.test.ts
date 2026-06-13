@@ -234,11 +234,13 @@ describe('unit production cycle', () => {
     const final = getSnapshot(repo, 4)
     expect(final.fleets).toHaveLength(1)
     expect(final.fleets[0]).toMatchObject({
-      id: 'unit:probe',
+      defId: 'unit:probe',
       ownerId: toPlayerId(U1),
       location: 'pl:aurora',
       status: 'idle'
     })
+    // Instance id is unique, not the def id
+    expect(final.fleets[0]!.id).not.toBe('unit:probe')
     expect(final.planets.find(p => p.id === 'pl:aurora')!.queues.shipyard).toHaveLength(0)
   })
 })

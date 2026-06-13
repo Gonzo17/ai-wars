@@ -106,7 +106,10 @@ export type TravelStatus = 'idle' | 'en-route'
 
 export type UnitId = Id<'unit'>
 export interface Unit {
+  /** Unique instance id once the unit joined the fleet list; equals the def id while still in a shipyard queue. */
   id: UnitId
+  /** Definition id (lookup key into UNIT_DEFS). Set when the unit completes. */
+  defId?: UnitId
   type: 'battleship' | 'probe' | 'colonizer'
   name: string
   status: TravelStatus

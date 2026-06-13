@@ -4,9 +4,10 @@ import type { GameRepository } from './repository'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
 import type { GameEvent } from '~~/shared/types/events'
-import type { BuildingId, PlanetId, PlayerId, ResearchId, Resource, Unit, UnitId } from '~~/shared/types/game'
+import type { BuildingId, PlanetId, PlayerId, ResearchId, Resource, SolarSystemId, Unit, UnitId } from '~~/shared/types/game'
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
 import { calculateResourceProduction, getResearchPointsPerTurn } from '~~/shared/utils/economy'
+import { findLanePath, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
 type ResolveResult = {
   resolved: boolean
@@ -146,10 +147,13 @@ function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: TurnPla
     if (command.type === 'moveFleet') {
       const fleet = next.fleets.find((f: Unit) => f.id === command.fleetId)
       if (!fleet) continue
+      const fromSystemId = getSystemIdForLocation(next, fleet.location)
+      const path = fromSystemId ? findLanePath(next.systems, fromSystemId, command.toSystemId) : null
       const updated: Unit = {
         ...fleet,
         status: 'en-route',
-        destination: command.toSystemId
+        destination: command.toSystemId,
+        eta: path?.length
       }
       next.fleets = next.fleets.map((f: Unit) => (f.id === updated.id ? updated : f))
     }
@@ -224,6 +228,55 @@ function advanceResearch(snapshot: GameSnapshot, turn: number, nextEventId: () =
       })
     }
     updateAvailableResearch(player)
+  }
+}
+
+/**
+ * Move every en-route fleet one star lane along the (re-computed) shortest
+ * path to its destination. Fleets arriving this turn become idle and emit
+ * an arrival event.
+ */
+function advanceFleets(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
+  for (const fleet of snapshot.fleets) {
+    if (fleet.status !== 'en-route' || !fleet.destination) continue
+    const destinationId = fleet.destination as SolarSystemId
+    const fromSystemId = getSystemIdForLocation(snapshot, fleet.location)
+    const path = fromSystemId ? findLanePath(snapshot.systems, fromSystemId, destinationId) : null
+
+    if (!path) {
+      // No route (validation should prevent this) — stand down where we are
+      fleet.status = 'idle'
+      fleet.destination = undefined
+      fleet.eta = undefined
+      continue
+    }
+
+    if (path.length > 0) {
+      fleet.location = path[0]!
+      fleet.eta = path.length - 1
+    }
+
+    if (path.length <= 1) {
+      fleet.location = destinationId
+      fleet.status = 'idle'
+      fleet.destination = undefined
+      fleet.eta = undefined
+      const systemName = snapshot.systems.find(s => s.id === destinationId)?.name ?? destinationId
+      addEvent(snapshot, fleet.ownerId, {
+        id: nextEventId(),
+        type: 'army-arrived',
+        severity: 'info',
+        year: turn,
+        titleKey: 'events.types.army-arrived.title',
+        titleParams: { name: unitNameKey(fleet.defId ?? fleet.id) },
+        descriptionKey: 'events.types.army-arrived.description',
+        descriptionParams: { location: systemName },
+        relatedEntityId: destinationId,
+        relatedEntityType: 'system',
+        read: false,
+        timestamp: Date.now()
+      })
+    }
   }
 }
 
@@ -305,7 +358,14 @@ function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId: () => 
         if (current.id === 'unit:worker') {
           planet.workers += 1
         } else {
-          snapshot.fleets.push({ ...current, eta: undefined, location: planet.id } as Unit)
+          // Assign a unique instance id; the def id stays available via defId
+          snapshot.fleets.push({
+            ...current,
+            id: `${current.id}@${planet.id}@t${turn}` as UnitId,
+            defId: current.id,
+            eta: undefined,
+            location: planet.id
+          } as Unit)
         }
         planet.progressMemory = Object.fromEntries(
           Object.entries(planet.progressMemory).filter(([key]) => key !== current.id)
@@ -400,20 +460,23 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
       nextSnapshot = applyPlan(nextSnapshot, player, plan)
     }
 
-    // Step 2: Add resource production from existing buildings (before completing new ones)
+    let eventIndex = 0
+    const nextEventId = () => `evt-${turn}-${eventIndex++}`
+
+    // Step 2: Move fleets one star lane along their routes
+    advanceFleets(nextSnapshot, turn, nextEventId)
+
+    // Step 3: Add resource production from existing buildings (before completing new ones)
     for (const player of nextSnapshot.players) {
       const production = calculateResourceProduction(nextSnapshot.planets, player.id)
       applyResourceProduction(player, production)
     }
 
-    let eventIndex = 0
-    const nextEventId = () => `evt-${turn}-${eventIndex++}`
-
-    // Step 3: Advance research and complete buildings/units
+    // Step 4: Advance research and complete buildings/units
     advanceResearch(nextSnapshot, turn, nextEventId)
     advanceQueues(nextSnapshot, turn, nextEventId)
 
-    // Step 4: Update resource deltas for display (production for next turn)
+    // Step 5: Update resource deltas for display (production for next turn)
     updateResourceDeltas(nextSnapshot)
 
     nextSnapshot = { ...nextSnapshot, turn: turn + 1 }

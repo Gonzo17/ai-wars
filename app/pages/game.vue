@@ -72,6 +72,62 @@
           @open-planet="handleOpenPlanetFromOverview"
         />
 
+        <!-- Fleet panel (system view) -->
+        <div
+          v-if="viewMode === 'system' && myFleetsInActiveSystem.length > 0 && !planetPanelOpen && !planetOverviewOpen && !eventLogStore.isOpen && !researchStore.isOpen"
+          data-testid="fleet-panel"
+          class="absolute bottom-6 left-6 z-20 w-80 rounded-lg border border-primary-500/30 bg-neutral-900/95 shadow-lg shadow-primary-500/10 p-4 space-y-3"
+        >
+          <div class="flex items-center gap-2">
+            <UIcon
+              name="i-lucide-rocket"
+              class="w-4 h-4 text-primary-300"
+            />
+            <span class="text-sm font-semibold text-neutral-100">{{ $t('game.fleet.title') }}</span>
+          </div>
+          <div
+            v-for="fleet in myFleetsInActiveSystem"
+            :key="fleet.id"
+            :data-testid="`fleet-row-${fleet.id}`"
+            class="rounded-md border border-neutral-700/50 bg-neutral-900/70 p-2 space-y-1.5"
+          >
+            <div class="flex items-center gap-2">
+              <UIcon
+                :name="fleet.icon"
+                class="w-4 h-4 text-primary-200"
+              />
+              <span class="text-sm text-neutral-100">{{ fleet.name }}</span>
+              <span
+                v-if="fleet.status === 'en-route' && fleet.destinationName"
+                class="ml-auto text-[11px] text-info-300"
+              >
+                → {{ fleet.destinationName }} · {{ $t('game.common.duration-rounds', { count: fleet.eta }) }}
+              </span>
+              <span
+                v-else
+                class="ml-auto text-[11px] text-neutral-500"
+              >{{ $t('game.fleet.idle') }}</span>
+            </div>
+            <select
+              class="w-full rounded-md border border-neutral-700 bg-neutral-800 px-2 py-1 text-xs text-neutral-200"
+              :value="fleet.pendingTargetId"
+              data-testid="fleet-move-select"
+              @change="handleFleetMoveOrder(fleet.id, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">
+                {{ $t('game.fleet.keep') }}
+              </option>
+              <option
+                v-for="target in fleetMoveTargets"
+                :key="target.id"
+                :value="target.id"
+              >
+                {{ target.name }} — {{ $t('game.common.duration-rounds', { count: target.eta }) }}
+              </option>
+            </select>
+          </div>
+        </div>
+
         <!-- Event Log Overlay -->
         <GameEventLogCenter
           v-if="eventLogStore.isOpen"
@@ -108,6 +164,7 @@ import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
 import { getResearchPointsPerTurn } from '~~/shared/utils/economy'
+import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
 type MapViewMode = 'universe' | 'galaxy' | 'system' | 'planet'
 type SelectionType = 'planet' | 'army' | 'system' | 'galaxy' | 'research'
@@ -716,13 +773,65 @@ const getStationedUnits = (planet: Planet): Array<{ unitDefId: string, count: nu
   const counts = new Map<string, number>()
   for (const f of fleets) {
     if (f.location === planet.id) {
-      counts.set(f.id, (counts.get(f.id) ?? 0) + 1)
+      const defId = f.defId ?? f.id
+      counts.set(defId, (counts.get(defId) ?? 0) + 1)
     }
   }
   for (const [unitDefId, count] of counts.entries()) {
     result.push({ unitDefId, count })
   }
   return result
+}
+
+// ── Fleets & movement orders ──────────────────────────────────────────
+const myFleetsInActiveSystem = computed(() => {
+  if (!snapshot.value || !currentUserId.value || !activeSystemId.value) return []
+  const playerId = toPlayerId(currentUserId.value)
+  return snapshot.value.fleets
+    .filter(fleet => fleet.ownerId === playerId)
+    .map((fleet) => {
+      const defId = fleet.defId ?? fleet.id
+      const catalogEntry = unitCatalog.value.find(unit => unit.id === defId)
+      const pending = turnPlan.value.commands.find(
+        command => command.type === 'moveFleet' && command.fleetId === fleet.id
+      )
+      return {
+        id: fleet.id,
+        name: catalogEntry?.name ?? defId,
+        icon: catalogEntry?.icon ?? 'i-lucide-rocket',
+        systemId: getSystemIdForLocation(snapshot.value!, fleet.location),
+        status: fleet.status,
+        eta: fleet.eta ?? 0,
+        destinationName: fleet.destination
+          ? (systemNameById.value.get(fleet.destination as never) ?? fleet.destination)
+          : null,
+        pendingTargetId: pending?.type === 'moveFleet' ? pending.toSystemId as string : ''
+      }
+    })
+    .filter(fleet => fleet.systemId === activeSystemId.value)
+})
+
+const fleetMoveTargets = computed(() => {
+  if (!snapshot.value || !activeSystemId.value) return []
+  const fromId = activeSystemId.value as SolarSystemId
+  return snapshot.value.systems
+    .filter(system => system.id !== fromId)
+    .map(system => ({
+      id: system.id,
+      name: system.name,
+      eta: getLaneEta(snapshot.value!.systems, fromId, system.id)
+    }))
+    .filter((target): target is typeof target & { eta: number } => target.eta !== null)
+})
+
+const handleFleetMoveOrder = (fleetId: string, toSystemId: string) => {
+  const next: TurnCommand[] = turnPlan.value.commands.filter(
+    command => !(command.type === 'moveFleet' && command.fleetId === fleetId)
+  )
+  if (toSystemId) {
+    next.push({ type: 'moveFleet', fleetId: fleetId as UnitId, toSystemId: toSystemId as SolarSystemId })
+  }
+  turnPlan.value = { commands: next }
 }
 
 const planetsView = computed((): GamePlanet[] => {

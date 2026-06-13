@@ -508,6 +508,11 @@
         "system": "system",
         "research": "research"
       }
+    },
+    "fleet": {
+      "title": "Fleets",
+      "idle": "In orbit",
+      "keep": "Keep current orders"
     }
   }
 }
