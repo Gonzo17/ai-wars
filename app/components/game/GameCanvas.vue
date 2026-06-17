@@ -1,17 +1,38 @@
 <script setup lang="ts">
+import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
+
 type PlanetSize = 'small' | 'medium' | 'large' | 'huge'
 
 const props = defineProps<{
   viewMode: 'universe' | 'galaxy' | 'system' | 'planet'
   selectedType: 'planet' | 'army' | 'system' | 'galaxy' | 'research'
   selectedId: string
-  planets: Array<{ id: string, name: string, location: { x: number, y: number }, systemId: string, size?: PlanetSize }>
+  planets: Array<{ id: string, name: string, location: { x: number, y: number }, systemId: string, size?: PlanetSize, type?: string }>
   systems: Array<{ id: string, name: string, location: { x: number, y: number }, childCount: number }>
   galaxies: Array<{ id: string, name: string, location: { x: number, y: number }, childCount: number }>
   ownedIds?: string[]
+  colorById?: Record<string, string>
 }>()
 
 const ownedSet = computed(() => new Set(props.ownedIds ?? []))
+
+// Ring encodes ownership: planets and the (buildable) sun always get one — grey
+// if unclaimed; the viewer's own holdings get a thicker, brighter ring. Unowned
+// systems/galaxies get a subtle neutral ring + soft inner edge so the circular
+// crop blends into the backdrop.
+const ringStyle = (node: MapNode): Record<string, string> => {
+  const color = props.colorById?.[node.id]
+  if (color) {
+    return ownedSet.value.has(node.id)
+      ? { boxShadow: `0 0 0 3px ${color}, 0 0 24px ${color}aa` }
+      : { boxShadow: `0 0 0 2px ${color}, 0 0 12px ${color}66` }
+  }
+  if (node.type === 'planet' || node.type === 'sun') {
+    return { boxShadow: `0 0 0 2px ${UNCLAIMED_COLOR}, 0 0 10px ${UNCLAIMED_COLOR}55` }
+  }
+  // Unowned system / galaxy
+  return { boxShadow: '0 0 0 2px rgba(255,255,255,0.35), 0 0 16px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.55)' }
+}
 
 const emit = defineEmits<{
   (e: 'select-planet' | 'select-system' | 'select-galaxy', id: string): void
@@ -26,12 +47,21 @@ const { t } = useI18n()
 // - Planet: 64–192px (recommended 192px, scaled by data size)
 // - Sun: 192–256px (recommended 256px)
 
-const nodeImages = {
-  galaxy: '/background2.png',
-  system: '/background1.png',
-  planet: '/planet.png',
-  sun: '/sun1.png'
-} as const
+// Real imagery (NASA + telescope photography, see docs/CREDITS.md).
+const GALAXY_VARIANTS = 6
+const SYSTEM_VARIANTS = 6
+const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
+
+// Stable per-id pick so a given galaxy/system always shows the same image.
+const hashId = (id: string) => {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+  return h
+}
+const planetImage = (type?: string) => `/planets/${type && KNOWN_PLANET_TYPES.has(type) ? type : 'terrestrial'}.webp`
+const galaxyImage = (id: string) => `/galaxies/${hashId(id) % GALAXY_VARIANTS}.webp`
+const systemImage = (id: string) => `/systems/${hashId(id) % SYSTEM_VARIANTS}.webp`
+const sunImage = '/sun.webp'
 
 const planetSizeMap: Record<PlanetSize, number> = {
   small: 56,
@@ -80,7 +110,7 @@ const nodes = computed<MapNode[]>(() => {
       type: 'galaxy' as const,
       location: item.location,
       sizePx: sizeFromChildren(item.childCount, 180, 320),
-      image: nodeImages.galaxy
+      image: galaxyImage(item.id)
     }))
   }
 
@@ -91,7 +121,7 @@ const nodes = computed<MapNode[]>(() => {
       type: 'system' as const,
       location: item.location,
       sizePx: sizeFromChildren(item.childCount, 140, 240),
-      image: nodeImages.system
+      image: systemImage(item.id)
     }))
   }
 
@@ -101,7 +131,7 @@ const nodes = computed<MapNode[]>(() => {
     type: 'planet' as const,
     location: pushAwayFromSun(item.location, 18),
     sizePx: planetSizeMap[item.size ?? 'medium'],
-    image: nodeImages.planet
+    image: planetImage(item.type)
   }))
 
   const sunNode: MapNode = {
@@ -110,7 +140,7 @@ const nodes = computed<MapNode[]>(() => {
     type: 'sun',
     location: { x: 50, y: 50 },
     sizePx: 180,
-    image: nodeImages.sun
+    image: sunImage
   }
 
   return [sunNode, ...planetNodes]
@@ -126,9 +156,10 @@ const nodeStyle = (node: MapNode) => ({
 })
 
 const backgroundImage = computed(() => {
-  if (props.viewMode === 'universe') return `url('/background1.png')`
-  if (props.viewMode === 'galaxy') return `url('/background2.png')`
-  return `url('/background1.png')`
+  if (props.viewMode === 'universe') return `url('/space/universe.webp')`
+  if (props.viewMode === 'galaxy') return `url('/space/galaxy.webp')`
+  // system + planet share the system backdrop.
+  return `url('/space/system.webp')`
 })
 
 const zoomState = ref<'idle' | 'in' | 'out'>('idle')
@@ -206,41 +237,30 @@ const handleZoomEnd = () => {
           :key="node.id"
           :class="[
             'absolute bg-center bg-cover rounded-full',
-            node.type === 'sun' ? 'pointer-events-none sun-glow' : 'pointer-events-auto',
-            ownedSet.has(node.id) ? 'owned-node' : ''
+            node.type === 'sun' ? 'pointer-events-none sun-glow' : 'pointer-events-auto'
           ]"
           :data-testid="node.type !== 'sun' ? `map-node-${node.id}` : undefined"
           :data-owned="ownedSet.has(node.id) ? 'true' : undefined"
-          :style="nodeStyle(node)"
+          :style="[nodeStyle(node), ringStyle(node)]"
         >
-          <!-- Owner marker -->
+          <!-- Name label above the node (ownership is shown by the ring colour) -->
           <div
-            v-if="ownedSet.has(node.id)"
-            class="absolute -top-1 left-1/2 z-20 flex -translate-x-1/2 -translate-y-full items-center gap-1 rounded-full bg-primary-500/90 px-2 py-0.5 text-[10px] font-semibold text-primary-950 shadow-lg whitespace-nowrap pointer-events-none"
-          >
-            <UIcon
-              name="i-lucide-circle-user"
-              class="h-3 w-3"
-            />
-            {{ $t('game.map.you') }}
-          </div>
-          <UButton
             v-if="node.type !== 'sun'"
-            :color="node.type === 'system' || node.type === 'galaxy' ? 'primary' : 'secondary'"
-            variant="ghost"
-            size="xl"
-            class="flex items-center justify-center rounded-full"
-            :style="{ width: `${node.sizePx}px`, height: `${node.sizePx}px` }"
+            class="absolute -top-2 left-1/2 z-20 -translate-x-1/2 -translate-y-full rounded-full bg-neutral-950/85 px-2 py-0.5 text-[11px] font-semibold text-white shadow-lg whitespace-nowrap pointer-events-none ring-1 ring-white/10"
+          >
+            {{ node.name }}
+          </div>
+          <button
+            v-if="node.type !== 'sun'"
+            type="button"
+            :aria-label="node.name"
+            class="h-full w-full rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             @click="node.type === 'system'
               ? emit('select-system', node.id)
               : node.type === 'galaxy'
                 ? emit('select-galaxy', node.id)
                 : emit('select-planet', node.id)"
-          >
-            <span class="flex items-center gap-1">
-              <span class="text-md text-black font-bold">{{ node.name }}</span>
-            </span>
-          </UButton>
+          />
         </div>
       </div>
     </div>
@@ -254,10 +274,6 @@ const handleZoomEnd = () => {
 
 .zoom-out {
   animation: zoomOut 1.2s cubic-bezier(.1,.8,.46,1);
-}
-
-.owned-node {
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.9), 0 0 22px rgba(139, 92, 246, 0.45);
 }
 
 .sun-glow {

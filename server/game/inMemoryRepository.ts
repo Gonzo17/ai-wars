@@ -39,16 +39,22 @@ export class InMemoryGameRepository implements GameRepository {
     return this.data.lobby_players.filter(row => row.lobby_id === lobbyId).map(row => row.user_id)
   }
 
+  async listLobbyPlayersDetailed(lobbyId: string): Promise<Array<{ user_id: string, color: string | null }>> {
+    return this.data.lobby_players
+      .filter(row => row.lobby_id === lobbyId)
+      .map(row => ({ user_id: row.user_id, color: row.color ?? null }))
+  }
+
   async createGame(createdBy: string): Promise<string> {
     const gameId = `game-${this.data.gameCounter++}`
     this.data.games.push({ id: gameId, created_by: createdBy, status: 'active', turn: 1, phase: 'planning', resolving_turn: null } as GameRow)
     return gameId
   }
 
-  async addGamePlayers(gameId: string, userIds: string[]): Promise<void> {
-    for (const userId of userIds) {
+  async addGamePlayers(gameId: string, players: Array<{ userId: string, color: string | null }>): Promise<void> {
+    for (const { userId, color } of players) {
       if (!this.data.game_players.some(row => row.game_id === gameId && row.user_id === userId)) {
-        this.data.game_players.push({ game_id: gameId, user_id: userId })
+        this.data.game_players.push({ game_id: gameId, user_id: userId, color })
       }
     }
   }

@@ -1,5 +1,6 @@
 import { createError } from 'h3'
 import { initialState } from './initialState'
+import { assignPlayerColors } from '~~/shared/defs/playerColors'
 import type { GameRepository } from './repository'
 
 export async function startLobbyGame(repo: GameRepository, userId: string, lobbyId: string): Promise<{ gameId: string }> {
@@ -28,17 +29,19 @@ export async function startLobbyGame(repo: GameRepository, userId: string, lobby
     throw createError({ statusCode: 409, statusMessage: 'Lobby not open' })
   }
 
-  const playerIds = await repo.listLobbyPlayers(lobbyId)
-  if (!playerIds.includes(userId)) {
-    playerIds.push(userId)
+  const lobbyPlayers = await repo.listLobbyPlayersDetailed(lobbyId)
+  if (!lobbyPlayers.some(p => p.user_id === userId)) {
+    lobbyPlayers.push({ user_id: userId, color: null })
   }
+  const playerIds = lobbyPlayers.map(p => p.user_id)
   const gameId = await repo.createGame(userId)
 
   if (!gameId) {
     throw createError({ statusCode: 500, statusMessage: 'Game create failed' })
   }
 
-  await repo.addGamePlayers(gameId, playerIds)
+  // Keep each player's chosen lobby colour; auto-assign the rest from the palette.
+  await repo.addGamePlayers(gameId, assignPlayerColors(lobbyPlayers))
 
   const snapshot = initialState(playerIds)
   await repo.insertGameState(gameId, 1, snapshot)

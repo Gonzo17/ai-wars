@@ -92,9 +92,10 @@ describe('colonization', () => {
     await playTurn(repo, 1)
 
     const next = getSnapshot(repo, 2)
-    const outpost = next.planets.find(p => p.id === 'pl:frontier-alpha')!
-    expect(outpost.owner).toBe(toPlayerId(U1))
-    expect(next.players.find(p => p.id === toPlayerId(U1))!.planets).toContain('pl:frontier-alpha')
+    // The colonizer captures one unclaimed planet in its system (layout-independent).
+    const outpost = next.planets.find(p => p.systemId === 'sys:frontier' && p.owner === toPlayerId(U1))!
+    expect(outpost).toBeDefined()
+    expect(next.players.find(p => p.id === toPlayerId(U1))!.planets).toContain(outpost.id)
     // colony ship consumed
     expect(next.fleets.filter(f => f.defId === 'unit:colony-ship')).toHaveLength(0)
     // planetsControlled updated for ascension gates

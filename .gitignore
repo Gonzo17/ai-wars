@@ -35,3 +35,6 @@ memory/
 # Playwright playtest output
 test-results/
 playwright-report/
+
+# Raw image sources (only the processed assets under public/ are committed)
+assets-raw/

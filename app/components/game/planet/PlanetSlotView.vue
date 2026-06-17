@@ -444,6 +444,10 @@ const getBuildingIcon = (buildingId: string): string => {
 
 const productionPerRound = computed(() => props.planet.workers * props.planet.productionPerWorker)
 
+const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
+const planetImageSrc = computed(() =>
+  `/planets/${KNOWN_PLANET_TYPES.has(props.planet.type) ? props.planet.type : 'terrestrial'}.webp`)
+
 const estimateRounds = (productionCost: number) => {
   if (productionPerRound.value <= 0) return 0
   return Math.max(1, Math.ceil(productionCost / productionPerRound.value))
@@ -477,7 +481,7 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
         <div class="flex items-center gap-3">
           <div
             class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-primary-500/40"
-            style="background-image: url('/planet.png')"
+            :style="{ backgroundImage: `url('${planetImageSrc}')` }"
           />
           <div>
             <h2 class="text-lg font-bold text-neutral-100">
@@ -607,7 +611,7 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
           }"
         >
           <img
-            src="/planet.png"
+            :src="planetImageSrc"
             alt=""
             class="w-full h-full object-cover opacity-70"
           >

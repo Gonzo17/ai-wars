@@ -31,6 +31,7 @@
           :systems="systemsInGalaxy"
           :planets="planetsInSystem"
           :owned-ids="ownedMapIds"
+          :color-by-id="colorById"
           @select-planet="handleSelectPlanet"
           @select-system="handleSelectSystem"
           @select-galaxy="handleSelectGalaxy"
@@ -178,6 +179,7 @@ import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissing
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
+import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
 import { getResearchPointsPerTurn } from '~~/shared/utils/economy'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
@@ -276,7 +278,7 @@ const snapshot = ref<GameSnapshot | null>(null)
 const currentUserId = ref<string | null>(null)
 const submitting = ref(false)
 const readyUserIds = ref<Set<string>>(new Set())
-const gamePlayers = ref<Array<{ id: string, name: string }>>([])
+const gamePlayers = ref<Array<{ id: string, name: string, color: string | null }>>([])
 const yearPulse = ref(false)
 const turnAnimationActive = ref(false)
 let turnAnimationTimer: ReturnType<typeof setTimeout> | null = null
@@ -427,7 +429,7 @@ const loadPlayers = async () => {
   if (!gameId.value) return
   const { data, error } = await supabase
     .from('game_players')
-    .select('user_id')
+    .select('user_id, color')
     .eq('game_id', gameId.value)
 
   if (error) {
@@ -436,6 +438,7 @@ const loadPlayers = async () => {
   }
 
   const userIds = (data ?? []).map(row => row.user_id)
+  const colorMap = Object.fromEntries((data ?? []).map(row => [row.user_id, (row.color as string | null) ?? null]))
   if (userIds.length === 0) {
     gamePlayers.value = []
     return
@@ -452,7 +455,7 @@ const loadPlayers = async () => {
   }
 
   const nameMap = Object.fromEntries((profiles ?? []).map(row => [row.id, row.username ?? row.id]))
-  gamePlayers.value = userIds.map(id => ({ id, name: nameMap[id] ?? id }))
+  gamePlayers.value = userIds.map(id => ({ id, name: nameMap[id] ?? id, color: colorMap[id] ?? null }))
 }
 
 const loadSnapshot = async () => {
@@ -1084,6 +1087,33 @@ const ownedMapIds = computed(() => {
     if (galaxyId) ids.push(galaxyId)
   }
   return Array.from(new Set(ids))
+})
+
+const myColor = computed(() =>
+  gamePlayers.value.find(p => p.id === currentUserId.value)?.color ?? null)
+
+/** Owner PlayerId → chosen colour (from game_players, joined via snapshot.userId). */
+const playerColorByOwner = computed(() => {
+  const byUserId = new Map(gamePlayers.value.map(p => [p.id, p.color]))
+  const map = new Map<string, string>()
+  for (const player of snapshot.value?.players ?? []) {
+    const color = byUserId.get(player.userId)
+    if (color) map.set(player.id, color)
+  }
+  return map
+})
+
+/** Map node id → ring colour: planets by owner (grey if unclaimed), my systems/galaxies in my colour. */
+const colorById = computed<Record<string, string>>(() => {
+  const result: Record<string, string> = {}
+  for (const planet of planets.value) {
+    result[planet.id] = playerColorByOwner.value.get(planet.owner) ?? UNCLAIMED_COLOR
+  }
+  const mine = myColor.value
+  if (mine) {
+    for (const id of ownedMapIds.value) result[id] ??= mine
+  }
+  return result
 })
 
 const homeSystemId = computed(() => {

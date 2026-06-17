@@ -87,52 +87,73 @@ function galaxyLocation(index: number, total: number): { x: number, y: number } 
   }
 }
 
-function makeHomePlanets(template: HomeTemplate, systemId: SolarSystemId, owner: Planet['owner']): Planet[] {
-  return [
-    {
-      id: template.primaryId,
-      systemId,
-      name: template.primaryName,
-      owner,
-      type: 'terrestrial',
-      size: 'large',
-      workers: 1,
-      productionPerWorker: 20,
-      slots: makeSlots(
-        [
-          { id: 'bld:fusion-core' as BuildingId, level: 2 },
-          { id: 'bld:hydroponics' as BuildingId, level: 3 },
-          { id: 'bld:orbital-dock' as BuildingId, level: 1 },
-          { id: 'bld:data-center' as BuildingId, level: 1 }
-        ],
-        new Map([[2, 'ore']])
-      ),
-      queues: { build: [], shipyard: [] },
-      progressMemory: {},
-      productionCarryover: 0,
-      location: { x: 28, y: 44 }
-    },
-    {
-      id: template.secondaryId,
-      systemId,
-      name: template.secondaryName,
-      owner,
-      type: 'ice-giant',
-      size: 'medium',
-      workers: 1,
-      productionPerWorker: 20,
-      slots: makeSlots(
-        [
-          { id: 'bld:refinery-node' as BuildingId, level: 1 },
-          { id: 'bld:listening-post' as BuildingId, level: 1 }
-        ]
-      ),
-      queues: { build: [], shipyard: [] },
-      progressMemory: {},
-      productionCarryover: 0,
-      location: { x: 52, y: 62 }
+/** Every planet type, in a fixed ring order so each system reads consistently. */
+const ALL_TYPES: Planet['type'][] = ['terrestrial', 'oceanic', 'ice-giant', 'gas-giant', 'desert', 'barren']
+const TYPE_SIZE: Record<Planet['type'], Planet['size']> = {
+  'terrestrial': 'large',
+  'oceanic': 'large',
+  'ice-giant': 'medium',
+  'gas-giant': 'huge',
+  'desert': 'medium',
+  'barren': 'small'
+}
+
+/** In-system position for a planet: spread the types evenly on a ring around the sun. */
+function ringLocation(typeIndex: number): { x: number, y: number } {
+  const angle = (typeIndex / ALL_TYPES.length) * Math.PI * 2 - Math.PI / 2
+  return {
+    x: Math.round(50 + 30 * Math.cos(angle)),
+    y: Math.round(50 + 30 * Math.sin(angle))
+  }
+}
+
+type OwnedPlanetDef = { id: PlanetId, name: string, slots: PlanetSlotData[] }
+type NeutralIdDef = { id: PlanetId, name: string }
+
+/**
+ * Build one planet of every type for a system (ring-arranged). `owned` supplies
+ * an owned-planet override per type (stable id, name, starting buildings); types
+ * in `stableNeutral` keep a fixed unclaimed id (so tests/links stay valid); any
+ * remaining type becomes a generated unclaimed expansion target.
+ */
+function makeSystemPlanets(
+  systemKey: string,
+  systemId: SolarSystemId,
+  systemName: string,
+  owner: Planet['owner'],
+  owned: Partial<Record<Planet['type'], OwnedPlanetDef>> = {},
+  stableNeutral: Partial<Record<Planet['type'], NeutralIdDef>> = {}
+): Planet[] {
+  return ALL_TYPES.map((type, i) => {
+    const location = ringLocation(i)
+    const ownedDef = owned[type]
+    if (ownedDef) {
+      return {
+        id: ownedDef.id,
+        systemId,
+        name: ownedDef.name,
+        owner,
+        type,
+        size: TYPE_SIZE[type],
+        workers: 1,
+        productionPerWorker: 20,
+        slots: ownedDef.slots,
+        queues: { build: [], shipyard: [] },
+        progressMemory: {},
+        productionCarryover: 0,
+        location
+      }
     }
-  ]
+    const neutral = stableNeutral[type]
+    return makeNeutralPlanet(
+      neutral?.id ?? `pl:${systemKey}-${type}` as PlanetId,
+      systemId,
+      neutral?.name ?? `${systemName} ${type}`,
+      type,
+      TYPE_SIZE[type],
+      location
+    )
+  })
 }
 
 /** An empty, unclaimed planet with an ore node — an expansion target worth taking. */
@@ -207,25 +228,44 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     const galaxyId = `galaxy:${template.key}` as Galaxy['id']
     gatewaySystemIds.push(gateSystemId)
 
-    // Home planets (owned)
-    const homePlanets = makeHomePlanets(template, homeSystemId, player.id)
-    player.planets = homePlanets.map(p => p.id)
+    // Home system: every planet type, with the two named home worlds owned.
+    const homePlanets = makeSystemPlanets(
+      template.key, homeSystemId, template.systemName, player.id,
+      {
+        'terrestrial': {
+          id: template.primaryId,
+          name: template.primaryName,
+          slots: makeSlots(
+            [
+              { id: 'bld:fusion-core' as BuildingId, level: 2 },
+              { id: 'bld:hydroponics' as BuildingId, level: 3 },
+              { id: 'bld:orbital-dock' as BuildingId, level: 1 },
+              { id: 'bld:data-center' as BuildingId, level: 1 }
+            ],
+            new Map([[2, 'ore']])
+          )
+        },
+        'ice-giant': {
+          id: template.secondaryId,
+          name: template.secondaryName,
+          slots: makeSlots([
+            { id: 'bld:refinery-node' as BuildingId, level: 1 },
+            { id: 'bld:listening-post' as BuildingId, level: 1 }
+          ])
+        }
+      }
+    )
+    player.planets = homePlanets.filter(p => p.owner === player.id).map(p => p.id)
 
-    // Expansion targets inside the player's own galaxy
-    const reachPlanet = makeNeutralPlanet(
-      `pl:${template.key}-reach` as PlanetId, reachSystemId,
-      `${template.systemName} II`, 'barren', 'small', { x: 40, y: 50 }
-    )
-    const gatePlanet = makeNeutralPlanet(
-      `pl:${template.key}-gate` as PlanetId, gateSystemId,
-      `${template.systemName} Gate`, 'desert', 'medium', { x: 46, y: 52 }
-    )
-    planets.push(...homePlanets, reachPlanet, gatePlanet)
+    // Expansion targets inside the player's own galaxy — full type sets too.
+    const reachPlanets = makeSystemPlanets(`${template.key}-reach`, reachSystemId, `${template.systemName} Reach`, 'unclaimed')
+    const gatePlanets = makeSystemPlanets(`${template.key}-gate`, gateSystemId, `${template.systemName} Gate`, 'unclaimed')
+    planets.push(...homePlanets, ...reachPlanets, ...gatePlanets)
 
     systems.push(
       { id: homeSystemId, name: template.systemName, intel: 'high', connections: [reachSystemId], planets: homePlanets.map(p => p.id), location: { x: 26, y: 50 } },
-      { id: reachSystemId, name: `${template.systemName} Reach`, intel: 'medium', connections: [homeSystemId, gateSystemId], planets: [reachPlanet.id], location: { x: 50, y: 50 } },
-      { id: gateSystemId, name: `${template.systemName} Gate`, intel: 'medium', connections: [reachSystemId, FRONTIER_SYSTEM], planets: [gatePlanet.id], location: { x: 74, y: 50 } }
+      { id: reachSystemId, name: `${template.systemName} Reach`, intel: 'medium', connections: [homeSystemId, gateSystemId], planets: reachPlanets.map(p => p.id), location: { x: 50, y: 50 } },
+      { id: gateSystemId, name: `${template.systemName} Gate`, intel: 'medium', connections: [reachSystemId, FRONTIER_SYSTEM], planets: gatePlanets.map(p => p.id), location: { x: 74, y: 50 } }
     )
 
     galaxies.push({
@@ -238,11 +278,14 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     })
   })
 
-  // Shared contested Frontier: the prize that links every player's galaxy.
-  const frontierPlanets = [
-    makeNeutralPlanet('pl:frontier-alpha' as PlanetId, FRONTIER_SYSTEM, 'Frontier Alpha', 'oceanic', 'large', { x: 38, y: 46 }),
-    makeNeutralPlanet('pl:frontier-beta' as PlanetId, FRONTIER_SYSTEM, 'Frontier Beta', 'desert', 'medium', { x: 62, y: 56 })
-  ]
+  // Shared contested Frontier: every type, with the two named prizes kept stable.
+  const frontierPlanets = makeSystemPlanets(
+    'frontier', FRONTIER_SYSTEM, 'Frontier', 'unclaimed', {},
+    {
+      oceanic: { id: 'pl:frontier-alpha' as PlanetId, name: 'Frontier Alpha' },
+      desert: { id: 'pl:frontier-beta' as PlanetId, name: 'Frontier Beta' }
+    }
+  )
   planets.push(...frontierPlanets)
 
   systems.push({

@@ -38,6 +38,15 @@ export class SupabaseGameRepository implements GameRepository {
     return (data ?? []).map(row => row.user_id)
   }
 
+  async listLobbyPlayersDetailed(lobbyId: string): Promise<Array<{ user_id: string, color: string | null }>> {
+    const { data } = await this.client
+      .from('lobby_players')
+      .select('user_id, color')
+      .eq('lobby_id', lobbyId)
+
+    return (data ?? []).map(row => ({ user_id: row.user_id as string, color: (row.color as string | null) ?? null }))
+  }
+
   async createGame(createdBy: string): Promise<string> {
     const { data } = await this.client
       .from('games')
@@ -48,9 +57,11 @@ export class SupabaseGameRepository implements GameRepository {
     return data?.id as string
   }
 
-  async addGamePlayers(gameId: string, userIds: string[]): Promise<void> {
-    if (userIds.length === 0) return
-    await this.client.from('game_players').insert(userIds.map(userId => ({ game_id: gameId, user_id: userId })))
+  async addGamePlayers(gameId: string, players: Array<{ userId: string, color: string | null }>): Promise<void> {
+    if (players.length === 0) return
+    await this.client.from('game_players').insert(
+      players.map(p => ({ game_id: gameId, user_id: p.userId, color: p.color }))
+    )
   }
 
   async insertGameState(gameId: string, turn: number, snapshot: GameSnapshot): Promise<void> {

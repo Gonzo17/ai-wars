@@ -31,6 +31,7 @@
     "@vue/test-utils": "^2.4.6",
     "eslint": "^9.39.2",
     "happy-dom": "^20.9.0",
+    "sharp": "^0.35.1",
     "supabase": "2.72.4",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",

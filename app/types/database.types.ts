@@ -36,6 +36,7 @@ export type Database = {
     Tables: {
       game_players: {
         Row: {
+          color: string | null
           game_id: string
           joined_at: string | null
           ready_at: string | null
@@ -43,6 +44,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          color?: string | null
           game_id: string
           joined_at?: string | null
           ready_at?: string | null
@@ -50,6 +52,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          color?: string | null
           game_id?: string
           joined_at?: string | null
           ready_at?: string | null
@@ -168,18 +171,21 @@ export type Database = {
       }
       lobby_players: {
         Row: {
+          color: string | null
           is_host: boolean | null
           joined_at: string | null
           lobby_id: string
           user_id: string
         }
         Insert: {
+          color?: string | null
           is_host?: boolean | null
           joined_at?: string | null
           lobby_id: string
           user_id: string
         }
         Update: {
+          color?: string | null
           is_host?: boolean | null
           joined_at?: string | null
           lobby_id?: string
@@ -250,7 +256,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_game_member: { Args: { p_game_id: string }, Returns: boolean }
     }
     Enums: {
       [_ in never]: never

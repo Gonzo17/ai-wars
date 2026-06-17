@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { PLAYER_COLORS, UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
+
 const { t } = useI18n()
 const supabase = useSupabaseClient()
 const user = useSupabaseUser()
@@ -19,6 +21,7 @@ let channel: ReturnType<typeof supabase.channel> | null = null
 type LobbyPlayer = {
   user_id: string
   is_host?: boolean | null
+  color?: string | null
   profiles?: {
     username?: string | null
   } | null
@@ -138,7 +141,7 @@ const refreshLobbies = async () => {
 const loadMembers = async (lobbyId: string) => {
   const { data, error } = await supabase
     .from('lobby_players')
-    .select('user_id, is_host')
+    .select('user_id, is_host, color')
     .eq('lobby_id', lobbyId)
 
   if (error) {
@@ -162,6 +165,27 @@ const loadMembers = async (lobbyId: string) => {
     ...player,
     profiles: { username: nameMap[player.user_id] || t('lobby.commander') }
   }))
+}
+
+const colorOptions = PLAYER_COLORS
+const unclaimedColor = UNCLAIMED_COLOR
+
+const myColor = computed(() =>
+  members.value.find(p => p.user_id === userIdRef.value)?.color ?? null)
+
+const colorTakenBy = (color: string) =>
+  members.value.find(p => p.color === color && p.user_id !== userIdRef.value)
+
+const chooseColor = async (color: string) => {
+  const userId = await getUserId()
+  if (!userId || !myLobbyId.value) return
+  if (colorTakenBy(color)) return
+  const { error } = await supabase
+    .from('lobby_players')
+    .update({ color })
+    .match({ lobby_id: myLobbyId.value, user_id: userId })
+  if (error) displayError(error)
+  else await loadMembers(myLobbyId.value)
 }
 
 const leaveCurrentLobby = async () => {
@@ -327,6 +351,14 @@ watch(currentLobby, (value) => {
           <div class="flex gap-2">
             <CommonLanguageSwitch />
             <UButton
+              icon="i-lucide-image"
+              to="/credits"
+              variant="soft"
+              color="neutral"
+            >
+              {{ t('lobby.credits-button') }}
+            </UButton>
+            <UButton
               icon="i-lucide-user"
               to="/profile"
               variant="soft"
@@ -384,7 +416,11 @@ watch(currentLobby, (value) => {
                       class="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-4 py-3"
                     >
                       <div class="flex items-center gap-3">
-                        <span class="h-2 w-2 rounded-full bg-success-400" />
+                        <span
+                          class="h-3 w-3 rounded-full ring-1 ring-white/30"
+                          :style="{ backgroundColor: player.color || unclaimedColor }"
+                          :title="player.color ? '' : t('lobby.color-unset')"
+                        />
                         <span>{{ player.profiles?.username || t('lobby.commander') }}</span>
                       </div>
                       <span
@@ -399,6 +435,33 @@ watch(currentLobby, (value) => {
                       {{ t('lobby.waiting-for-players') }}
                     </p>
                   </div>
+                </div>
+
+                <!-- Colour picker -->
+                <div>
+                  <p class="text-sm font-semibold text-white uppercase tracking-wide mb-3">
+                    🎨 {{ t('lobby.color-title') }}
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      v-for="color in colorOptions"
+                      :key="color"
+                      type="button"
+                      :disabled="!!colorTakenBy(color)"
+                      :title="colorTakenBy(color) ? colorTakenBy(color)?.profiles?.username || '' : ''"
+                      :data-testid="`color-swatch-${color}`"
+                      class="h-8 w-8 rounded-full ring-2 transition disabled:opacity-30 disabled:cursor-not-allowed"
+                      :class="myColor === color ? 'ring-white scale-110' : 'ring-white/20 hover:ring-white/60'"
+                      :style="{ backgroundColor: color }"
+                      @click="chooseColor(color)"
+                    />
+                  </div>
+                  <p
+                    v-if="!myColor"
+                    class="text-xs text-neutral-400 mt-2"
+                  >
+                    {{ t('lobby.color-hint') }}
+                  </p>
                 </div>
               </div>
 

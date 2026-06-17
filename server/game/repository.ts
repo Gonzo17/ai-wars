@@ -11,6 +11,7 @@ export type LobbyPlayerRow = {
   lobby_id: string
   user_id: string
   is_host?: boolean
+  color?: string | null
 }
 
 export type GameRow = {
@@ -25,6 +26,7 @@ export type GameRow = {
 export type GamePlayerRow = {
   game_id: string
   user_id: string
+  color?: string | null
   ready_turn?: number | null
   ready_at?: string | null
 }
@@ -47,8 +49,9 @@ export interface GameRepository {
   getLobby(lobbyId: string): Promise<LobbyRow | null>
   getLobbyMembership(lobbyId: string, userId: string): Promise<LobbyPlayerRow | null>
   listLobbyPlayers(lobbyId: string): Promise<string[]>
+  listLobbyPlayersDetailed(lobbyId: string): Promise<Array<{ user_id: string, color: string | null }>>
   createGame(createdBy: string): Promise<string>
-  addGamePlayers(gameId: string, userIds: string[]): Promise<void>
+  addGamePlayers(gameId: string, players: Array<{ userId: string, color: string | null }>): Promise<void>
   insertGameState(gameId: string, turn: number, snapshot: GameSnapshot): Promise<void>
   updateLobbyStarted(lobbyId: string, gameId: string, startedAt: string): Promise<void>
 

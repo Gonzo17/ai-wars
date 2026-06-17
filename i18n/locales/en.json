@@ -27,6 +27,9 @@
     "not-logged-in": "No logged-in user found. Please log in again.",
     "unknown": "Unknown",
     "commander": "Commander",
+    "color-title": "Your colour",
+    "color-hint": "Pick a colour — it marks your worlds on the map.",
+    "color-unset": "No colour chosen yet",
     "status-started": "Started",
     "status-waiting": "Waiting",
     "host-label": "Host:",
@@ -50,7 +53,8 @@
     "lobby-name-hint": "Optional – will be auto-generated if empty",
     "lobby-name-placeholder": "Lobby Name (optional)",
     "create-button": "Create & Join",
-    "host-badge": "⭐ Host"
+    "host-badge": "⭐ Host",
+    "credits-button": "Credits"
   },
   "profile": {
     "title": "Profile",
@@ -524,5 +528,14 @@
       "idle": "In orbit",
       "keep": "Keep current orders"
     }
+  },
+  "credits": {
+    "title": "Image Credits",
+    "intro": "All map imagery is real — NASA public-domain stills and amateur astrophotography used with permission.",
+    "nasa-title": "NASA",
+    "nasa-note": "Public-domain still imagery courtesy of NASA / JPL-Caltech.",
+    "telescope-title": "Telescope astrophotography",
+    "telescope-note": "Amateur astrophotography by Torsten Renner, used with permission.",
+    "back": "Back"
   }
 }

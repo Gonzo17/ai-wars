@@ -27,6 +27,9 @@
     "not-logged-in": "Kein eingeloggter User gefunden. Bitte neu einloggen.",
     "unknown": "Unbekannt",
     "commander": "Commander",
+    "color-title": "Deine Farbe",
+    "color-hint": "Wähle eine Farbe — sie markiert deine Welten auf der Karte.",
+    "color-unset": "Noch keine Farbe gewählt",
     "status-started": "Gestartet",
     "status-waiting": "Wartet",
     "host-label": "Host:",
@@ -50,7 +53,8 @@
     "lobby-name-hint": "Optional – wird sonst automatisch vergeben",
     "lobby-name-placeholder": "Lobby Name (optional)",
     "create-button": "Erstellen & Beitreten",
-    "host-badge": "⭐ Host"
+    "host-badge": "⭐ Host",
+    "credits-button": "Credits"
   },
   "profile": {
     "title": "Profil",
@@ -524,5 +528,14 @@
       "idle": "Im Orbit",
       "keep": "Befehl beibehalten"
     }
+  },
+  "credits": {
+    "title": "Bildnachweise",
+    "intro": "Alle Karten-Bilder sind echt — gemeinfreie NASA-Aufnahmen und Amateur-Astrofotografie, mit Genehmigung verwendet.",
+    "nasa-title": "NASA",
+    "nasa-note": "Gemeinfreies Bildmaterial mit freundlicher Genehmigung der NASA / JPL-Caltech.",
+    "telescope-title": "Teleskop-Astrofotografie",
+    "telescope-note": "Amateur-Astrofotografie von Torsten Renner, mit Genehmigung verwendet.",
+    "back": "Zurück"
   }
 }
