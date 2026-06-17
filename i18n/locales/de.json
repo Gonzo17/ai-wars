@@ -522,7 +522,9 @@
       "shell-inner": "Innere Hülle",
       "shell-outer": "Äußere Hüllen",
       "back-to-system": "Zurück zum System",
-      "no-megastructures": "Noch keine Megastrukturen"
+      "no-megastructures": "Noch keine Megastrukturen",
+      "shipyard-title": "Werft",
+      "choose-ship": "Schiff bauen"
     },
     "errors": {
       "submit-failed": "Zug konnte nicht übermittelt werden",

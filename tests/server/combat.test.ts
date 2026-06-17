@@ -219,4 +219,39 @@ describe('star megastructures', () => {
     // Dyson sphere adds 200 energy/turn to the player's production.
     expect(player.resources.find(r => r.key === 'res:energy')!.delta).toBeGreaterThanOrEqual(200)
   })
+
+  it('lets a Stellar Shipyard build ships on a star', () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    const { star } = ownHomeStar(state)
+    const u1 = state.players.find(p => p.id === toPlayerId(U1))!
+    for (const r of u1.resources) r.current = 5000
+    u1.research.completedTechIds.push('tech:first-shipyard')
+
+    // Without a shipyard the star cannot build ships (no orbital dock).
+    const noYard: TurnPlan = { commands: [{ type: 'buildUnit', planetId: star.id, unitId: 'unit:frigate' as UnitId }] }
+    expect(validateTurnPlan(state, toPlayerId(U1), noYard).length).toBeGreaterThan(0)
+
+    // A completed Stellar Shipyard substitutes for the orbital-dock requirement.
+    star.slots[0] = { index: 0, zone: 'orbital', buildingId: 'bld:orbital-shipyard-mega' as BuildingId, buildingLevel: 1, isConstructing: false, constructionTimeLeft: 0, resourceNode: null }
+    const withYard: TurnPlan = { commands: [{ type: 'buildUnit', planetId: star.id, unitId: 'unit:frigate' as UnitId }] }
+    expect(validateTurnPlan(state, toPlayerId(U1), withYard)).toHaveLength(0)
+  })
+
+  it('a Star Fortress garrisons its system against enemy capture', async () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    const frontierStar = state.planets.find(p => p.kind === 'star' && p.systemId === 'sys:frontier')!
+    frontierStar.owner = toPlayerId(U2)
+    frontierStar.slots[0] = { index: 0, zone: 'orbital', buildingId: 'bld:star-fortress' as BuildingId, buildingLevel: 1, isConstructing: false, constructionTimeLeft: 0, resourceNode: null }
+    // U1 tries to grab an undefended planet in the fortified system.
+    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:frontier')
+
+    await playTurn(repo, 1)
+
+    const next = getSnapshot(repo, 2)
+    const u1GrabbedSomething = next.planets.some(p =>
+      p.systemId === 'sys:frontier' && p.kind !== 'star' && p.owner === toPlayerId(U1))
+    expect(u1GrabbedSomething).toBe(false)
+  })
 })

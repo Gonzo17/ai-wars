@@ -349,6 +349,23 @@ function resolveCombat(snapshot: GameSnapshot, turn: number, nextEventId: () => 
  * contests it. Unclaimed planets and undefended enemy planets are both valid
  * targets; the colonizer is consumed on capture.
  */
+const STAR_FORTRESS_ID = 'bld:star-fortress'
+
+/**
+ * A completed Star Fortress garrisons its whole system: an enemy cannot quietly
+ * colonize planets or capture the star there. (A future siege mechanic will let
+ * a strong enough fleet break it; for now it is an absolute cheap-grab block.)
+ */
+function systemHasEnemyFortress(snapshot: GameSnapshot, systemId: string, actorId: string): boolean {
+  return snapshot.planets.some(p =>
+    p.systemId === systemId
+    && p.kind === 'star'
+    && p.owner !== actorId
+    && p.owner !== 'unclaimed'
+    && p.owner !== 'unknown'
+    && p.slots.some(s => s.buildingId === STAR_FORTRESS_ID && !s.isConstructing))
+}
+
 function resolveColonization(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
   const colonizers = snapshot.fleets.filter(fleet =>
     fleet.status !== 'en-route' && getUnitDef(fleet.defId ?? fleet.id)?.unitType === 'colonizer')
@@ -365,6 +382,7 @@ function resolveColonization(snapshot: GameSnapshot, turn: number, nextEventId: 
       && !consumedFleetIds.has(fleet.id)
       && getSystemIdForLocation(snapshot, fleet.location) === systemId)
     if (enemyPresent) continue
+    if (systemHasEnemyFortress(snapshot, systemId, colonizer.ownerId)) continue
 
     const target = snapshot.planets.find(planet =>
       planet.systemId === systemId
@@ -433,6 +451,7 @@ function resolveStarCapture(snapshot: GameSnapshot, turn: number, nextEventId: (
       && !consumedFleetIds.has(fleet.id)
       && getSystemIdForLocation(snapshot, fleet.location) === systemId)
     if (enemyPresent) continue
+    if (systemHasEnemyFortress(snapshot, systemId, constructor.ownerId)) continue
 
     const star = snapshot.planets.find(p =>
       p.kind === 'star'

@@ -11,10 +11,23 @@ interface ResourceCosts {
   rare: number
 }
 
+/**
+ * Buildings that stand in for another facility requirement. A captured star has
+ * no orbital dock, but a completed Stellar Shipyard provides the same capability,
+ * so ship/unit builds requiring an orbital dock are allowed on such a star.
+ */
+const FACILITY_SUBSTITUTES: Record<string, string[]> = {
+  'bld:orbital-dock': ['bld:orbital-shipyard-mega']
+}
+
 const hasSlotBuildingRequirement = (planet: Planet, requirements: Array<{ id: string, level: number }>) => {
   for (const req of requirements) {
-    const slot = planet.slots.find(s => s.buildingId === req.id && !s.isConstructing && s.buildingLevel >= req.level)
-    if (!slot) return false
+    const direct = planet.slots.find(s => s.buildingId === req.id && !s.isConstructing && s.buildingLevel >= req.level)
+    if (direct) continue
+    const substitutes = FACILITY_SUBSTITUTES[req.id] ?? []
+    const hasSubstitute = substitutes.length > 0
+      && planet.slots.some(s => s.buildingId !== null && substitutes.includes(s.buildingId) && !s.isConstructing)
+    if (!hasSubstitute) return false
   }
   return true
 }

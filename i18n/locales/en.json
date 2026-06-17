@@ -522,7 +522,9 @@
       "shell-inner": "Inner shell",
       "shell-outer": "Outer shells",
       "back-to-system": "Back to system",
-      "no-megastructures": "No megastructures yet"
+      "no-megastructures": "No megastructures yet",
+      "shipyard-title": "Shipyard",
+      "choose-ship": "Build Ship"
     },
     "errors": {
       "submit-failed": "Failed to submit turn",

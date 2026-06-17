@@ -82,6 +82,7 @@
           v-if="viewMode === 'planet' && selectedStarWithQueue"
           :star="selectedStarWithQueue"
           :building-catalog="starBuildingCatalog"
+          :unit-catalog="unitCatalog"
           :can-build="starCanBuild"
           :player-resources="playerResources"
           @close="handleExitPlanetView"

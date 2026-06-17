@@ -22,6 +22,19 @@ interface BuildingDefinition {
   lockedByTechName?: string | null
 }
 
+interface UnitDefinition {
+  id: string
+  name: string
+  role: string
+  category: 'support' | 'combat'
+  resourceCosts: BuildCosts
+  productionCost: number
+  icon: string
+  requiresFacility: boolean
+  locked?: boolean
+  lockedByTechName?: string | null
+}
+
 interface StarData {
   id: string
   name: string
@@ -31,6 +44,7 @@ interface StarData {
   productionPerWorker: number
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
   buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
+  stationedUnits: Array<{ unitDefId: string, count: number }>
 }
 
 interface PlayerResources {
@@ -43,6 +57,8 @@ const props = defineProps<{
   star: StarData
   /** Megastructure catalog (site: 'star' buildings only). */
   buildingCatalog: BuildingDefinition[]
+  /** Units the Stellar Shipyard can produce (facility units). */
+  unitCatalog: UnitDefinition[]
   /** Whether the viewer controls this star (false → read-only capture hint). */
   canBuild: boolean
   playerResources?: PlayerResources
@@ -54,6 +70,7 @@ const emit = defineEmits<{
 }>()
 
 const DYSON_ID = 'bld:dyson-sphere'
+const SHIPYARD_ID = 'bld:orbital-shipyard-mega'
 
 // ── Layout ────────────────────────────────────────────────────────────
 const STAR_RADIUS = 90
@@ -69,11 +86,13 @@ const CANVAS_SIZE = (SHELL_BASE_RADIUS + (STAR_SLOT_COUNT - 1) * SHELL_STEP + SH
 const assignments = ref(new Map<number, string>())
 const buildMenuSlotIndex = ref<number | null>(null)
 const hoveredSlotIndex = ref<number | null>(null)
+const unitTrainingMenuOpen = ref(false)
 
 watch(() => props.star.id, () => {
   assignments.value = new Map()
   buildMenuSlotIndex.value = null
   hoveredSlotIndex.value = null
+  unitTrainingMenuOpen.value = false
 })
 
 type ShellSlot = {
@@ -175,6 +194,30 @@ const estimateRounds = (productionCost: number) => {
 
 const getBuildingName = (id: string) => props.buildingCatalog.find(b => b.id === id)?.name ?? id
 const getBuildingIcon = (id: string) => props.buildingCatalog.find(b => b.id === id)?.icon ?? 'i-lucide-orbit'
+
+// ── Stellar Shipyard: build ships at the star ─────────────────────────
+const hasShipyard = computed(() =>
+  props.star.slots.some(s => s.buildingId === SHIPYARD_ID && !s.isConstructing))
+
+// The shipyard produces the same facility-gated units a planet's orbital dock would.
+const shipyardUnits = computed(() => props.unitCatalog.filter(u => u.requiresFacility))
+
+const canTrainUnit = (unit: UnitDefinition): boolean => {
+  if (unit.locked) return false
+  if (!props.playerResources) return true
+  return props.playerResources.energy >= unit.resourceCosts.energy
+    && props.playerResources.minerals >= unit.resourceCosts.minerals
+    && props.playerResources.rare >= unit.resourceCosts.rare
+}
+
+const handleTrainUnit = (unitId: string) => {
+  assignments.value = new Map()
+  unitTrainingMenuOpen.value = false
+  emit('queue-build', props.star.id, unitId, 'unit')
+}
+
+const getUnitName = (id: string) => props.unitCatalog.find(u => u.id === id)?.name ?? id
+const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.icon ?? 'i-lucide-rocket'
 </script>
 
 <template>
@@ -462,6 +505,143 @@ const getBuildingIcon = (id: string) => props.buildingCatalog.find(b => b.id ===
             </div>
           </div>
         </Transition>
+      </div>
+
+      <!-- Stellar Shipyard: stationed units + training -->
+      <div
+        v-if="canBuild && hasShipyard"
+        class="flex items-center gap-2 z-20"
+      >
+        <span class="text-[11px] text-neutral-500 uppercase tracking-wider mr-1">
+          {{ $t('game.star.shipyard-title') }}
+        </span>
+        <div
+          v-for="(unit, idx) in star.stationedUnits"
+          :key="idx"
+          class="relative w-11 h-11 rounded-md border border-amber-700/40 bg-amber-950/40 flex flex-col items-center justify-center gap-0.5 cursor-default"
+        >
+          <UIcon
+            :name="getUnitIcon(unit.unitDefId)"
+            class="w-4 h-4 text-amber-200"
+          />
+          <span class="text-[8px] text-neutral-400 truncate max-w-10 text-center leading-tight">
+            {{ getUnitName(unit.unitDefId) }}
+          </span>
+          <span
+            v-if="unit.count > 1"
+            class="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-neutral-700 border border-neutral-600 rounded-full w-4.5 h-4.5 flex items-center justify-center text-neutral-200"
+          >
+            {{ unit.count }}
+          </span>
+        </div>
+        <div class="relative">
+          <button
+            type="button"
+            data-testid="star-train-unit"
+            class="w-11 h-11 rounded-md border border-dashed border-amber-600/50 bg-amber-950/30 flex items-center justify-center transition-colors"
+            :class="unitTrainingMenuOpen ? 'border-amber-400/60 bg-amber-900/40' : 'hover:border-amber-400/60 hover:bg-amber-900/40'"
+            @click="unitTrainingMenuOpen = !unitTrainingMenuOpen"
+          >
+            <UIcon
+              name="i-lucide-plus"
+              class="w-4 h-4"
+              :class="unitTrainingMenuOpen ? 'text-amber-300' : 'text-neutral-500'"
+            />
+          </button>
+          <Transition name="fade">
+            <div
+              v-if="unitTrainingMenuOpen"
+              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg border border-amber-500/30 bg-neutral-900 shadow-2xl shadow-amber-500/10 overflow-hidden z-50"
+            >
+              <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
+                <span class="text-sm font-semibold text-neutral-200">
+                  {{ $t('game.star.choose-ship') }}
+                </span>
+                <UButton
+                  icon="i-lucide-x"
+                  color="neutral"
+                  variant="ghost"
+                  size="xs"
+                  @click="unitTrainingMenuOpen = false"
+                />
+              </div>
+              <div class="max-h-48 overflow-y-auto p-2 space-y-1">
+                <button
+                  v-for="unit in shipyardUnits"
+                  :key="unit.id"
+                  type="button"
+                  :data-testid="`star-train-option-${unit.id}`"
+                  class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
+                  :class="{ 'opacity-40 cursor-not-allowed': !canTrainUnit(unit) }"
+                  :disabled="!canTrainUnit(unit)"
+                  @click="handleTrainUnit(unit.id)"
+                >
+                  <div class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-900/40 shrink-0">
+                    <UIcon
+                      :name="unit.icon"
+                      class="h-4 w-4 text-amber-200"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-neutral-100 truncate">
+                      {{ unit.name }}
+                    </p>
+                    <div class="flex items-center gap-2 text-[10px] text-neutral-500">
+                      <span
+                        v-if="unit.resourceCosts.energy"
+                        class="flex items-center gap-0.5"
+                      >
+                        <UIcon
+                          name="i-lucide-zap"
+                          class="w-2.5 h-2.5 text-warning-300"
+                        />
+                        {{ unit.resourceCosts.energy }}
+                      </span>
+                      <span
+                        v-if="unit.resourceCosts.minerals"
+                        class="flex items-center gap-0.5"
+                      >
+                        <UIcon
+                          name="i-lucide-pickaxe"
+                          class="w-2.5 h-2.5 text-neutral-300"
+                        />
+                        {{ unit.resourceCosts.minerals }}
+                      </span>
+                      <span
+                        v-if="unit.resourceCosts.rare"
+                        class="flex items-center gap-0.5"
+                      >
+                        <UIcon
+                          name="i-lucide-atom"
+                          class="w-2.5 h-2.5 text-primary-300"
+                        />
+                        {{ unit.resourceCosts.rare }}
+                      </span>
+                      <span class="text-neutral-600">·</span>
+                      <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(unit.productionCost) }) }}</span>
+                    </div>
+                  </div>
+                  <div
+                    v-if="unit.locked"
+                    class="shrink-0"
+                  >
+                    <UBadge
+                      color="info"
+                      variant="subtle"
+                      size="xs"
+                    >
+                      <UIcon
+                        name="i-lucide-lock"
+                        class="w-3 h-3 mr-0.5"
+                      />
+                      {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
+                    </UBadge>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </Transition>
+        </div>
       </div>
 
       <!-- Back button -->
