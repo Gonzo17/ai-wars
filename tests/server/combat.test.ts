@@ -98,8 +98,8 @@ describe('colonization', () => {
     expect(next.players.find(p => p.id === toPlayerId(U1))!.planets).toContain(outpost.id)
     // colony ship consumed
     expect(next.fleets.filter(f => f.defId === 'unit:colony-ship')).toHaveLength(0)
-    // planetsControlled updated for ascension gates
-    expect(next.players.find(p => p.id === toPlayerId(U1))!.research.empireState.planetsControlled).toBe(3)
+    // planetsControlled updated for ascension gates (1 homeworld + 1 colonised)
+    expect(next.players.find(p => p.id === toPlayerId(U1))!.research.empireState.planetsControlled).toBe(2)
 
     const events = next.players.find(p => p.id === toPlayerId(U1))!.events
     expect(events.some(e => e.type === 'colony-established')).toBe(true)

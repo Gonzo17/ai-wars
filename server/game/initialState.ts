@@ -9,10 +9,11 @@ import { createPlanetSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetS
 
 /**
  * Map layout (vision: Civ-continents). Each player gets their OWN galaxy with
- * three systems — home (2 owned planets), a reach system and a gateway system
- * (both with one unclaimed planet to expand into). Every gateway links by a
- * long lane to a single shared, contested **Frontier** galaxy in the middle.
- * So players expand inside their own galaxy and clash over the Frontier.
+ * three systems. Every system holds one planet of each type; the player starts
+ * owning only the terrestrial **homeworld** in the home system — which other
+ * worlds to settle is a strategic choice. Every gateway links by a long lane to
+ * a single shared, contested **Frontier** galaxy in the middle, so players
+ * expand inside their own galaxy and clash over the Frontier.
  */
 
 const FRONTIER_GALAXY = 'galaxy:frontier'
@@ -107,7 +108,7 @@ function ringLocation(typeIndex: number): { x: number, y: number } {
   }
 }
 
-type OwnedPlanetDef = { id: PlanetId, name: string, slots: PlanetSlotData[] }
+type OwnedPlanetDef = { id: PlanetId, name: string, slots: PlanetSlotData[], isHomeworld?: boolean }
 type NeutralIdDef = { id: PlanetId, name: string }
 
 /**
@@ -133,6 +134,7 @@ function makeSystemPlanets(
         systemId,
         name: ownedDef.name,
         owner,
+        isHomeworld: ownedDef.isHomeworld ?? false,
         type,
         size: TYPE_SIZE[type],
         workers: 1,
@@ -195,7 +197,7 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       ascensionTierReached: 'k0.6',
       computeLevel: 1,
       empireState: {
-        planetsControlled: 2,
+        planetsControlled: 1,
         homeSystemMajority: true,
         intelLevel: 'low'
       },
@@ -228,13 +230,15 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     const galaxyId = `galaxy:${template.key}` as Galaxy['id']
     gatewaySystemIds.push(gateSystemId)
 
-    // Home system: every planet type, with the two named home worlds owned.
+    // Home system: every planet type, but only the terrestrial homeworld is owned
+    // at the start. Which other worlds to settle is a strategic choice.
     const homePlanets = makeSystemPlanets(
       template.key, homeSystemId, template.systemName, player.id,
       {
-        'terrestrial': {
+        terrestrial: {
           id: template.primaryId,
           name: template.primaryName,
+          isHomeworld: true,
           slots: makeSlots(
             [
               { id: 'bld:fusion-core' as BuildingId, level: 2 },
@@ -244,14 +248,6 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
             ],
             new Map([[2, 'ore']])
           )
-        },
-        'ice-giant': {
-          id: template.secondaryId,
-          name: template.secondaryName,
-          slots: makeSlots([
-            { id: 'bld:refinery-node' as BuildingId, level: 1 },
-            { id: 'bld:listening-post' as BuildingId, level: 1 }
-          ])
         }
       }
     )

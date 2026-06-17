@@ -62,78 +62,95 @@ These are the areas David explicitly flags as "not strategically interesting yet
   unlocking whole capability classes, specialization points, repeatable research
   to deepen a buff. Techs must gate real unlocks (roadmap item 1).
 
-## Megastructures, stars & victory (refined June 2026)
+## Progression spine: stars drive advancement (refined June 2026)
 
-**Stars become first-class map objects in the late game.** Each system has one
-star as a build site for star-anchored megastructures (Dyson swarm stages,
-later e.g. stellar engine). This gives the map a phase arc: planets matter
-early (economy), lanes/chokepoints matter mid (position), stars matter late
-(victory). Planet ownership and star control in the same system are separate —
-an enemy colony can sit in a system whose star you are harvesting; space
-control (fleet combat) decides who may build at or damage the star.
+The backbone that ties the tech tree, planets and stars together: **controlling
+stars is how you advance.** Thematically Kardashev — more stars = more energy =
+higher civilization type = new research, buildings and units. This makes the map
+matter from the first turns (you *must* take stars to progress), independent of
+the endgame.
 
-**Defense stays at system granularity.** A fleet stationed in a system defends
-everything in it; optional stationary orbital-defense buildings as an
-alternative. No separate guard micromanagement. Megastructures are *damaged*
-by raids (stages knocked offline, repairable), never instantly destroyed —
-except the victory wonder, where destructibility is the counterplay.
+**Taking a star is a second kind of colonisation.** A planet gets a *surface*
+base; a **star** gets an orbital **Dyson scaffold**, built by a dedicated *star
+constructor* unit under space superiority (the unit is consumed, like the colony
+ship). The scaffold *is* the capture and gives you a base. A star base shares the
+planet machinery (owner, slots, production, workers/robots, build queue, combat,
+fog) but has its own **megastructure catalogue**: Dyson swarm stages (energy),
+Matryoshka brain (research boost), orbital shipyard, orbital defence. Planet and
+star control in a system stay separate — space control (fleet combat) decides who
+may build at / damage the star.
 
-**Kardashev tiers are game abstractions, not astronomy.** A "galaxy" is a
-cluster of ~5–8 systems. Each player starts in their own home galaxy
-(Civ-continents pattern) with a contested neutral region between them.
-Ascension gates use *threshold* empire requirements (e.g. majority of your
-galaxy's stars, N Dyson stages, specific megastructure built) — never "own
-every star", to avoid denial-by-hidden-outpost endgames. The existing
-`AscensionGateDef.requiresEmpire` is the intended mechanism; extend
-`EmpireRequirement` with star/megastructure fields when implementing.
+**Players start with a single planet** — a terrestrial **homeworld** (always
+Earth-like). Every system also holds one planet of each other type as unclaimed
+settling targets; which to take is strategic. The homeworld is flagged
+(`Planet.isHomeworld`) and anchors the military victory.
 
-**Three victory conditions, distinct by *type* not just ingredients (refined June 2026).**
-The point is three different *verbs* — hold / build / eliminate — so none feels
-like "build a wonder with different prerequisites". All three need a base of
-late-game research, then diverge into expansion vs. research vs. military.
+## Kardashev ladder (refined June 2026)
 
-1. **Expansion — a *control* victory (hold a threshold).** Control ≥ N solar
-   systems and hold them for K turns. Crossing the threshold (while the base
-   prerequisites are met) starts a galaxy-wide, fully visible **dominance
-   countdown**; opponents must take a system away to pause/reset it. This makes
-   the sprawling empire the target everyone gangs up on — structurally
-   different from defending a build site. Win trigger = a maintained *state*,
-   not a finished object.
-   - *"Control a system"* (pin down when implementing): own the star + planet
-     majority + no contesting enemy fleet. Ties to system-granular control and
-     "stars as build sites" above.
-2. **Research — a *completion* victory (Temporal Ascension).** Build the
-   time-travel capstone: thematically a *different* ascension — transcending
-   causality, not scale/energy. Requires a deep tech line + an exotic resource,
-   reachable "tall" without wide territory → the underdog / comeback path. The
-   grandfather paradox is irrelevant to the game (it just ends on a win); the
-   fiction hand-wave is that the AI ascends *out of* the timeline (a-temporal),
-   so it doesn't erase its own origin. Completion = instant win.
-3. **Military — an *elimination* victory.** Eliminate all opponents. Enabled
-   late-game by a **planet-cracker mega-unit** (Death Star-like): expensive,
-   slow, *mobile*, destroys enemy planets so domination doesn't stall against
-   well-defended worlds. Deliberately asymmetric: you build the *weapon*, then
-   *use* it — not "build → win". Military must require actually fighting.
+The scale tops out at **Type 3 — there is no Type 4.** "Beyond the galaxy" would
+be "the whole universe", which in this game is just *all galaxies* = the military
+win, not a power tier. What lies past Type 3 is therefore not a higher *number*
+but three *kinds* of transcendence (the three victories).
 
-**Every path telegraphs before it wins — no no-warning snowball.** What differs
-is the notification model and the counter-shape:
+| Band | Gate | Role |
+|---|---|---|
+| 0.6 → 1.0 (planetary) | research / compute only | short on-ramp: base economy, first fleet, expansion |
+| → 2.0 (stellar leap) | **1 star + Dyson Sphere** | the one hard planetary→stellar gate |
+| 2.0 → 2.x (stellar era) | research / compute / Dyson stages (one star suffices) | **the main playing field; shared late-game base where all three victory lines unlock** — never gated by *more* stars, so a "tall" single-star player misses nothing |
+| → 3.0 (galactic) | **majority (~90%) of the galaxy's stars**, held | = **Expansion victory**; the finish line, not a research tier |
 
-| Path | Win trigger | Notification | Counter-shape |
+So depth belongs in the **2.x band**, not (as today) crammed between 0.6 and 2.0:
+short on-ramp, stretched stellar era. Extend `EmpireRequirement` with star fields
+(`starsControlled`, `dysonStages`, `galaxyStarFraction`);
+`AscensionGateDef.requiresEmpire` stays the mechanism.
+
+## Three victory conditions — three verbs (refined June 2026)
+
+A shared shape: **condition met → visible countdown → hold / finish to win.** They
+differ in trigger and counter. The mystery lives in the *approach*; the imminent
+win is always telegraphed (multiplayer fairness). All three branch from the shared
+Type-2.x research base.
+
+| Path | Trigger | Notification | Counter-shape |
 |---|---|---|---|
-| Expansion | hold N systems for K turns | vague "approaching" early warning (you know territorial danger, *not* whether hidden conditions are met) → hard visible countdown once they qualify | peel a system off (many locations) |
-| Research | finish the capstone | globally announced, visible completion countdown | destroy the structure (one location) |
-| Military | eliminate opponents | intel on planet-cracker construction start + completion, but its location fogged until it strikes (cat-and-mouse) | hunt/destroy the mobile weapon, or out-defend |
+| **Expansion** (wide) | ascend to Type 3: hold a majority (~90%) of galaxy stars for K turns | vague "approaching" early → hard visible countdown once qualified | peel a system off (many locations) |
+| **Research** (tall) | **Temporal Ascension** capstone — transcend causality, *step off* the energy ladder; reachable tall from the 2.x base, no wide territory needed (underdog / comeback path) | globally announced completion countdown (build time) | destroy the structure (one location) |
+| **Military** (eliminate) | capture **all enemy homeworlds** + a moderate star/planet threshold (far below "take everything"), hold K turns | intel on the threat | retake a homeworld |
 
-The mystery lives in the *approach*; the actual imminent win is always clearly
-telegraphed (multiplayer fairness). The planet-cracker doubles as the universal
-disruptor of the two peaceful wins (crack the lynchpin planet) — but
+**Research fiction:** the AI ascends *out of* the timeline (a-temporal), so the
+grandfather paradox is irrelevant — it just ends on a win.
+
+**Planet-cracker** — the late-game mega-unit (Death Star-like): expensive, slow,
+*mobile*. It **destroys planets *and* stars** (objects become destructible). It is
+both (a) the siege tool that makes the military path viable against fortified
+worlds and (b) a **brutal direct win**: destroy enough planets/stars and you win —
+possible *only* with this one unit, and the enemy is **warned** (construction
+intel + a strike telegraph, location fogged until it hits). It also doubles as the
+universal disruptor of the two peaceful wins (crack the lynchpin) — but
 *conventional* fleets must also be able to damage a wonder, so military is never
 *mandatory* to stop a win.
+
+**Defense stays at system granularity.** A fleet stationed in a system defends
+everything in it; optional stationary orbital-defence buildings as an alternative.
+No separate guard micromanagement. Megastructures are *damaged* by raids (stages
+knocked offline, repairable), never instantly destroyed — except by the
+planet-cracker / the victory wonder, where destructibility is the counterplay.
+
+**Kardashev tiers are game abstractions, not astronomy.** A "galaxy" is a cluster
+of ~5–8 systems. Each player starts in their own home galaxy (Civ-continents
+pattern) with a contested neutral region between them. Ascension gates use
+*threshold* requirements — never "own every star", to avoid
+denial-by-hidden-outpost endgames.
 
 Dyson swarm is **economy infrastructure, not a victory trigger** —
 non-exclusive and staged (every player can build their own, per star, in
 stages); some *expansions/extensions* of it may be exclusive. It fuels whichever
 path the player is pursuing.
+
+**Open points to pin when building the endgame:** whether the planet-cracker's
+"brutal destroy" is a *separate* military path or the same condition expressed by
+destruction; whether "starting planet" stays exactly one homeworld; the exact
+star/planet thresholds and hold durations.
 
 **Pacing target: ~80–120 turns ≈ 1–2h.** Simultaneous turns are short —
 median ~30s (one build queue per planet, one research, few fleet stacks),

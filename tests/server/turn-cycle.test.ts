@@ -47,15 +47,17 @@ function getResource(player: PlayerSnapshot, key: ResourceId): number {
 }
 
 describe('initial state', () => {
-  it('gives every player a symmetric home world', () => {
+  it('gives every player a single terrestrial homeworld', () => {
     const snapshot = initialState([U1, U2], 1)
 
     for (const userId of [U1, U2]) {
       const player = getPlayer(snapshot, userId)
-      expect(player.planets).toHaveLength(2)
+      expect(player.planets).toHaveLength(1)
 
       const owned = snapshot.planets.filter(p => p.owner === player.id)
       expect(owned.map(p => p.id).sort()).toEqual([...player.planets].sort())
+      expect(owned[0]!.type).toBe('terrestrial')
+      expect(owned[0]!.isHomeworld).toBe(true)
 
       const buildings = owned
         .flatMap(p => p.slots)
@@ -66,9 +68,7 @@ describe('initial state', () => {
         'bld:data-center@1',
         'bld:fusion-core@2',
         'bld:hydroponics@3',
-        'bld:listening-post@1',
-        'bld:orbital-dock@1',
-        'bld:refinery-node@1'
+        'bld:orbital-dock@1'
       ])
     }
 
@@ -95,9 +95,9 @@ describe('initial state', () => {
     const snapshot = getSnapshot(repo, 3)
     const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
     expect(p1.resources).toEqual(p2.resources)
-    // 2 turns of fusion-core L2 (100/turn) and refinery L1 (25/turn)
+    // 2 turns of fusion-core L2 (100/turn); the lone homeworld has no mineral building yet
     expect(getResource(p1, 'res:energy')).toBe(700)
-    expect(getResource(p1, 'res:material')).toBe(150)
+    expect(getResource(p1, 'res:material')).toBe(100)
   })
 })
 
@@ -135,10 +135,9 @@ describe('building construction cycle', () => {
     const events = getPlayer(turn4, U1).events
     expect(events.some(e => e.type === 'building-complete')).toBe(true)
 
-    // Mine sits on the ore node → ore-extraction synergy doubles its 15 to 30,
-    // plus the home refinery's 25 → 55 in the mineral delta
+    // Mine sits on the ore node → ore-extraction synergy doubles its 15 to 30
     const mineralRes = getPlayer(turn4, U1).resources.find(r => r.key === 'res:material')
-    expect(mineralRes?.delta).toBe(55)
+    expect(mineralRes?.delta).toBe(30)
   })
 
   it('resuming the same build in the same slot does not charge again', async () => {
@@ -155,8 +154,8 @@ describe('building construction cycle', () => {
 
     const turn4 = getSnapshot(repo, 4)
     const p1 = getPlayer(turn4, U1)
-    // 100 start − 50 (charged exactly once) + 3 × 25 refinery production
-    expect(getResource(p1, 'res:material')).toBe(125)
+    // 100 start − 50 (charged exactly once); no refinery on the lone homeworld
+    expect(getResource(p1, 'res:material')).toBe(50)
     expect(turn4.planets.find(p => p.id === 'pl:aurora')!.slots[3]!.isConstructing).toBe(false)
   })
 

@@ -62,6 +62,8 @@ export interface Planet {
   systemId: SolarSystemId
   name: string
   owner: PlayerId | 'unknown' | 'unclaimed'
+  /** True for a player's starting world (always terrestrial). Drives the military victory (capture/destroy all homeworlds). */
+  isHomeworld?: boolean
   type: 'terrestrial' | 'gas-giant' | 'ice-giant' | 'barren' | 'oceanic' | 'desert'
   size: 'small' | 'medium' | 'large' | 'huge'
   workers: number
