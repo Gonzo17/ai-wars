@@ -5,7 +5,7 @@ import {
 import { calculateResourceProduction } from '~~/shared/utils/economy'
 import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType } from '~~/shared/types/game'
 import type { PlayerResearchState } from '~~/shared/types/research'
-import { createPlanetSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
+import { createPlanetSlots, createStarSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
 
 /**
  * Map layout (vision: Civ-continents). Each player gets their OWN galaxy with
@@ -160,8 +160,8 @@ function makeSystemPlanets(
 
 /**
  * The system's star — an unclaimed build site captured with a star constructor
- * (not a colony ship). Rendered as the central sun. Slots/megastructures come in
- * a later step; for now it is just a capturable object with no buildable slots.
+ * (not a colony ship). Rendered as the central sun. Once captured it offers
+ * concentric megastructure shells (Dyson sphere, Matrioshka brain, …).
  */
 function makeStar(systemKey: string, systemId: SolarSystemId, systemName: string): Planet {
   return {
@@ -174,7 +174,7 @@ function makeStar(systemKey: string, systemId: SolarSystemId, systemName: string
     size: 'huge',
     workers: 1,
     productionPerWorker: 20,
-    slots: [],
+    slots: createStarSlots(),
     queues: { build: [], shipyard: [] },
     progressMemory: {},
     productionCarryover: 0,
@@ -223,7 +223,9 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       empireState: {
         planetsControlled: 1,
         homeSystemMajority: true,
-        intelLevel: 'low'
+        intelLevel: 'low',
+        starsControlled: 0,
+        dysonStages: 0
       },
       completedTechIds: [],
       activeResearch: undefined,

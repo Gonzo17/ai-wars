@@ -28,6 +28,10 @@ export interface EmpireRequirement {
   planetsControlled?: number
   homeSystemMajority?: boolean
   intelLevel?: 'low' | 'medium' | 'high'
+  /** Captured stars required (stellar progression — K2.0 onward). */
+  starsControlled?: number
+  /** Highest Dyson-sphere stage built on any owned star. */
+  dysonStages?: number
 }
 
 export interface AscensionGateDef {
@@ -50,6 +54,8 @@ export interface PlayerResearchState {
     planetsControlled: number
     homeSystemMajority: boolean
     intelLevel: 'low' | 'medium' | 'high'
+    starsControlled: number
+    dysonStages: number
   }
   completedTechIds: string[]
   activeResearch?: ActiveResearch

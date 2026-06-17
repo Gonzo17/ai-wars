@@ -177,7 +177,9 @@
         "requirements": {
           "planets": "1 Planet | {count} Planeten",
           "home-system": "Heimsystem-Mehrheit",
-          "intel": "{level}-Intel"
+          "intel": "{level}-Intel",
+          "stars": "1 Stern erobert | {count} Sterne erobert",
+          "dyson": "Dyson-Sphäre Stufe {count}"
         }
       },
       "locked": {
@@ -187,7 +189,9 @@
         "requires-compute": "Benötigt Compute Level {level}",
         "requires-planets": "Benötigt 1 kontrollierten Planeten | Benötigt {count} kontrollierte Planeten",
         "requires-home-system": "Benötigt Heimsystem-Mehrheit",
-        "requires-intel": "Benötigt Intel-Stufe {level}"
+        "requires-intel": "Benötigt Intel-Stufe {level}",
+        "requires-stars": "Benötigt 1 eroberten Stern | Benötigt {count} eroberte Sterne",
+        "requires-dyson": "Benötigt Dyson-Sphäre Stufe {count}"
       },
       "techs": {
         "bootstrapped-ai-core": {
@@ -464,6 +468,22 @@
       "data-center": {
         "name": "Rechenzentrum",
         "description": "Erzeugt Forschungspunkte für das Imperium."
+      },
+      "dyson-sphere": {
+        "name": "Dyson-Sphäre",
+        "description": "Umschließt den Stern, um seine volle Energie zu ernten. Wird in Stufen gebaut — jede Stufe schließt die Hülle weiter und ebnet den Weg zu Kardaschow II."
+      },
+      "matrioshka-brain": {
+        "name": "Matrjoschka-Gehirn",
+        "description": "Verschachtelte Rechenhüllen um den Stern — eine gewaltige Forschungsmaschine."
+      },
+      "orbital-shipyard-mega": {
+        "name": "Stellare Werft",
+        "description": "Eine Werft in Sternengröße für die größten Flotten."
+      },
+      "star-fortress": {
+        "name": "Sternenfestung",
+        "description": "Orbitales Verteidigungsnetz zum Schutz des Sterns und seines Systems."
       }
     },
     "units": {
@@ -482,7 +502,27 @@
       "colony-ship": {
         "name": "Kolonieschiff",
         "role": "Kolonisierung"
+      },
+      "star-constructor": {
+        "name": "Sternenkonstruktor",
+        "role": "Sternübernahme"
       }
+    },
+    "star": {
+      "title": "Stern",
+      "subtitle": "Megastruktur-Hüllen",
+      "owner": "Kontrolliert von {owner}",
+      "unclaimed": "Nicht eroberter Stern",
+      "capture-hint": "Schicke einen Sternenkonstruktor hierher, um diesen Stern zu erobern.",
+      "choose-megastructure": "Megastruktur wählen",
+      "empty-shell": "Leere Hülle",
+      "click-to-build": "Klicken, um eine Megastruktur zu bauen",
+      "dyson-progress": "Dyson-Sphäre · Stufe {level}/{max}",
+      "dyson-empty": "Dyson-Sphäre nicht begonnen",
+      "shell-inner": "Innere Hülle",
+      "shell-outer": "Äußere Hüllen",
+      "back-to-system": "Zurück zum System",
+      "no-megastructures": "Noch keine Megastrukturen"
     },
     "errors": {
       "submit-failed": "Zug konnte nicht übermittelt werden",

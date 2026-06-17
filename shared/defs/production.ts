@@ -17,6 +17,12 @@ export type UnitCategory = 'support' | 'combat'
 export type BuildingDefinition = {
   id: BuildingId
   category: BuildingCategory
+  /**
+   * Build site. 'star' buildings (megastructures) can ONLY be placed on a
+   * captured star; 'planet' (default when absent) only on planets. Capturing
+   * the star is therefore the gate to megastructures — see resolveStarCapture.
+   */
+  site?: 'planet' | 'star'
   resourceCosts: { energy: number, minerals: number, rare: number }
   productionCost: number
   buildTime: number
@@ -26,6 +32,9 @@ export type BuildingDefinition = {
   maxLevel?: number
   icon?: string
 }
+
+/** Build site of a building definition (defaults to 'planet' when unset). */
+export const buildingSite = (def: BuildingDefinition): 'planet' | 'star' => def.site ?? 'planet'
 
 export type UnitDefinition = {
   id: UnitId
@@ -65,7 +74,16 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
   // Infrastructure buildings
   { id: 'bld:hydroponics', category: 'infrastructure', resourceCosts: { energy: 60, minerals: 40, rare: 5 }, productionCost: 60, buildTime: 3, requirements: {}, maxLevel: 4, icon: 'i-lucide-leaf' },
   { id: 'bld:hab-complex', category: 'infrastructure', resourceCosts: { energy: 70, minerals: 95, rare: 8 }, productionCost: 100, buildTime: 5, requirements: {}, maxLevel: 4, icon: 'i-lucide-home' },
-  { id: 'bld:landing-pad', category: 'infrastructure', resourceCosts: { energy: 40, minerals: 30, rare: 2 }, productionCost: 40, buildTime: 2, requirements: {}, maxLevel: 2, icon: 'i-lucide-plane-landing' }
+  { id: 'bld:landing-pad', category: 'infrastructure', resourceCosts: { energy: 40, minerals: 30, rare: 2 }, productionCost: 40, buildTime: 2, requirements: {}, maxLevel: 2, icon: 'i-lucide-plane-landing' },
+  // ── Megastructures (site: 'star') ────────────────────────────────────
+  // Only buildable on a captured star. Balance values are placeholders — the
+  // pass happens once the whole stellar loop is in (see Step 2 design). The
+  // Dyson sphere is staged via maxLevel (each level = one Dyson stage); a built
+  // Dyson stage drives the path to Kardashev K2.0.
+  { id: 'bld:dyson-sphere', category: 'energy', site: 'star', resourceCosts: { energy: 0, minerals: 500, rare: 50 }, productionCost: 400, buildTime: 20, requirements: {}, resourceProduction: { energy: 200 }, maxLevel: 5, icon: 'i-lucide-orbit' },
+  { id: 'bld:matrioshka-brain', category: 'research', site: 'star', resourceCosts: { energy: 300, minerals: 300, rare: 80 }, productionCost: 400, buildTime: 20, requirements: {}, researchPoints: 60, maxLevel: 3, icon: 'i-lucide-brain-circuit' },
+  { id: 'bld:orbital-shipyard-mega', category: 'military', site: 'star', resourceCosts: { energy: 200, minerals: 300, rare: 40 }, productionCost: 300, buildTime: 15, requirements: {}, maxLevel: 1, icon: 'i-lucide-wrench' },
+  { id: 'bld:star-fortress', category: 'military', site: 'star', resourceCosts: { energy: 150, minerals: 250, rare: 30 }, productionCost: 250, buildTime: 12, requirements: {}, maxLevel: 3, icon: 'i-lucide-shield' }
 ]
 
 export const UNIT_DEFS: UnitDefinition[] = [

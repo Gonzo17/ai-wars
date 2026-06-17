@@ -32,7 +32,9 @@ export const useResearchStore = defineStore('research', () => {
   const empireState = ref({
     planetsControlled: 1,
     homeSystemMajority: true,
-    intelLevel: 'low' as 'low' | 'medium' | 'high'
+    intelLevel: 'low' as 'low' | 'medium' | 'high',
+    starsControlled: 0,
+    dysonStages: 0
   })
 
   // Initialzustand: keine Forschung abgeschlossen und keine aktive Forschung
@@ -165,6 +167,22 @@ export const useResearchStore = defineStore('research', () => {
           })
         }
       }
+      if (req.starsControlled && empireState.value.starsControlled < req.starsControlled) {
+        reasons.push({
+          type: 'empire',
+          message: t('game.research.locked.requires-stars', { count: req.starsControlled }),
+          value: empireState.value.starsControlled,
+          required: req.starsControlled
+        })
+      }
+      if (req.dysonStages && empireState.value.dysonStages < req.dysonStages) {
+        reasons.push({
+          type: 'empire',
+          message: t('game.research.locked.requires-dyson', { count: req.dysonStages }),
+          value: empireState.value.dysonStages,
+          required: req.dysonStages
+        })
+      }
     }
 
     return reasons
@@ -234,6 +252,12 @@ export const useResearchStore = defineStore('research', () => {
           return false
         }
       }
+      if (req.starsControlled && empireState.value.starsControlled < req.starsControlled) {
+        return false
+      }
+      if (req.dysonStages && empireState.value.dysonStages < req.dysonStages) {
+        return false
+      }
     }
 
     return true
@@ -278,6 +302,22 @@ export const useResearchStore = defineStore('research', () => {
         empireMet = empireMet && met
         empireDetails.push({
           requirement: t('game.research.gate.requirements.intel', { level: t(`game.systems.intel.${req.intelLevel}`) }),
+          met
+        })
+      }
+      if (req.starsControlled) {
+        const met = empireState.value.starsControlled >= req.starsControlled
+        empireMet = empireMet && met
+        empireDetails.push({
+          requirement: t('game.research.gate.requirements.stars', { count: req.starsControlled }),
+          met
+        })
+      }
+      if (req.dysonStages) {
+        const met = empireState.value.dysonStages >= req.dysonStages
+        empireMet = empireMet && met
+        empireDetails.push({
+          requirement: t('game.research.gate.requirements.dyson', { count: req.dysonStages }),
           met
         })
       }

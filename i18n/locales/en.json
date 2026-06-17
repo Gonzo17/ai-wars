@@ -177,7 +177,9 @@
         "requirements": {
           "planets": "1 planet | {count} planets",
           "home-system": "Home system majority",
-          "intel": "{level} intel"
+          "intel": "{level} intel",
+          "stars": "1 star captured | {count} stars captured",
+          "dyson": "Dyson sphere stage {count}"
         }
       },
       "locked": {
@@ -187,7 +189,9 @@
         "requires-compute": "Requires Compute Level {level}",
         "requires-planets": "Requires 1 planet controlled | Requires {count} planets controlled",
         "requires-home-system": "Requires home system majority",
-        "requires-intel": "Requires {level} intel level"
+        "requires-intel": "Requires {level} intel level",
+        "requires-stars": "Requires 1 star captured | Requires {count} stars captured",
+        "requires-dyson": "Requires Dyson sphere stage {count}"
       },
       "techs": {
         "bootstrapped-ai-core": {
@@ -464,6 +468,22 @@
       "data-center": {
         "name": "Data Center",
         "description": "Generates research points for the empire."
+      },
+      "dyson-sphere": {
+        "name": "Dyson Sphere",
+        "description": "Encloses the star to harvest its full output. Built in stages — each stage closes the shell further and powers the path to Kardashev II."
+      },
+      "matrioshka-brain": {
+        "name": "Matrioshka Brain",
+        "description": "Nested computational shells around the star — a colossal research engine."
+      },
+      "orbital-shipyard-mega": {
+        "name": "Stellar Shipyard",
+        "description": "A star-scale construction yard for the largest fleets."
+      },
+      "star-fortress": {
+        "name": "Star Fortress",
+        "description": "Orbital defense grid guarding the star and its system."
       }
     },
     "units": {
@@ -482,7 +502,27 @@
       "colony-ship": {
         "name": "Colony Ship",
         "role": "Colonization"
+      },
+      "star-constructor": {
+        "name": "Star Constructor",
+        "role": "Stellar capture"
       }
+    },
+    "star": {
+      "title": "Star",
+      "subtitle": "Megastructure shells",
+      "owner": "Controlled by {owner}",
+      "unclaimed": "Uncaptured star",
+      "capture-hint": "Send a Star Constructor here to capture this star.",
+      "choose-megastructure": "Choose Megastructure",
+      "empty-shell": "Empty shell",
+      "click-to-build": "Click to build a megastructure",
+      "dyson-progress": "Dyson sphere · stage {level}/{max}",
+      "dyson-empty": "Dyson sphere not started",
+      "shell-inner": "Inner shell",
+      "shell-outer": "Outer shells",
+      "back-to-system": "Back to system",
+      "no-megastructures": "No megastructures yet"
     },
     "errors": {
       "submit-failed": "Failed to submit turn",

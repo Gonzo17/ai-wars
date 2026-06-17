@@ -1,8 +1,8 @@
 import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/game'
 import type { TurnPlan, ValidationError } from '../types/turn'
-import { BUILD_QUEUE_LIMIT, getBuildingDef, getUnitDef } from '../defs/production'
+import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
-import { isBuildingAllowedInZone, TOTAL_SLOT_COUNT } from '../types/planetSlots'
+import { isBuildingAllowedInZone } from '../types/planetSlots'
 import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
 
 interface ResourceCosts {
@@ -108,8 +108,8 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
         continue
       }
 
-      // Validate slot index
-      if (command.slotIndex < 0 || command.slotIndex >= TOTAL_SLOT_COUNT) {
+      // Validate slot index against this site's actual slot count
+      if (command.slotIndex < 0 || command.slotIndex >= planet.slots.length) {
         errors.push({ code: 'INVALID_COMMAND', message: 'Slot index out of range', path })
         continue
       }
@@ -119,8 +119,19 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
         continue
       }
 
-      // Zone check
-      if (!isBuildingAllowedInZone(command.buildingId, slot.zone)) {
+      // Site check: megastructures only on stars, planet buildings only on planets
+      const isStar = planet.kind === 'star'
+      if (buildingSite(building) === 'star' && !isStar) {
+        errors.push({ code: 'INVALID_COMMAND', message: 'Megastructure can only be built on a star', path })
+        continue
+      }
+      if (buildingSite(building) !== 'star' && isStar) {
+        errors.push({ code: 'INVALID_COMMAND', message: 'This building cannot be built on a star', path })
+        continue
+      }
+
+      // Zone check (planets only — star shells are not surface/orbital zoned)
+      if (!isStar && !isBuildingAllowedInZone(command.buildingId, slot.zone)) {
         errors.push({ code: 'INVALID_COMMAND', message: 'Building not allowed in this zone', path })
         continue
       }

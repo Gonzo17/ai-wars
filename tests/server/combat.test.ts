@@ -3,7 +3,8 @@ import { submitTurn } from '../../server/game/turn'
 import { initialState } from '../../server/game/initialState'
 import { InMemoryGameRepository } from '../../server/game/inMemoryRepository'
 import { toPlayerId } from '../../server/game/playerId'
-import type { GameSnapshot, Unit, UnitId } from '../../shared/types/game'
+import { validateTurnPlan } from '../../shared/validation/turnPlan'
+import type { BuildingId, GameSnapshot, Planet, Unit, UnitId } from '../../shared/types/game'
 import type { TurnPlan } from '../../shared/types/turn'
 
 const U1 = 'u1'
@@ -163,5 +164,59 @@ describe('star capture', () => {
     const next = getSnapshot(repo, 2)
     const star = next.planets.find(p => p.kind === 'star' && p.systemId === 'sys:frontier')!
     expect(star.owner).toBe('unclaimed')
+  })
+})
+
+describe('star megastructures', () => {
+  /** Hand the home star to U1 so we can build megastructures on it. */
+  function ownHomeStar(state: GameSnapshot): { star: Planet, homeworld: Planet } {
+    const homeworld = state.planets.find(p => p.owner === toPlayerId(U1) && p.kind !== 'star')!
+    const star = state.planets.find(p => p.kind === 'star' && p.systemId === homeworld.systemId)!
+    star.owner = toPlayerId(U1)
+    return { star, homeworld }
+  }
+
+  it('gates building placement by site', () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    const { star, homeworld } = ownHomeStar(state)
+    // Give the player enough resources so only the site rule can fail.
+    const u1 = state.players.find(p => p.id === toPlayerId(U1))!
+    for (const r of u1.resources) r.current = 5000
+
+    // Megastructure on the captured star → allowed
+    const onStar: TurnPlan = { commands: [{ type: 'buildStructure', planetId: star.id, buildingId: 'bld:dyson-sphere' as BuildingId, slotIndex: 0 }] }
+    expect(validateTurnPlan(state, toPlayerId(U1), onStar)).toHaveLength(0)
+
+    // Megastructure on a planet → rejected
+    const megaOnPlanet: TurnPlan = { commands: [{ type: 'buildStructure', planetId: homeworld.id, buildingId: 'bld:dyson-sphere' as BuildingId, slotIndex: 0 }] }
+    expect(validateTurnPlan(state, toPlayerId(U1), megaOnPlanet).length).toBeGreaterThan(0)
+
+    // Normal building on the star → rejected
+    const planetBldOnStar: TurnPlan = { commands: [{ type: 'buildStructure', planetId: star.id, buildingId: 'bld:solar-array' as BuildingId, slotIndex: 0 }] }
+    expect(validateTurnPlan(state, toPlayerId(U1), planetBldOnStar).length).toBeGreaterThan(0)
+  })
+
+  it('completes a Dyson sphere on a captured star, lifting energy and dysonStages', async () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    const { star } = ownHomeStar(state)
+    // Seed a nearly-finished Dyson stage so one empty turn completes it.
+    star.slots[0] = { index: 0, zone: 'orbital', buildingId: 'bld:dyson-sphere' as BuildingId, buildingLevel: 1, isConstructing: true, constructionTimeLeft: 20, resourceNode: null }
+    star.queues.build = [{ slotIndex: 0 }]
+
+    await playTurn(repo, 1)
+
+    const next = getSnapshot(repo, 2)
+    const nextStar = next.planets.find(p => p.id === star.id)!
+    const dysonSlot = nextStar.slots[0]!
+    expect(dysonSlot.buildingId).toBe('bld:dyson-sphere')
+    expect(dysonSlot.isConstructing).toBe(false)
+
+    const player = next.players.find(p => p.id === toPlayerId(U1))!
+    expect(player.research.empireState.starsControlled).toBe(1)
+    expect(player.research.empireState.dysonStages).toBe(1)
+    // Dyson sphere adds 200 energy/turn to the player's production.
+    expect(player.resources.find(r => r.key === 'res:energy')!.delta).toBeGreaterThanOrEqual(200)
   })
 })

@@ -78,6 +78,16 @@
           @queue-build="handleQueueBuild"
         />
 
+        <GameStarSlotView
+          v-if="viewMode === 'planet' && selectedStarWithQueue"
+          :star="selectedStarWithQueue"
+          :building-catalog="starBuildingCatalog"
+          :can-build="starCanBuild"
+          :player-resources="playerResources"
+          @close="handleExitPlanetView"
+          @queue-build="handleQueueBuild"
+        />
+
         <GamePlanetOverview
           v-if="planetOverviewOpen"
           :planets="planetsWithEffectiveQueue"
@@ -237,6 +247,7 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  site: 'planet' | 'star'
   locked: boolean
   lockedByTechName: string | null
 }
@@ -751,7 +762,7 @@ const getSizeLabel = (size: PlanetSize) => {
   return te(key) ? t(key) : size
 }
 
-const buildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.map((def) => {
+const allBuildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.map((def) => {
   const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
   return {
     id: def.id,
@@ -762,10 +773,15 @@ const buildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.map((
     resourceCosts: def.resourceCosts,
     productionCost: def.productionCost,
     icon: def.icon ?? 'i-lucide-hammer',
+    site: def.site ?? 'planet',
     locked: missingResearch.length > 0,
     lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
   }
 }))
+
+// Planet panels only see planet buildings; the star panel only sees megastructures.
+const buildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site !== 'star'))
+const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site === 'star'))
 
 const unitCatalog = computed((): UnitDefinition[] => UNIT_DEFS.map((def) => {
   const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
@@ -853,66 +869,70 @@ const handleFleetMoveOrder = (fleetId: string, toSystemId: string) => {
   turnPlan.value = { commands: next }
 }
 
-const planetsView = computed((): GamePlanet[] => {
-  if (!planets.value.length) return []
-  return planets.value.filter(planet => planet.kind !== 'star').map(planet => ({
-    id: planet.id,
-    systemId: planet.systemId,
-    systemName: systemNameById.value.get(planet.systemId) ?? planet.systemId,
-    name: planet.name,
-    owner: planet.owner,
-    ownerLabel: getOwnerLabel(planet.owner),
-    type: planet.type,
-    typeLabel: getTypeLabel(planet.type),
-    size: planet.size ?? 'medium',
-    sizeLabel: getSizeLabel((planet.size ?? 'medium') as PlanetSize),
-    workers: planet.workers,
-    productionPerWorker: planet.productionPerWorker,
-    buildings: planet.slots
-      .filter(s => s.buildingId && !s.isConstructing)
-      .map(s => ({ id: s.buildingId!, level: s.buildingLevel })),
-    slots: planet.slots.map(s => ({
-      buildingId: s.buildingId,
-      buildingLevel: s.buildingLevel,
-      isConstructing: s.isConstructing,
-      constructionTimeLeft: s.constructionTimeLeft,
-      zone: s.zone,
-      resourceNode: s.resourceNode
-    })),
-    buildQueue: [
-      ...planet.queues.build.map((entry) => {
-        const slot = planet.slots[entry.slotIndex]
-        if (!slot?.buildingId) return null
-        const def = getBuildingDef(slot.buildingId)
-        const productionCost = def?.productionCost ?? 0
-        const remaining = slot.constructionTimeLeft
-        const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
-        return {
-          id: slot.buildingId,
-          kind: 'building' as const,
-          productionSpent: Math.max(0, Math.round(progress * productionCost)),
-          resourcePaid: true,
-          slotIndex: entry.slotIndex
-        }
-      }).filter((e): e is NonNullable<typeof e> => e !== null),
-      ...planet.queues.shipyard.map((entry) => {
-        const def = getUnitDef(entry.id)
-        const productionCost = def?.productionCost ?? 0
-        const remaining = entry.eta ?? productionCost
-        const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
-        return {
-          id: entry.id,
-          kind: 'unit' as const,
-          productionSpent: Math.max(0, Math.round(progress * productionCost)),
-          resourcePaid: true
-        }
-      })
-    ].slice(0, BUILD_QUEUE_LIMIT),
-    shipyardQueue: [],
-    stationedUnits: getStationedUnits(planet),
-    location: planet.location
-  }))
+// Map a raw Planet (incl. stars) to the view shape used by the build panels.
+const toPlanetView = (planet: Planet): GamePlanet => ({
+  id: planet.id,
+  systemId: planet.systemId,
+  systemName: systemNameById.value.get(planet.systemId) ?? planet.systemId,
+  name: planet.name,
+  owner: planet.owner,
+  ownerLabel: getOwnerLabel(planet.owner),
+  type: planet.type,
+  typeLabel: getTypeLabel(planet.type),
+  size: planet.size ?? 'medium',
+  sizeLabel: getSizeLabel((planet.size ?? 'medium') as PlanetSize),
+  workers: planet.workers,
+  productionPerWorker: planet.productionPerWorker,
+  buildings: planet.slots
+    .filter(s => s.buildingId && !s.isConstructing)
+    .map(s => ({ id: s.buildingId!, level: s.buildingLevel })),
+  slots: planet.slots.map(s => ({
+    buildingId: s.buildingId,
+    buildingLevel: s.buildingLevel,
+    isConstructing: s.isConstructing,
+    constructionTimeLeft: s.constructionTimeLeft,
+    zone: s.zone,
+    resourceNode: s.resourceNode
+  })),
+  buildQueue: [
+    ...planet.queues.build.map((entry) => {
+      const slot = planet.slots[entry.slotIndex]
+      if (!slot?.buildingId) return null
+      const def = getBuildingDef(slot.buildingId)
+      const productionCost = def?.productionCost ?? 0
+      const remaining = slot.constructionTimeLeft
+      const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
+      return {
+        id: slot.buildingId,
+        kind: 'building' as const,
+        productionSpent: Math.max(0, Math.round(progress * productionCost)),
+        resourcePaid: true,
+        slotIndex: entry.slotIndex
+      }
+    }).filter((e): e is NonNullable<typeof e> => e !== null),
+    ...planet.queues.shipyard.map((entry) => {
+      const def = getUnitDef(entry.id)
+      const productionCost = def?.productionCost ?? 0
+      const remaining = entry.eta ?? productionCost
+      const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
+      return {
+        id: entry.id,
+        kind: 'unit' as const,
+        productionSpent: Math.max(0, Math.round(progress * productionCost)),
+        resourcePaid: true
+      }
+    })
+  ].slice(0, BUILD_QUEUE_LIMIT),
+  shipyardQueue: [],
+  stationedUnits: getStationedUnits(planet),
+  location: planet.location
 })
+
+const planetsView = computed((): GamePlanet[] =>
+  planets.value.filter(planet => planet.kind !== 'star').map(toPlanetView))
+
+const starsView = computed((): GamePlanet[] =>
+  planets.value.filter(planet => planet.kind === 'star').map(toPlanetView))
 
 const buildQueueLimit = BUILD_QUEUE_LIMIT
 const buildQueueOverrides = ref<Record<string, Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>>>({})
@@ -961,7 +981,7 @@ const handleBackToOverview = () => {
 }
 
 const handleQueueBuild = (planetId: string, buildingId: string, kind: 'building' | 'unit', slotIndex?: number) => {
-  const planet = planetsView.value.find(item => item.id === planetId)
+  const planet = buildSites.value.find(item => item.id === planetId)
   if (!planet) return
   if (currentUserId.value) {
     const playerId = toPlayerId(currentUserId.value)
@@ -1008,7 +1028,7 @@ const handleQueueBuild = (planetId: string, buildingId: string, kind: 'building'
 }
 
 const handleCancelBuild = (planetId: string) => {
-  const planet = planetsView.value.find(item => item.id === planetId)
+  const planet = buildSites.value.find(item => item.id === planetId)
   if (!planet) return
 
   // Get current queue (with overrides)
@@ -1120,6 +1140,19 @@ const colorById = computed<Record<string, string>>(() => {
 /** The star of the currently viewed system (rendered as the central sun, carries an ownership ring). */
 const activeSystemStarId = computed(() =>
   planets.value.find(p => p.kind === 'star' && p.systemId === activeSystemId.value)?.id ?? null)
+
+// ── Star build panel (megastructures) ─────────────────────────────────
+const selectedStar = computed(() => starsView.value.find(s => s.id === selectedId.value))
+const selectedStarWithQueue = computed(() => {
+  if (!selectedStar.value) return null
+  const override = buildQueueOverrides.value[selectedStar.value.id]
+  return { ...selectedStar.value, buildQueue: override ?? selectedStar.value.buildQueue }
+})
+const starCanBuild = computed(() =>
+  Boolean(selectedStar.value && myPlayerId.value && selectedStar.value.owner === myPlayerId.value))
+
+/** Every buildable site (planets + captured/visible stars) for build-command lookups. */
+const buildSites = computed((): GamePlanet[] => [...planetsView.value, ...starsView.value])
 
 const homeSystemId = computed(() => {
   const playerId = myPlayerId.value

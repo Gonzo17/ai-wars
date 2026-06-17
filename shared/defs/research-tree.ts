@@ -360,10 +360,11 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:orbital-fabricators'
     ],
     requiresCompute: 10,
+    // K2.0 Stellar Mastery: capturing a star and closing a Dyson sphere around
+    // it is THE gate — stellar progression, not planet count (see VISION).
     requiresEmpire: {
-      planetsControlled: 8,
-      homeSystemMajority: true,
-      intelLevel: 'high'
+      starsControlled: 1,
+      dysonStages: 1
     }
   },
   {

@@ -466,10 +466,26 @@ function resolveStarCapture(snapshot: GameSnapshot, turn: number, nextEventId: (
   }
 }
 
-/** Keep each player's empireState.planetsControlled in sync with ownership. */
+/**
+ * Keep each player's empireState in sync with ownership: planets controlled,
+ * stars controlled, and the highest Dyson-sphere stage built on any owned star.
+ * These drive the stellar ascension gates (K2.0 onward).
+ */
 function updatePlanetsControlled(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
-    player.research.empireState.planetsControlled = snapshot.planets.filter(p => p.owner === player.id && p.kind !== 'star').length
+    const owned = snapshot.planets.filter(p => p.owner === player.id)
+    const ownedStars = owned.filter(p => p.kind === 'star')
+    let dysonStages = 0
+    for (const star of ownedStars) {
+      for (const slot of star.slots) {
+        if (slot.buildingId === 'bld:dyson-sphere' && !slot.isConstructing) {
+          dysonStages = Math.max(dysonStages, slot.buildingLevel)
+        }
+      }
+    }
+    player.research.empireState.planetsControlled = owned.filter(p => p.kind !== 'star').length
+    player.research.empireState.starsControlled = ownedStars.length
+    player.research.empireState.dysonStages = dysonStages
   }
 }
 
@@ -663,7 +679,6 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     resolveCombat(nextSnapshot, turn, nextEventId)
     resolveColonization(nextSnapshot, turn, nextEventId)
     resolveStarCapture(nextSnapshot, turn, nextEventId)
-    updatePlanetsControlled(nextSnapshot)
 
     // Step 4: Add resource production from existing buildings (before completing new ones)
     for (const player of nextSnapshot.players) {
@@ -674,6 +689,10 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     // Step 5: Advance research and complete buildings/units
     advanceResearch(nextSnapshot, turn, nextEventId)
     advanceQueues(nextSnapshot, turn, nextEventId)
+
+    // Empire counts reflect the post-resolution state (ownership + completed
+    // megastructures), so this runs after capture/colonization AND queue completion.
+    updatePlanetsControlled(nextSnapshot)
 
     // Step 6: Update resource deltas for display (production for next turn)
     updateResourceDeltas(nextSnapshot)

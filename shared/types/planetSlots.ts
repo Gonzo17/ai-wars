@@ -79,6 +79,13 @@ export function isBuildingAllowedInZone(id: BuildingId, zone: 'surface' | 'orbit
   return zone === 'orbital' ? ORBITAL_BUILDING_IDS.includes(id) : isSurfaceBuilding(id)
 }
 
+// ── Star megastructure shells ─────────────────────────────────────────
+// A captured star has no surface — megastructures sit in concentric orbital
+// shells around it. We model them as plain slots (zone 'orbital' is cosmetic
+// here; placement is gated by building `site`, not zone). The innermost shell
+// is conventionally the Dyson sphere; the StarSlotView renders accordingly.
+export const STAR_SLOT_COUNT = 4
+
 // ── Backward-compat alias ─────────────────────────────────────────────
 export const HEX_SLOT_COORDS = SURFACE_SLOT_COORDS
 
@@ -119,6 +126,22 @@ export function createPlanetSlots(
   }
 
   return slots
+}
+
+/**
+ * Create the default shell layout for a star: STAR_SLOT_COUNT empty slots.
+ * No surface zone, no resource nodes — only megastructures go here.
+ */
+export function createStarSlots(): PlanetSlotData[] {
+  return Array.from({ length: STAR_SLOT_COUNT }, (_, i) => ({
+    index: i,
+    zone: 'orbital' as const,
+    buildingId: null,
+    buildingLevel: 0,
+    isConstructing: false,
+    constructionTimeLeft: 0,
+    resourceNode: null
+  }))
 }
 
 /**

@@ -238,14 +238,15 @@ const handleZoomEnd = () => {
           v-for="node in nodes"
           :key="node.id"
           :class="[
-            'absolute bg-center bg-cover rounded-full',
-            node.type === 'sun' ? 'pointer-events-none sun-glow' : 'pointer-events-auto'
+            'absolute bg-center bg-cover rounded-full pointer-events-auto',
+            node.type === 'sun' ? 'sun-glow' : ''
           ]"
-          :data-testid="node.type !== 'sun' ? `map-node-${node.id}` : undefined"
+          :data-testid="`map-node-${node.id}`"
           :data-owned="ownedSet.has(node.id) ? 'true' : undefined"
           :style="[nodeStyle(node), ringStyle(node)]"
         >
-          <!-- Name label above the node (ownership is shown by the ring colour) -->
+          <!-- Name label above the node (ownership is shown by the ring colour).
+               Hidden for the sun so the central glow stays clean. -->
           <div
             v-if="node.type !== 'sun'"
             class="absolute -top-2 left-1/2 z-20 -translate-x-1/2 -translate-y-full rounded-full bg-neutral-950/85 px-2 py-0.5 text-[11px] font-semibold text-white shadow-lg whitespace-nowrap pointer-events-none ring-1 ring-white/10"
@@ -253,10 +254,9 @@ const handleZoomEnd = () => {
             {{ node.name }}
           </div>
           <button
-            v-if="node.type !== 'sun'"
             type="button"
             :aria-label="node.name"
-            class="h-full w-full rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            class="relative z-10 h-full w-full rounded-full cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
             @click="node.type === 'system'
               ? emit('select-system', node.id)
               : node.type === 'galaxy'
