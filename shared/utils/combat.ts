@@ -6,9 +6,10 @@ import type { PlayerId, Unit } from '../types/game'
  * extend to a per-matchup matrix when the unit roster grows.
  */
 export const COMBAT_WEIGHT: Record<Unit['type'], number> = {
-  battleship: 1,
-  probe: 0.4,
-  colonizer: 0.3
+  'battleship': 1,
+  'probe': 0.4,
+  'colonizer': 0.3,
+  'star-constructor': 0.3
 }
 
 const EPSILON = 1e-9

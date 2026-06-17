@@ -158,6 +158,30 @@ function makeSystemPlanets(
   })
 }
 
+/**
+ * The system's star — an unclaimed build site captured with a star constructor
+ * (not a colony ship). Rendered as the central sun. Slots/megastructures come in
+ * a later step; for now it is just a capturable object with no buildable slots.
+ */
+function makeStar(systemKey: string, systemId: SolarSystemId, systemName: string): Planet {
+  return {
+    id: `pl:${systemKey}-star` as PlanetId,
+    systemId,
+    name: `${systemName} Star`,
+    owner: 'unclaimed',
+    kind: 'star',
+    type: 'terrestrial', // unused for stars — the client renders by kind
+    size: 'huge',
+    workers: 1,
+    productionPerWorker: 20,
+    slots: [],
+    queues: { build: [], shipyard: [] },
+    progressMemory: {},
+    productionCarryover: 0,
+    location: { x: 50, y: 50 }
+  }
+}
+
 /** An empty, unclaimed planet with an ore node — an expansion target worth taking. */
 function makeNeutralPlanet(
   id: PlanetId,
@@ -256,12 +280,17 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     // Expansion targets inside the player's own galaxy — full type sets too.
     const reachPlanets = makeSystemPlanets(`${template.key}-reach`, reachSystemId, `${template.systemName} Reach`, 'unclaimed')
     const gatePlanets = makeSystemPlanets(`${template.key}-gate`, gateSystemId, `${template.systemName} Gate`, 'unclaimed')
-    planets.push(...homePlanets, ...reachPlanets, ...gatePlanets)
+
+    // One unclaimed star per system (taking your home star is the first stellar goal).
+    const homeStar = makeStar(template.key, homeSystemId, template.systemName)
+    const reachStar = makeStar(`${template.key}-reach`, reachSystemId, `${template.systemName} Reach`)
+    const gateStar = makeStar(`${template.key}-gate`, gateSystemId, `${template.systemName} Gate`)
+    planets.push(...homePlanets, ...reachPlanets, ...gatePlanets, homeStar, reachStar, gateStar)
 
     systems.push(
-      { id: homeSystemId, name: template.systemName, intel: 'high', connections: [reachSystemId], planets: homePlanets.map(p => p.id), location: { x: 26, y: 50 } },
-      { id: reachSystemId, name: `${template.systemName} Reach`, intel: 'medium', connections: [homeSystemId, gateSystemId], planets: reachPlanets.map(p => p.id), location: { x: 50, y: 50 } },
-      { id: gateSystemId, name: `${template.systemName} Gate`, intel: 'medium', connections: [reachSystemId, FRONTIER_SYSTEM], planets: gatePlanets.map(p => p.id), location: { x: 74, y: 50 } }
+      { id: homeSystemId, name: template.systemName, intel: 'high', connections: [reachSystemId], planets: homePlanets.map(p => p.id), starId: homeStar.id, location: { x: 26, y: 50 } },
+      { id: reachSystemId, name: `${template.systemName} Reach`, intel: 'medium', connections: [homeSystemId, gateSystemId], planets: reachPlanets.map(p => p.id), starId: reachStar.id, location: { x: 50, y: 50 } },
+      { id: gateSystemId, name: `${template.systemName} Gate`, intel: 'medium', connections: [reachSystemId, FRONTIER_SYSTEM], planets: gatePlanets.map(p => p.id), starId: gateStar.id, location: { x: 74, y: 50 } }
     )
 
     galaxies.push({
@@ -282,13 +311,15 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
       desert: { id: 'pl:frontier-beta' as PlanetId, name: 'Frontier Beta' }
     }
   )
-  planets.push(...frontierPlanets)
+  const frontierStar = makeStar('frontier', FRONTIER_SYSTEM, 'Frontier')
+  planets.push(...frontierPlanets, frontierStar)
 
   systems.push({
     id: FRONTIER_SYSTEM,
     name: 'The Frontier',
     intel: 'low',
     connections: [...gatewaySystemIds],
+    starId: frontierStar.id,
     planets: frontierPlanets.map(p => p.id),
     location: { x: 50, y: 50 }
   })

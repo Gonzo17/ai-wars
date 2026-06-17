@@ -34,6 +34,10 @@
         "title-captured": "Planet erobert",
         "description": "Neue Kolonie auf {location} gegründet",
         "description-captured": "Kontrolle über {location} übernommen"
+      },
+      "star-captured": {
+        "title": "Stern übernommen",
+        "description": "Dyson-Gerüst um {location} errichtet"
       }
     },
     "details": {

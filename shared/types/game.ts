@@ -33,6 +33,8 @@ export interface SolarSystem {
   intel: IntelLevel
   connections: SolarSystemId[]
   planets: PlanetId[]
+  /** The system's single star (a Planet with kind: 'star'), captured for stellar progression. */
+  starId?: PlanetId
   location: {
     x: number
     y: number
@@ -62,6 +64,12 @@ export interface Planet {
   systemId: SolarSystemId
   name: string
   owner: PlayerId | 'unknown' | 'unclaimed'
+  /**
+   * Build-site kind. 'star' reuses the planet machinery (slots/production/queues)
+   * but is captured via a star constructor (not a colony ship) and rendered as the
+   * central sun. Defaults to 'planet' when absent. For a star, `type` is unused.
+   */
+  kind?: 'planet' | 'star'
   /** True for a player's starting world (always terrestrial). Drives the military victory (capture/destroy all homeworlds). */
   isHomeworld?: boolean
   type: 'terrestrial' | 'gas-giant' | 'ice-giant' | 'barren' | 'oceanic' | 'desert'
@@ -112,7 +120,7 @@ export interface Unit {
   id: UnitId
   /** Definition id (lookup key into UNIT_DEFS). Set when the unit completes. */
   defId?: UnitId
-  type: 'battleship' | 'probe' | 'colonizer'
+  type: 'battleship' | 'probe' | 'colonizer' | 'star-constructor'
   name: string
   status: TravelStatus
   location: PlanetId | SolarSystemId | GalaxyId

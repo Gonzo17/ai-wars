@@ -120,3 +120,48 @@ describe('colonization', () => {
     expect(next.fleets.some(f => f.ownerId === toPlayerId(U2))).toBe(true)
   })
 })
+
+describe('star capture', () => {
+  it('captures the system star with a star constructor under space superiority', async () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    placeFleet(state, U1, 'unit:star-constructor', 'star-constructor', 1, 'sys:frontier')
+
+    await playTurn(repo, 1)
+
+    const next = getSnapshot(repo, 2)
+    const star = next.planets.find(p => p.kind === 'star' && p.systemId === 'sys:frontier')!
+    expect(star.owner).toBe(toPlayerId(U1))
+    // constructor consumed; star does not count as a controlled planet
+    expect(next.fleets.filter(f => f.defId === 'unit:star-constructor')).toHaveLength(0)
+    expect(next.players.find(p => p.id === toPlayerId(U1))!.research.empireState.planetsControlled).toBe(1)
+
+    const events = next.players.find(p => p.id === toPlayerId(U1))!.events
+    expect(events.some(e => e.type === 'star-captured')).toBe(true)
+  })
+
+  it('does not capture a star contested by an enemy fleet', async () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    placeFleet(state, U1, 'unit:star-constructor', 'star-constructor', 1, 'sys:frontier')
+    placeFleet(state, U2, 'unit:frigate', 'battleship', 4, 'sys:frontier')
+
+    await playTurn(repo, 1)
+
+    const next = getSnapshot(repo, 2)
+    const star = next.planets.find(p => p.kind === 'star' && p.systemId === 'sys:frontier')!
+    expect(star.owner).toBe('unclaimed')
+  })
+
+  it('colony ships never target the star', async () => {
+    const repo = seedGame()
+    const state = getSnapshot(repo, 1)
+    placeFleet(state, U1, 'unit:colony-ship', 'colonizer', 1, 'sys:frontier')
+
+    await playTurn(repo, 1)
+
+    const next = getSnapshot(repo, 2)
+    const star = next.planets.find(p => p.kind === 'star' && p.systemId === 'sys:frontier')!
+    expect(star.owner).toBe('unclaimed')
+  })
+})

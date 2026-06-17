@@ -5,6 +5,7 @@ export type GameEventType
     | 'army-arrived'
     | 'combat'
     | 'colony-established'
+    | 'star-captured'
     | 'discovery'
     | 'diplomatic'
 

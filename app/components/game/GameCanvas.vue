@@ -12,6 +12,8 @@ const props = defineProps<{
   galaxies: Array<{ id: string, name: string, location: { x: number, y: number }, childCount: number }>
   ownedIds?: string[]
   colorById?: Record<string, string>
+  /** Real star id of the viewed system, so the central sun carries an ownership ring. */
+  starId?: string
 }>()
 
 const ownedSet = computed(() => new Set(props.ownedIds ?? []))
@@ -135,7 +137,7 @@ const nodes = computed<MapNode[]>(() => {
   }))
 
   const sunNode: MapNode = {
-    id: 'sun',
+    id: props.starId ?? 'sun',
     name: t('game.map.sun'),
     type: 'sun',
     location: { x: 50, y: 50 },

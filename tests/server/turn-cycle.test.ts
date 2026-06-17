@@ -87,6 +87,22 @@ describe('initial state', () => {
     }
   })
 
+  it('gives every system one unclaimed star', () => {
+    const snapshot = initialState([U1, U2], 1)
+
+    for (const system of snapshot.systems) {
+      expect(system.starId).toBeDefined()
+      const star = snapshot.planets.find(p => p.id === system.starId)
+      expect(star?.kind).toBe('star')
+      expect(star?.owner).toBe('unclaimed')
+      expect(star?.systemId).toBe(system.id)
+    }
+    // stars are not counted as planets for ascension
+    for (const player of snapshot.players) {
+      expect(player.research.empireState.planetsControlled).toBe(1)
+    }
+  })
+
   it('players resolve empty turns to identical resources', async () => {
     const repo = seedTwoPlayerGame()
     await playTurn(repo, 1)

@@ -34,6 +34,10 @@
         "title-captured": "Planet Captured",
         "description": "New colony founded on {location}",
         "description-captured": "Seized control of {location}"
+      },
+      "star-captured": {
+        "title": "Star Claimed",
+        "description": "Dyson scaffold built around {location}"
       }
     },
     "details": {

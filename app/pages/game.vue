@@ -32,6 +32,7 @@
           :planets="planetsInSystem"
           :owned-ids="ownedMapIds"
           :color-by-id="colorById"
+          :star-id="activeSystemStarId ?? undefined"
           @select-planet="handleSelectPlanet"
           @select-system="handleSelectSystem"
           @select-galaxy="handleSelectGalaxy"
@@ -854,7 +855,7 @@ const handleFleetMoveOrder = (fleetId: string, toSystemId: string) => {
 
 const planetsView = computed((): GamePlanet[] => {
   if (!planets.value.length) return []
-  return planets.value.map(planet => ({
+  return planets.value.filter(planet => planet.kind !== 'star').map(planet => ({
     id: planet.id,
     systemId: planet.systemId,
     systemName: systemNameById.value.get(planet.systemId) ?? planet.systemId,
@@ -1115,6 +1116,10 @@ const colorById = computed<Record<string, string>>(() => {
   }
   return result
 })
+
+/** The star of the currently viewed system (rendered as the central sun, carries an ownership ring). */
+const activeSystemStarId = computed(() =>
+  planets.value.find(p => p.kind === 'star' && p.systemId === activeSystemId.value)?.id ?? null)
 
 const homeSystemId = computed(() => {
   const playerId = myPlayerId.value

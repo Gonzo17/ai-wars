@@ -368,6 +368,7 @@ function resolveColonization(snapshot: GameSnapshot, turn: number, nextEventId: 
 
     const target = snapshot.planets.find(planet =>
       planet.systemId === systemId
+      && planet.kind !== 'star'
       && planet.owner !== colonizer.ownerId
       && planet.owner !== 'unknown'
       && !capturedPlanetIds.has(planet.id))
@@ -412,10 +413,63 @@ function resolveColonization(snapshot: GameSnapshot, turn: number, nextEventId: 
   }
 }
 
+/**
+ * Idle star-constructor fleets capture their system's star when no enemy fleet
+ * contests it — building the Dyson scaffold. The constructor is consumed; the
+ * star becomes an owned build site (megastructures come later).
+ */
+function resolveStarCapture(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
+  const constructors = snapshot.fleets.filter(fleet =>
+    fleet.status !== 'en-route' && getUnitDef(fleet.defId ?? fleet.id)?.unitType === 'star-constructor')
+
+  const consumedFleetIds = new Set<string>()
+
+  for (const constructor of constructors) {
+    const systemId = getSystemIdForLocation(snapshot, constructor.location)
+    if (!systemId) continue
+
+    const enemyPresent = snapshot.fleets.some(fleet =>
+      fleet.ownerId !== constructor.ownerId
+      && !consumedFleetIds.has(fleet.id)
+      && getSystemIdForLocation(snapshot, fleet.location) === systemId)
+    if (enemyPresent) continue
+
+    const star = snapshot.planets.find(p =>
+      p.kind === 'star'
+      && p.systemId === systemId
+      && p.owner !== constructor.ownerId
+      && p.owner !== 'unknown')
+    if (!star) continue
+
+    star.owner = constructor.ownerId
+    if (star.workers < 1) star.workers = 1
+    consumedFleetIds.add(constructor.id)
+
+    addEvent(snapshot, constructor.ownerId, {
+      id: nextEventId(),
+      type: 'star-captured',
+      severity: 'success',
+      year: turn,
+      titleKey: 'events.types.star-captured.title',
+      titleParams: { name: star.name },
+      descriptionKey: 'events.types.star-captured.description',
+      descriptionParams: { location: star.name },
+      relatedEntityId: star.systemId,
+      relatedEntityType: 'system',
+      read: false,
+      timestamp: Date.now()
+    })
+  }
+
+  if (consumedFleetIds.size > 0) {
+    snapshot.fleets = snapshot.fleets.filter(fleet => !consumedFleetIds.has(fleet.id))
+  }
+}
+
 /** Keep each player's empireState.planetsControlled in sync with ownership. */
 function updatePlanetsControlled(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
-    player.research.empireState.planetsControlled = snapshot.planets.filter(p => p.owner === player.id).length
+    player.research.empireState.planetsControlled = snapshot.planets.filter(p => p.owner === player.id && p.kind !== 'star').length
   }
 }
 
@@ -608,6 +662,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     // Step 3: Resolve combat where fleets meet, then colonize undefended planets
     resolveCombat(nextSnapshot, turn, nextEventId)
     resolveColonization(nextSnapshot, turn, nextEventId)
+    resolveStarCapture(nextSnapshot, turn, nextEventId)
     updatePlanetsControlled(nextSnapshot)
 
     // Step 4: Add resource production from existing buildings (before completing new ones)
