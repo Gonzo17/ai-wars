@@ -1,4 +1,6 @@
-import type { Planet } from '../types/game'
+import type { Planet, ResourceId } from '../types/game'
+import { getBuildingDef } from '../defs/production'
+import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
 import { slotOutput } from './synergies'
 
 export type ResourceTotals = { energy: number, minerals: number, rare: number }
@@ -19,6 +21,25 @@ export function calculateResourceProduction(planets: Planet[], playerId: string)
       totals.energy += output.energy
       totals.minerals += output.minerals
       totals.rare += output.rare
+    }
+  })
+  return totals
+}
+
+/**
+ * Per-turn strategic-resource output: each completed extractor sitting ON its
+ * matching deposit yields `amount × level`. Returns a record keyed by ResourceId
+ * (zero-filled for every strategic resource).
+ */
+export function calculateStrategicProduction(planets: Planet[], playerId: string): Record<ResourceId, number> {
+  const totals = Object.fromEntries(STRATEGIC_RESOURCE_IDS.map(id => [id, 0])) as Record<ResourceId, number>
+  forEachOwnedPlanet(planets, playerId, (planet) => {
+    for (const slot of planet.slots) {
+      if (!slot.buildingId || slot.isConstructing) continue
+      const def = getBuildingDef(slot.buildingId)
+      const sp = def?.strategicProduction
+      if (!sp || slot.resourceNode !== sp.requiresNode) continue
+      totals[sp.resource] = (totals[sp.resource] ?? 0) + sp.amount * Math.max(1, slot.buildingLevel)
     }
   })
   return totals

@@ -1,6 +1,7 @@
 import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/game'
 import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
+import type { StrategicCosts } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
 import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
@@ -63,6 +64,18 @@ function subtractCosts(available: ResourceCosts, cost: ResourceCosts): ResourceC
   }
 }
 
+function canAffordStrategic(available: Record<string, number>, costs: StrategicCosts | undefined): boolean {
+  if (!costs) return true
+  return Object.entries(costs).every(([key, amount]) => (available[key] ?? 0) >= (amount ?? 0))
+}
+
+function subtractStrategic(available: Record<string, number>, costs: StrategicCosts | undefined): void {
+  if (!costs) return
+  for (const [key, amount] of Object.entries(costs)) {
+    available[key] = (available[key] ?? 0) - (amount ?? 0)
+  }
+}
+
 /**
  * A build on a slot is a "resume" (no new resource cost) if the slot
  * already has the same buildingId assigned and is under construction (resources were paid earlier).
@@ -89,6 +102,8 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   let hasResearchCommand = false
   const queueCounts = new Map<string, number>()
   let availableResources = getPlayerResources(player)
+  const availableStrategic: Record<string, number> = {}
+  for (const r of player.resources) availableStrategic[r.key] = r.current
 
   for (const [index, command] of plan.commands.entries()) {
     const path = `commands.${index}`
@@ -167,12 +182,18 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
         errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path })
       }
 
+      // Extractors must sit ON their matching strategic deposit
+      if (building.strategicProduction && slot.resourceNode !== building.strategicProduction.requiresNode) {
+        errors.push({ code: 'INVALID_COMMAND', message: 'Extractor must be built on the matching deposit', path })
+      }
+
       // Resource cost (only for new builds, not resumes)
       if (!isResumingSlotBuild(planet, command.slotIndex, command.buildingId)) {
-        if (!canAfford(availableResources, building.resourceCosts)) {
+        if (!canAfford(availableResources, building.resourceCosts) || !canAffordStrategic(availableStrategic, building.strategicCosts)) {
           errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path })
         } else {
           availableResources = subtractCosts(availableResources, building.resourceCosts)
+          subtractStrategic(availableStrategic, building.strategicCosts)
         }
       }
 
@@ -213,10 +234,11 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       }
       // Resource cost (only new builds)
       if (!isResumingUnitBuild(planet, command.unitId)) {
-        if (!canAfford(availableResources, unit.resourceCosts)) {
+        if (!canAfford(availableResources, unit.resourceCosts) || !canAffordStrategic(availableStrategic, unit.strategicCosts)) {
           errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path })
         } else {
           availableResources = subtractCosts(availableResources, unit.resourceCosts)
+          subtractStrategic(availableStrategic, unit.strategicCosts)
         }
       }
       const pending = queueCounts.get(planet.id) ?? 0

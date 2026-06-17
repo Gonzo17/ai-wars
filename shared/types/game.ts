@@ -43,7 +43,12 @@ export interface SolarSystem {
 
 export type PlanetId = Id<'pl'>
 
-export type ResourceNodeType = 'ore'
+/**
+ * A deposit sitting on a planet slot. 'ore' boosts base minerals (synergy);
+ * the others are *strategic* deposits — discovered via research and mined by a
+ * dedicated extractor into a strategic-resource stock (see shared/defs/strategicResources.ts).
+ */
+export type ResourceNodeType = 'ore' | 'exotic-matter' | 'antimatter'
 
 export interface PlanetSlotData {
   index: number

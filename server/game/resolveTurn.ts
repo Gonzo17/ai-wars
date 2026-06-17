@@ -6,7 +6,8 @@ import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
 import type { GameEvent } from '~~/shared/types/events'
 import type { BuildingId, PlanetId, PlayerId, ResearchId, Resource, SolarSystemId, Unit, UnitId } from '~~/shared/types/game'
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
-import { calculateResourceProduction, getResearchPointsPerTurn } from '~~/shared/utils/economy'
+import { calculateResourceProduction, calculateStrategicProduction, getResearchPointsPerTurn } from '~~/shared/utils/economy'
+import type { StrategicCosts } from '~~/shared/defs/production'
 import { findLanePath, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 import { resolveFleetCombat } from '~~/shared/utils/combat'
 
@@ -40,6 +41,21 @@ function applyResourceProduction(player: PlayerSnapshot, production: ResourceCos
   modifyResource(player, 'res:rare', production.rare)
 }
 
+/** Spend strategic resources (keyed by ResourceId) for a build. */
+function deductStrategicCosts(player: PlayerSnapshot, costs: StrategicCosts | undefined) {
+  if (!costs) return
+  for (const [key, amount] of Object.entries(costs)) {
+    if (amount) modifyResource(player, key, -amount)
+  }
+}
+
+/** Add this turn's mined strategic resources to the player's stocks. */
+function applyStrategicProduction(player: PlayerSnapshot, production: Record<string, number>) {
+  for (const [key, amount] of Object.entries(production)) {
+    if (amount) modifyResource(player, key, amount)
+  }
+}
+
 function updateResourceDeltas(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
     const production = calculateResourceProduction(snapshot.planets, player.id)
@@ -49,6 +65,12 @@ function updateResourceDeltas(snapshot: GameSnapshot) {
     if (energyRes) energyRes.delta = production.energy
     if (mineralRes) mineralRes.delta = production.minerals
     if (rareRes) rareRes.delta = production.rare
+
+    const strategic = calculateStrategicProduction(snapshot.planets, player.id)
+    for (const [key, amount] of Object.entries(strategic)) {
+      const res = getPlayerResource(player, key)
+      if (res) res.delta = amount
+    }
   }
 }
 
@@ -669,6 +691,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
           const isResume = slot && slot.buildingId === command.buildingId && slot.isConstructing
           if (!isResume) {
             deductResourceCosts(player, def.resourceCosts)
+            deductStrategicCosts(player, def.strategicCosts)
           }
         }
         if (command.type === 'buildUnit') {
@@ -681,6 +704,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
           const memory = planet.progressMemory?.[command.unitId]
           if (!inShipyard && !memory?.resourcePaid) {
             deductResourceCosts(player, def.resourceCosts)
+            deductStrategicCosts(player, def.strategicCosts)
           }
         }
       }
@@ -703,6 +727,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     for (const player of nextSnapshot.players) {
       const production = calculateResourceProduction(nextSnapshot.planets, player.id)
       applyResourceProduction(player, production)
+      applyStrategicProduction(player, calculateStrategicProduction(nextSnapshot.planets, player.id))
     }
 
     // Step 5: Advance research and complete buildings/units

@@ -1,8 +1,18 @@
-import type { BuildingId, ResearchId, UnitId } from '../types/game'
+import type { BuildingId, ResearchId, ResourceId, ResourceNodeType, UnitId } from '../types/game'
 
 export type Requirement = {
   buildings?: Array<{ id: BuildingId, level: number }>
   research?: ResearchId[]
+}
+
+/** Strategic-resource cost/output, keyed by ResourceId (e.g. 'res:exotic-matter'). */
+export type StrategicCosts = Partial<Record<ResourceId, number>>
+
+/** A building that mines a strategic resource when placed on its matching deposit. */
+export type StrategicProduction = {
+  resource: ResourceId
+  amount: number
+  requiresNode: ResourceNodeType
 }
 
 export type ResourceProduction = {
@@ -29,6 +39,10 @@ export type BuildingDefinition = {
   requirements: Requirement
   researchPoints?: number
   resourceProduction?: ResourceProduction
+  /** Strategic resources consumed (once) to build this. */
+  strategicCosts?: StrategicCosts
+  /** Strategic resource mined per turn when on the matching deposit. */
+  strategicProduction?: StrategicProduction
   maxLevel?: number
   icon?: string
 }
@@ -43,6 +57,8 @@ export type UnitDefinition = {
   productionCost: number
   buildTime: number
   requirements: Requirement
+  /** Strategic resources consumed (once) to build this unit. */
+  strategicCosts?: StrategicCosts
   unitType: 'battleship' | 'probe' | 'colonizer' | 'star-constructor'
   strength: number
   icon?: string
@@ -75,12 +91,15 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
   { id: 'bld:hydroponics', category: 'infrastructure', resourceCosts: { energy: 60, minerals: 40, rare: 5 }, productionCost: 60, buildTime: 3, requirements: {}, maxLevel: 4, icon: 'i-lucide-leaf' },
   { id: 'bld:hab-complex', category: 'infrastructure', resourceCosts: { energy: 70, minerals: 95, rare: 8 }, productionCost: 100, buildTime: 5, requirements: {}, maxLevel: 4, icon: 'i-lucide-home' },
   { id: 'bld:landing-pad', category: 'infrastructure', resourceCosts: { energy: 40, minerals: 30, rare: 2 }, productionCost: 40, buildTime: 2, requirements: {}, maxLevel: 2, icon: 'i-lucide-plane-landing' },
+  // ── Strategic-resource extractors (surface; must sit ON the matching deposit) ──
+  { id: 'bld:exotic-extractor', category: 'rare', resourceCosts: { energy: 80, minerals: 120, rare: 10 }, productionCost: 100, buildTime: 5, requirements: { research: ['tech:exotic-matter-survey'] }, strategicProduction: { resource: 'res:exotic-matter', amount: 4, requiresNode: 'exotic-matter' }, maxLevel: 3, icon: 'i-lucide-gem' },
+  { id: 'bld:antimatter-collector', category: 'rare', resourceCosts: { energy: 140, minerals: 120, rare: 20 }, productionCost: 120, buildTime: 6, requirements: { research: ['tech:antimatter-containment'] }, strategicProduction: { resource: 'res:antimatter', amount: 3, requiresNode: 'antimatter' }, maxLevel: 3, icon: 'i-lucide-orbit' },
   // ── Megastructures (site: 'star') ────────────────────────────────────
   // Only buildable on a captured star. Balance values are placeholders — the
   // pass happens once the whole stellar loop is in (see Step 2 design). The
   // Dyson sphere is staged via maxLevel (each level = one Dyson stage); a built
   // Dyson stage drives the path to Kardashev K2.0.
-  { id: 'bld:dyson-sphere', category: 'energy', site: 'star', resourceCosts: { energy: 0, minerals: 500, rare: 50 }, productionCost: 400, buildTime: 20, requirements: {}, resourceProduction: { energy: 200 }, maxLevel: 5, icon: 'i-lucide-orbit' },
+  { id: 'bld:dyson-sphere', category: 'energy', site: 'star', resourceCosts: { energy: 0, minerals: 500, rare: 50 }, strategicCosts: { 'res:exotic-matter': 50 }, productionCost: 400, buildTime: 20, requirements: {}, resourceProduction: { energy: 200 }, maxLevel: 5, icon: 'i-lucide-orbit' },
   { id: 'bld:matrioshka-brain', category: 'research', site: 'star', resourceCosts: { energy: 300, minerals: 300, rare: 80 }, productionCost: 400, buildTime: 20, requirements: {}, researchPoints: 60, maxLevel: 3, icon: 'i-lucide-brain-circuit' },
   { id: 'bld:orbital-shipyard-mega', category: 'military', site: 'star', resourceCosts: { energy: 200, minerals: 300, rare: 40 }, productionCost: 300, buildTime: 15, requirements: {}, maxLevel: 1, icon: 'i-lucide-wrench' },
   { id: 'bld:star-fortress', category: 'military', site: 'star', resourceCosts: { energy: 150, minerals: 250, rare: 30 }, productionCost: 250, buildTime: 12, requirements: {}, maxLevel: 3, icon: 'i-lucide-shield' }
@@ -93,7 +112,9 @@ export const UNIT_DEFS: UnitDefinition[] = [
   { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 10 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
   { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 30 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
   // Combat units
-  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 20 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' }
+  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 20 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' },
+  // Antimatter capital ship — needs mined antimatter on top of the base cost.
+  { id: 'unit:dreadnought', category: 'combat', resourceCosts: { energy: 300, minerals: 400, rare: 60 }, strategicCosts: { 'res:antimatter': 30 }, productionCost: 300, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:antimatter-containment'] }, unitType: 'battleship', strength: 12, icon: 'i-lucide-rocket' }
 ]
 
 export const getBuildingDef = (id: BuildingId) => BUILDING_DEFS.find(def => def.id === id)

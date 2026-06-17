@@ -6,6 +6,7 @@ import { calculateResourceProduction } from '~~/shared/utils/economy'
 import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType } from '~~/shared/types/game'
 import type { PlayerResearchState } from '~~/shared/types/research'
 import { createPlanetSlots, createStarSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
+import { STRATEGIC_RESOURCES } from '~~/shared/defs/strategicResources'
 
 /**
  * Map layout (vision: Civ-continents). Each player gets their OWN galaxy with
@@ -191,6 +192,13 @@ function makeNeutralPlanet(
   size: Planet['size'],
   location: { x: number, y: number }
 ): Planet {
+  // Deposit type by planet type — gives a reason to settle specific worlds:
+  // barren → exotic matter, gas giants → antimatter, everything else → ore.
+  const nodeType: ResourceNodeType = type === 'barren'
+    ? 'exotic-matter'
+    : type === 'gas-giant'
+      ? 'antimatter'
+      : 'ore'
   return {
     id,
     systemId,
@@ -200,7 +208,7 @@ function makeNeutralPlanet(
     size,
     workers: 1,
     productionPerWorker: 20,
-    slots: makeSlots([], new Map([[2, 'ore']])),
+    slots: makeSlots([], new Map([[2, nodeType]])),
     queues: { build: [], shipyard: [] },
     progressMemory: {},
     productionCarryover: 0,
@@ -213,7 +221,9 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
   const baseResources: Resource[] = [
     { key: 'res:energy', current: 500, max: 2000, delta: 0 },
     { key: 'res:material', current: 100, max: 2000, delta: 0 },
-    { key: 'res:rare', current: 0, max: 500, delta: 0 }
+    { key: 'res:rare', current: 0, max: 500, delta: 0 },
+    // Strategic resources: discovered via research, mined on deposits, spent on advanced builds.
+    ...STRATEGIC_RESOURCES.map(r => ({ key: r.id, current: 0, max: r.max, delta: 0 }))
   ]
 
   const players: PlayerSnapshot[] = userIds.map((userId) => {

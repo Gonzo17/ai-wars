@@ -180,6 +180,15 @@ export const TECH_DEFS: TechDef[] = [
     prerequisites: ['tech:combat-ai'],
     researchPoints: 400
   },
+  {
+    id: 'tech:exotic-matter-survey',
+    name: 'Exotic Matter Survey',
+    description: 'Reveals exotic-matter deposits and unlocks their extraction. A strategic resource needed for megastructures.',
+    category: 'exploration_navigation',
+    tier: 'k1.0',
+    prerequisites: ['tech:deep-system-scan'],
+    researchPoints: 350
+  },
 
   // ============================================
   // K1.5 SYSTEM HEGEMONY (5 techs)
@@ -265,6 +274,16 @@ export const TECH_DEFS: TechDef[] = [
     tier: 'k2.0',
     prerequisites: ['tech:dyson-swarm'],
     researchPoints: 600,
+    requires: { compute: 12 }
+  },
+  {
+    id: 'tech:antimatter-containment',
+    name: 'Antimatter Containment',
+    description: 'Magnetic traps reveal antimatter deposits and unlock their collection — fuel for capital ships.',
+    category: 'energy_compute',
+    tier: 'k2.0',
+    prerequisites: ['tech:stellar-energy-capture'],
+    researchPoints: 700,
     requires: { compute: 12 }
   },
   {
