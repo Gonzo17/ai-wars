@@ -125,6 +125,8 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 8. **Game phase `resolving` is a transient lock.** Clients cannot submit or unsubmit while phase is `resolving`. Resolution is fast and atomic — phase flips back to `planning` after the snapshot is written.
 9. **The `~~/` alias resolves at build time only**. Don't expect it inside string-based dynamic imports.
 10. **Two `toPlayerId` implementations** exist (client + server) — keep them identical.
+11. **Stars are build sites with `site`-gated megastructures** (since June 2026): a `Planet` with `kind: 'star'` reuses all planet machinery (economy/queues/fog/combat) but is captured by a `unit:star-constructor` (not a colony ship) via `resolveStarCapture()`, and has shell slots from `createStarSlots()` (no surface zone). `BuildingDefinition.site` (`'planet' | 'star'`, default planet) gates placement in `validateTurnPlan` — megastructures (`bld:dyson-sphere` staged, `bld:matrioshka-brain`, `bld:orbital-shipyard-mega`, `bld:star-fortress`) only on stars, normal buildings only on planets. The client splits the catalog by site; the sun node opens `GameStarSlotView` (concentric shells + closing Dyson hull). `FACILITY_SUBSTITUTES` lets a completed stellar shipyard satisfy a `bld:orbital-dock` unit requirement (build ships on a star). `systemHasEnemyFortress()` makes a completed `bld:star-fortress` block enemy colonization/star-capture in its system (no siege mechanic yet).
+12. **`updatePlanetsControlled()` runs AFTER `advanceQueues()`** in resolve, so `empireState` (`planetsControlled`, `starsControlled`, `dysonStages`) reflects buildings completed *this* turn. It feeds the ascension gates — **K2.0 = 1 star + 1 Dyson stage** (`requiresEmpire: { starsControlled, dysonStages }` in `research-tree.ts`, evaluated in `app/stores/research.ts`).
 
 ## Testing strategy
 
@@ -156,6 +158,11 @@ The MVP works (auth, lobby, turn engine, economy, research tree, multi-zoom map)
 4. ✅ **Building synergies** (commit a34e304). Ore ×2, power grid, compute uplink via `slotOutput()`.
 5. ⛔ **Dumb AI opponent — dropped as a product feature.** Per [docs/VISION.md](docs/VISION.md), the game is multiplayer-only with no bots; the dev-testing need this was meant to solve is covered by the Playwright playtest harness. Only revisit as an explicit dev tool if asked.
 
-**Next candidates** (toward the vision, confirm before starting): the three victory conditions + late-game megastructures/Dyson stages + stars as build sites (see VISION.md), planet terrain types for deeper placement, and the known design-debt items in the June 2026 audit (snapshot redaction for the turn-plan/enemy info leak, `state.get` writing snapshots at arbitrary turns).
+Beyond the original five, the **stellar progression spine** is now in (confirm scope before extending):
+
+6. ✅ **Stars as capturable build sites** (commit f9dae46). Star constructor + `resolveStarCapture`.
+7. ✅ **Megastructures on stars** (commits 721860a, 707a4dc). Site-gated catalog, `GameStarSlotView` shell UI with closing Dyson hull, K2.0 = 1 star + 1 Dyson stage, functional Stellar Shipyard + Star Fortress. Balance numbers are placeholders — a tuning pass is deferred until the whole loop is playable.
+
+**Next candidates** (toward the vision, confirm before starting): **Tech-tree content rework** (Step 3 — restructure the `AscensionTier` ladder to a short 0.6→2.0 on-ramp + stretched stellar era, then rebuild `TECH_DEFS` with real depth; the current content is the #1 known weakness) and **planet terrain types** for deeper placement (Step 4). Then the three victory conditions + planet-cracker (see VISION.md), and the K3.0 expansion gate (`galaxyStarFraction`). Balance pass on all costs/outputs once the loop is playable. The Star Fortress still needs a siege mechanic (it is currently an absolute block).
 
 **Explicitly out of scope right now:** hex map (the star-lane graph is the genre-idiomatic answer), asymmetric factions, diplomacy, trade, animations/polish, and any move off the Nuxt browser stack. Do not propose features outside the vision without checking first.
