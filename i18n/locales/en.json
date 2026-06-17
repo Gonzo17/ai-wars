@@ -226,6 +226,14 @@
           "name": "Deep System Scan",
           "description": "Comprehensive mapping of orbital bodies and resources."
         },
+        "exotic-matter-survey": {
+          "name": "Exotic Matter Survey",
+          "description": "Reveals exotic-matter deposits and unlocks their extraction — a strategic resource for megastructures."
+        },
+        "antimatter-containment": {
+          "name": "Antimatter Containment",
+          "description": "Magnetic traps reveal antimatter deposits and unlock their collection — fuel for capital ships."
+        },
         "navigation-algorithms": {
           "name": "Navigation Algorithms",
           "description": "Optimal trajectory calculations for interplanetary travel."
@@ -321,6 +329,8 @@
       "energy": "Energy",
       "material": "Minerals",
       "rare": "Rare Elements",
+      "exotic-matter": "Exotic Matter",
+      "antimatter": "Antimatter",
       "energy-short": "E",
       "material-short": "M",
       "rare-short": "R"
@@ -484,6 +494,14 @@
       "star-fortress": {
         "name": "Star Fortress",
         "description": "Orbital defense grid guarding the star and its system."
+      },
+      "exotic-extractor": {
+        "name": "Exotic Matter Extractor",
+        "description": "Mines exotic matter from a deposit. Must be built on an exotic-matter node."
+      },
+      "antimatter-collector": {
+        "name": "Antimatter Collector",
+        "description": "Harvests antimatter from a deposit. Must be built on an antimatter node."
       }
     },
     "units": {
@@ -506,6 +524,10 @@
       "star-constructor": {
         "name": "Star Constructor",
         "role": "Stellar capture"
+      },
+      "dreadnought": {
+        "name": "Dreadnought",
+        "role": "Antimatter capital ship"
       }
     },
     "star": {

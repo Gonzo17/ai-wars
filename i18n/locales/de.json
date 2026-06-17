@@ -226,6 +226,14 @@
           "name": "Tiefensystem-Scan",
           "description": "Umfassende Kartierung von Himmelskörpern und Ressourcen."
         },
+        "exotic-matter-survey": {
+          "name": "Exotische-Materie-Vermessung",
+          "description": "Enthüllt Exotische-Materie-Vorkommen und schaltet ihren Abbau frei — eine strategische Ressource für Megastrukturen."
+        },
+        "antimatter-containment": {
+          "name": "Antimaterie-Einschluss",
+          "description": "Magnetfallen enthüllen Antimaterie-Vorkommen und schalten ihre Gewinnung frei — Treibstoff für Großkampfschiffe."
+        },
         "navigation-algorithms": {
           "name": "Navigationsalgorithmen",
           "description": "Optimale Trajektorienberechnung für interplanetare Reisen."
@@ -321,6 +329,8 @@
       "energy": "Energie",
       "material": "Minerale",
       "rare": "Seltene Elemente",
+      "exotic-matter": "Exotische Materie",
+      "antimatter": "Antimaterie",
       "energy-short": "E",
       "material-short": "M",
       "rare-short": "R"
@@ -484,6 +494,14 @@
       "star-fortress": {
         "name": "Sternenfestung",
         "description": "Orbitales Verteidigungsnetz zum Schutz des Sterns und seines Systems."
+      },
+      "exotic-extractor": {
+        "name": "Exotische-Materie-Extraktor",
+        "description": "Baut exotische Materie aus einem Vorkommen ab. Muss auf einem Exotische-Materie-Vorkommen stehen."
+      },
+      "antimatter-collector": {
+        "name": "Antimaterie-Kollektor",
+        "description": "Sammelt Antimaterie aus einem Vorkommen. Muss auf einem Antimaterie-Vorkommen stehen."
       }
     },
     "units": {
@@ -506,6 +524,10 @@
       "star-constructor": {
         "name": "Sternenkonstruktor",
         "role": "Sternübernahme"
+      },
+      "dreadnought": {
+        "name": "Schlachtkreuzer",
+        "role": "Antimaterie-Großkampfschiff"
       }
     },
     "star": {

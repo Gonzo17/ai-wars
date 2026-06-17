@@ -27,6 +27,7 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  strategicCosts?: Partial<Record<string, number>>
   locked?: boolean
   lockedByTechName?: string | null
 }
@@ -40,6 +41,7 @@ interface UnitDefinition {
   productionCost: number
   icon: string
   requiresFacility: boolean
+  strategicCosts?: Partial<Record<string, number>>
   locked?: boolean
   lockedByTechName?: string | null
 }
@@ -67,6 +69,7 @@ interface PlayerResources {
   energy: number
   minerals: number
   rare: number
+  strategic?: Record<string, number>
 }
 
 const props = defineProps<{
@@ -343,6 +346,23 @@ const canAfford = (costs: BuildCosts): boolean => {
     && props.playerResources.rare >= costs.rare
 }
 
+const STRATEGIC_ICONS: Record<string, string> = {
+  'res:exotic-matter': 'i-lucide-gem',
+  'res:antimatter': 'i-lucide-orbit'
+}
+
+const strategicCostList = (costs?: Partial<Record<string, number>>) =>
+  Object.entries(costs ?? {})
+    .filter(([, amount]) => Boolean(amount))
+    .map(([key, amount]) => ({ key, amount: amount as number, icon: STRATEGIC_ICONS[key] ?? 'i-lucide-sparkles' }))
+
+const canAffordStrategic = (costs?: Partial<Record<string, number>>): boolean => {
+  if (!costs) return true
+  const stock = props.playerResources?.strategic
+  if (!stock) return true
+  return Object.entries(costs).every(([key, amount]) => (stock[key] ?? 0) >= (amount ?? 0))
+}
+
 const isAlreadyPaid = (buildId: string, slotIndex: number): boolean => {
   // Check if this slot already has this building under construction (resources were paid)
   const serverSlot = props.planet.slots[slotIndex]
@@ -456,11 +476,15 @@ const estimateRounds = (productionCost: number) => {
 const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)'
 
 const resourceNodeIcons: Record<ResourceNodeType, string> = {
-  ore: 'i-lucide-mountain'
+  'ore': 'i-lucide-mountain',
+  'exotic-matter': 'i-lucide-gem',
+  'antimatter': 'i-lucide-orbit'
 }
 
 const resourceNodeLabels: Record<ResourceNodeType, string> = {
-  ore: 'Ore'
+  'ore': 'Ore',
+  'exotic-matter': 'Exotic Matter',
+  'antimatter': 'Antimatter'
 }
 
 const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
@@ -932,8 +956,8 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                 type="button"
                 :data-testid="`build-option-${building.id}`"
                 class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts)) }"
-                :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !canAfford(building.resourceCosts))"
+                :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts))) }"
+                :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts)))"
                 @click="handleBuild(building.id, buildMenuSlotIndex!)"
               >
                 <div class="flex h-8 w-8 items-center justify-center rounded-md bg-neutral-800/80 shrink-0">
@@ -976,6 +1000,17 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                         class="w-2.5 h-2.5 text-primary-300"
                       />
                       {{ building.resourceCosts.rare }}
+                    </span>
+                    <span
+                      v-for="sc in strategicCostList(building.strategicCosts)"
+                      :key="sc.key"
+                      class="flex items-center gap-0.5 text-fuchsia-300"
+                    >
+                      <UIcon
+                        :name="sc.icon"
+                        class="w-2.5 h-2.5"
+                      />
+                      {{ sc.amount }}
                     </span>
                     <span class="text-neutral-600">·</span>
                     <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(building.productionCost) }) }}</span>
@@ -1092,8 +1127,8 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                   :key="unit.id"
                   type="button"
                   class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                  :class="{ 'opacity-40 cursor-not-allowed': unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) }"
-                  :disabled="unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts)"
+                  :class="{ 'opacity-40 cursor-not-allowed': unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) || !canAffordStrategic(unit.strategicCosts) }"
+                  :disabled="unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) || !canAffordStrategic(unit.strategicCosts)"
                   @click="handleTrainUnit(unit.id)"
                 >
                   <div class="flex h-8 w-8 items-center justify-center rounded-md bg-sky-900/50 shrink-0">
@@ -1136,6 +1171,17 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
                           class="w-2.5 h-2.5 text-primary-300"
                         />
                         {{ unit.resourceCosts.rare }}
+                      </span>
+                      <span
+                        v-for="sc in strategicCostList(unit.strategicCosts)"
+                        :key="sc.key"
+                        class="flex items-center gap-0.5 text-fuchsia-300"
+                      >
+                        <UIcon
+                          :name="sc.icon"
+                          class="w-2.5 h-2.5"
+                        />
+                        {{ sc.amount }}
                       </span>
                       <span class="text-neutral-600">·</span>
                       <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(unit.productionCost) }) }}</span>

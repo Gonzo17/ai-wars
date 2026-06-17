@@ -192,6 +192,7 @@ import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
 import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
+import { STRATEGIC_RESOURCES, getStrategicResource, isStrategicResource } from '~~/shared/defs/strategicResources'
 import { getResearchPointsPerTurn } from '~~/shared/utils/economy'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
@@ -249,6 +250,7 @@ interface BuildingDefinition {
   productionCost: number
   icon: string
   site: 'planet' | 'star'
+  strategicCosts?: Partial<Record<string, number>>
   locked: boolean
   lockedByTechName: string | null
 }
@@ -262,6 +264,7 @@ interface UnitDefinition {
   productionCost: number
   icon: string
   requiresFacility: boolean
+  strategicCosts?: Partial<Record<string, number>>
   locked: boolean
   lockedByTechName: string | null
 }
@@ -611,7 +614,9 @@ useSeoMeta({
 const resourceMeta: Record<string, { labelKey: string, icon: string, accent: string }> = {
   'res:energy': { labelKey: 'game.resources.energy', icon: 'zap', accent: 'text-warning-300' },
   'res:material': { labelKey: 'game.resources.material', icon: 'pickaxe', accent: 'text-neutral-300' },
-  'res:rare': { labelKey: 'game.resources.rare', icon: 'atom', accent: 'text-primary-300' }
+  'res:rare': { labelKey: 'game.resources.rare', icon: 'atom', accent: 'text-primary-300' },
+  'res:exotic-matter': { labelKey: 'game.resources.exotic-matter', icon: 'gem', accent: 'text-fuchsia-300' },
+  'res:antimatter': { labelKey: 'game.resources.antimatter', icon: 'orbit', accent: 'text-cyan-300' }
 }
 
 // Calculate pending resource costs from turnPlan commands (optimistic updates)
@@ -658,7 +663,14 @@ const resources = computed((): GameResource[] => {
   if (!snapshot.value || !currentUserId.value) return []
   const playerId = toPlayerId(currentUserId.value)
   const player = snapshot.value.players.find(p => p.id === playerId || p.userId === currentUserId.value)
-  const list = player?.resources ?? []
+  const completed = completedTechIds.value
+  // Hide a strategic resource until it is discovered (survey tech done) or already mined.
+  const list = (player?.resources ?? []).filter((resource) => {
+    if (!isStrategicResource(resource.key)) return true
+    if (resource.current > 0) return true
+    const surveyTech = getStrategicResource(resource.key)?.surveyTech
+    return surveyTech ? completed.includes(surveyTech) : true
+  })
   const pending = pendingResourceCosts.value
 
   return list.map((resource) => {
@@ -684,16 +696,22 @@ const resources = computed((): GameResource[] => {
 })
 
 const playerResources = computed(() => {
-  if (!snapshot.value || !currentUserId.value) return { energy: 0, minerals: 0, rare: 0 }
+  if (!snapshot.value || !currentUserId.value) return { energy: 0, minerals: 0, rare: 0, strategic: {} as Record<string, number> }
   const playerId = toPlayerId(currentUserId.value)
   const player = snapshot.value.players.find(p => p.id === playerId || p.userId === currentUserId.value)
   const list = player?.resources ?? []
   const pending = pendingResourceCosts.value
 
+  const strategic: Record<string, number> = {}
+  for (const r of STRATEGIC_RESOURCES) {
+    strategic[r.id] = list.find(res => res.key === r.id)?.current ?? 0
+  }
+
   return {
     energy: (list.find(r => r.key === 'res:energy')?.current ?? 0) - pending.energy,
     minerals: (list.find(r => r.key === 'res:material')?.current ?? 0) - pending.minerals,
-    rare: (list.find(r => r.key === 'res:rare')?.current ?? 0) - pending.rare
+    rare: (list.find(r => r.key === 'res:rare')?.current ?? 0) - pending.rare,
+    strategic
   }
 })
 
@@ -775,6 +793,7 @@ const allBuildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.ma
     productionCost: def.productionCost,
     icon: def.icon ?? 'i-lucide-hammer',
     site: def.site ?? 'planet',
+    strategicCosts: def.strategicCosts,
     locked: missingResearch.length > 0,
     lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
   }
@@ -795,6 +814,7 @@ const unitCatalog = computed((): UnitDefinition[] => UNIT_DEFS.map((def) => {
     productionCost: def.productionCost,
     icon: def.icon ?? 'i-lucide-rocket',
     requiresFacility: (def.requirements.buildings?.length ?? 0) > 0,
+    strategicCosts: def.strategicCosts,
     locked: missingResearch.length > 0,
     lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
   }
