@@ -128,6 +128,7 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 11. **Stars are build sites with `site`-gated megastructures** (since June 2026): a `Planet` with `kind: 'star'` reuses all planet machinery (economy/queues/fog/combat) but is captured by a `unit:star-constructor` (not a colony ship) via `resolveStarCapture()`, and has shell slots from `createStarSlots()` (no surface zone). `BuildingDefinition.site` (`'planet' | 'star'`, default planet) gates placement in `validateTurnPlan` — megastructures (`bld:dyson-sphere` staged, `bld:matrioshka-brain`, `bld:orbital-shipyard-mega`, `bld:star-fortress`) only on stars, normal buildings only on planets. The client splits the catalog by site; the sun node opens `GameStarSlotView` (concentric shells + closing Dyson hull). `FACILITY_SUBSTITUTES` lets a completed stellar shipyard satisfy a `bld:orbital-dock` unit requirement (build ships on a star). `systemHasEnemyFortress()` makes a completed `bld:star-fortress` block enemy colonization/star-capture in its system (no siege mechanic yet).
 12. **`updatePlanetsControlled()` runs AFTER `advanceQueues()`** in resolve, so `empireState` (`planetsControlled`, `starsControlled`, `dysonStages`) reflects buildings completed *this* turn. It feeds the ascension gates — **K2.0 = 1 star + 1 Dyson stage** (`requiresEmpire: { starsControlled, dysonStages }` in `research-tree.ts`, evaluated in `app/stores/research.ts`).
 13. **Strategic resources are Civ-style** (since June 2026): defined in [shared/defs/strategicResources.ts](shared/defs/strategicResources.ts) (the single source tying resource ⇄ deposit `ResourceNodeType` ⇄ survey tech). They are **first-class entries in `player.resources`** but produced/spent via dedicated hooks, NOT the base `{energy, minerals, rare}` cost shape: `BuildingDefinition.strategicProduction` (extractor mines `amount × level` when its slot's `resourceNode` matches, via `calculateStrategicProduction`) and `strategicCosts` on buildings/units (consumed once on build). Discovery = research: a deposit's extractor is gated by its `surveyTech`, and the TopBar hides a strategic resource until the survey tech is done or you've mined some. Deposits are seeded in `initialState` by planet type (barren → exotic-matter, gas-giant → antimatter). Validation enforces affordability AND that an extractor sits on its matching deposit. To add a resource: extend `STRATEGIC_RESOURCES` + `ResourceNodeType`, add an extractor def + survey tech + i18n + a `STRATEGIC_ICONS`/`resourceMeta` entry.
+14. **Victory runs last in resolve and ends the game** (since June 2026): `resolveVictory()` ([server/game/resolve/victory.ts](server/game/resolve/victory.ts)) runs AFTER `updatePlanetsControlled` (it reads `empireState`). Shared shape: a player meeting a trigger starts a countdown stored on `GameSnapshot.victory.pending`; holding it `MILITARY_HOLD_TURNS` declares `winnerId`; breaking it resets. Only the **Military** path exists (`playerMeetsMilitary` in [shared/utils/victory.ts](shared/utils/victory.ts): owns every `isHomeworld` planet + `MILITARY_PLANET_THRESHOLD` planets — both constants are placeholders). `newTurn` passed to it is `turn + 1` (the snapshot being written). On a win the orchestrator calls `repo.updateGameStatus(gameId, 'finished')`, and `submitTurn` rejects a `finished` game (409). Victory state rides the snapshot (no migration, redacted like the rest). Wins/countdowns are emitted to **every** player (`victory` / `victory-imminent` events) for multiplayer fairness.
 
 ## Testing strategy
 
@@ -174,15 +175,19 @@ condition implemented at all** (the three wins / countdown / planet-cracker exis
 nowhere — you can ascend tiers but cannot win). Priority order: *close & vision-align
 the loop, then deepen.* (No effort estimates — David doesn't want them.)
 
-- **Phase 0 — Quick wins.** Fix galaxy/universe map contrast (NOT a logic regress —
-  GameCanvas + node-feeding code unchanged recently; the imagery swap `8cfee53` is the
-  last map-area change; verify live with `pnpm dev`). Split `resolveTurn.ts` (754 lines)
-  into modules before Phases 1/3.
-- **Phase 1 — Victory scaffold (highest leverage).** Generic `condition → visible
-  countdown → hold` in resolve + winner declaration + game phase `finished`. Military
-  path first (all enemy homeworlds + moderate threshold, hold K turns); countdown UI.
-  Expansion (`galaxyStarFraction`) & Research (Temporal Ascension capstone) as configs
-  of the same scheme.
+- **Phase 0 — Quick wins.** ✅ `resolveTurn.ts` split into `server/game/resolve/*`
+  modules (commit on branch `docs/navigation-combat-vision`). ⏸ Galaxy/universe map
+  contrast **intentionally skipped** — the maps get rebuilt in Phase 3 (unified graph),
+  so fixing the current rendering twice is wasted (David's call). Not a logic regress:
+  GameCanvas + node-feeding code were unchanged; the imagery swap `8cfee53` is the last
+  map-area change.
+- **Phase 1 — Victory scaffold (highest leverage).** ✅ **Military path done** (engine +
+  UI). Generic `condition → countdown → hold` state machine in `resolve/victory.ts`
+  (gotcha 14); `GameSnapshot.victory` carries countdowns + winner; game flips to
+  `status: finished` and `submitTurn` rejects it; `GameVictoryBanner` + `GameVictoryOverlay`
+  surface it. **Still to do:** Expansion (`galaxyStarFraction`) & Research (Temporal
+  Ascension capstone) as configs of the same machinery, and the balance of the
+  placeholder constants (`MILITARY_HOLD_TURNS`, `MILITARY_PLANET_THRESHOLD`).
 - **Phase 2 — Rebuild the tech tree** (current `TECH_DEFS` is a placeholder, may be
   discarded). Short on-ramp 0.6→2.0 + stretched 2.x band; remove `planetsControlled`
   gates; add `galaxyStarFraction` to `EmpireRequirement`. Real specialization with
