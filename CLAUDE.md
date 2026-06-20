@@ -195,7 +195,12 @@ the loop, then deepen.* (No effort estimates — David doesn't want them.)
   gates; add `galaxyStarFraction` to `EmpireRequirement`. Real specialization with
   opportunity cost; **some planets only colonizable with the matching specialization**;
   techs unlock buildings/units **and give buffs** to them. Design checkpoint with David
-  before the rewrite.
+  before the rewrite. **Playtest findings to fix here (June 2026):** *every research
+  must have a felt effect* — today you start already owning buildings that still need
+  research, and researching something often does nothing (already built, or needs a
+  resource you can't get yet); rare material is gated so late the player is blocked for
+  a long time. The resource model is reworked alongside the tree (more variety, earlier
+  access, escalating costs — see below).
 - **Phase 3 — Navigation & combat rework** (biggest open design — see VISION
   *Navigation & combat*): one unified node graph across all three levels (gateways,
   distances, speed, upgradable movement), edge-granular round-based combat (flee
@@ -208,4 +213,34 @@ the loop, then deepen.* (No effort estimates — David doesn't want them.)
 
 Critical path: Phase 0 split → Phase 1 Military win → Phase 2 checkpoint → Phase 3.
 
-**Explicitly out of scope right now:** hex map (the star-lane graph is the genre-idiomatic answer), asymmetric factions, diplomacy, trade, animations/polish, and any move off the Nuxt browser stack. Do not propose features outside the vision without checking first.
+### Playtest feedback & backlog (June 2026, from David)
+
+Captured from a hands-on playtest; slot these in around the phases above (most are
+confirmed direction, not yet scheduled). Detail lives in memory ([[feedback_playtest-2026-06]]).
+
+- **Civ-style production & placement UX** (significant redesign of planet building):
+  replace the per-slot click flow with a Civ-like side list of buildings + units and a
+  **shared build queue with multiple slots**. Picking a *unit* queues it; picking a
+  *building* lets you **place it on the map** where you want, and **hovering a free
+  slot previews base yield + bonuses**. Overlaps the Phase-3 terrain/synergy preview and
+  the Phase-2 catalog — decide the production model before/with those.
+- **Product shell & onboarding** (new workstream — make it feel like a PC game from the
+  first moment, not a website): after login → a **main menu** (settings, start) → a
+  **"Start game" submenu** with *Tutorial* / *Quick Play* (both greyed out for now) /
+  *Custom Lobby* (= the current lobby flow). **Guests** get only Tutorial + Quick Play;
+  **custom lobbies require a registered account**. Login itself is fine as is.
+- **Quick fixes / bugs:** (1) a game can start **without picking a colour** yet everyone
+  still gets one — make colour selection intentional or a clear default. (2) Worker/robot
+  cost is **constant** → make it **escalate** per additional worker so production can't be
+  ramped trivially (rising, but doubling is likely too harsh).
+- **TopBar resource tooltips:** hovering a stat (e.g. energy) shows a **breakdown of where
+  it comes from**. Small, early win; also useful for debugging.
+- **PC-game feel / polish (later, but confirmed wanted):** more animations, **event
+  sequences**, and **detailed end-of-game stats**. Still after gameplay depth — but these
+  are now explicit product goals, not "maybe".
+- **Dependency update (maintenance todo):** once the game basically stands, run the staged
+  bump — safe minor/patch batch first, then `@nuxt/ui` + supabase CLI with verification,
+  then the majors (pnpm 11, eslint 10, vitest 4 + test-utils 4, TS 6) one at a time. Full
+  audit in [[project-dependency-update]].
+
+**Explicitly out of scope right now:** hex map (the star-lane graph is the genre-idiomatic answer), asymmetric factions, diplomacy, trade, and any move off the Nuxt browser stack. *Animations / event sequences / end-game stats are deferred, not rejected* — confirmed wanted later (see the playtest backlog), just not before gameplay depth. Do not propose features outside the vision without checking first.
