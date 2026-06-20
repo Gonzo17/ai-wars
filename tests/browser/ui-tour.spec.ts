@@ -38,6 +38,11 @@ test('tours every major dialog on a seeded game', async ({ browser }) => {
   await expect(alice.getByTestId('end-turn-button')).toBeVisible()
   await shot(alice, '01-system-map')
 
+  // ── TopBar resource tooltip: per-planet production breakdown ──────────
+  await alice.getByTestId('resource-pill-res:energy').hover()
+  await expect(alice.getByTestId('resource-breakdown-res:energy')).toBeVisible()
+  await shot(alice, '01b-resource-breakdown')
+
   // ── Research tree + ascension gate ───────────────────────────────────
   await alice.getByTestId('research-button').click()
   await expect(alice.locator('[data-testid^="tech-node-"]').first()).toBeVisible()

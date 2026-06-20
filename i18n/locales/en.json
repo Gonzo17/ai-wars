@@ -575,6 +575,8 @@
     },
     "top-bar": {
       "era": "A.E.",
+      "per-turn": "/turn",
+      "no-production": "No production yet",
       "fullscreen-enter": "Enter fullscreen",
       "fullscreen-exit": "Exit fullscreen"
     },

@@ -7,6 +7,7 @@ interface GameResource {
   delta: string
   accent: string
   icon: string
+  breakdown?: Array<{ planetName: string, total: number, sources: Array<{ label: string, amount: number }> }>
 }
 
 const props = defineProps<{
@@ -71,7 +72,8 @@ onBeforeUnmount(() => {
         <div
           v-for="resource in props.resources"
           :key="resource.key"
-          class="flex items-center gap-2 h-9.5 px-3 rounded-md bg-neutral-900/60 border border-neutral-800"
+          :data-testid="`resource-pill-${resource.key}`"
+          class="group relative flex items-center gap-2 h-9.5 px-3 rounded-md bg-neutral-900/60 border border-neutral-800 cursor-help"
         >
           <UIcon
             :name="`i-lucide-${resource.icon}`"
@@ -87,6 +89,54 @@ onBeforeUnmount(() => {
           >
             {{ resource.delta }}
           </span>
+
+          <!-- Production breakdown (where does this resource come from?) -->
+          <div
+            :data-testid="`resource-breakdown-${resource.key}`"
+            class="pointer-events-none absolute left-0 top-full z-50 mt-1 hidden min-w-48 rounded-md border border-neutral-700 bg-neutral-950/95 p-2 text-xs shadow-xl group-hover:block"
+          >
+            <p class="mb-1 flex items-center gap-1.5 font-semibold text-neutral-200">
+              <UIcon
+                :name="`i-lucide-${resource.icon}`"
+                :class="resource.accent"
+              />
+              {{ resource.label }}
+              <span
+                class="ml-auto"
+                :class="resource.delta.startsWith('+') ? 'text-success-400' : 'text-critical-400'"
+              >{{ resource.delta }}{{ $t('game.top-bar.per-turn') }}</span>
+            </p>
+            <div
+              v-if="resource.breakdown?.length"
+              class="space-y-1.5"
+            >
+              <div
+                v-for="group in resource.breakdown"
+                :key="group.planetName"
+              >
+                <p class="flex justify-between gap-4 font-medium text-neutral-200">
+                  <span>{{ group.planetName }}</span>
+                  <span class="font-mono text-success-400">+{{ group.total }}</span>
+                </p>
+                <ul class="space-y-0.5 pl-2">
+                  <li
+                    v-for="src in group.sources"
+                    :key="src.label"
+                    class="flex justify-between gap-4 text-neutral-400"
+                  >
+                    <span>{{ src.label }}</span>
+                    <span class="font-mono text-success-400/80">+{{ src.amount }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <p
+              v-else
+              class="text-neutral-500"
+            >
+              {{ $t('game.top-bar.no-production') }}
+            </p>
+          </div>
         </div>
         <!-- Research Section -->
         <UButton

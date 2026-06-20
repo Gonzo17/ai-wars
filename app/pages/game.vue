@@ -206,7 +206,8 @@ import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
 import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
 import { STRATEGIC_RESOURCES, getStrategicResource, isStrategicResource } from '~~/shared/defs/strategicResources'
-import { getResearchPointsPerTurn } from '~~/shared/utils/economy'
+import { getResearchPointsPerTurn, resourceProductionBreakdown } from '~~/shared/utils/economy'
+import type { ProductionResourceKind } from '~~/shared/utils/economy'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
 type MapViewMode = 'universe' | 'galaxy' | 'system' | 'planet'
@@ -221,6 +222,8 @@ interface GameResource {
   delta: string
   accent: string
   icon: string
+  /** Production grouped by planet then building, for the hover tooltip ("where does this come from?"). */
+  breakdown?: Array<{ planetName: string, total: number, sources: Array<{ label: string, amount: number }> }>
 }
 
 interface GamePlanet {
@@ -632,6 +635,13 @@ const resourceMeta: Record<string, { labelKey: string, icon: string, accent: str
   'res:antimatter': { labelKey: 'game.resources.antimatter', icon: 'orbit', accent: 'text-cyan-300' }
 }
 
+/** Base resources whose per-building production breakdown is shown in the TopBar tooltip. */
+const RESOURCE_KIND_BY_KEY: Record<string, ProductionResourceKind> = {
+  'res:energy': 'energy',
+  'res:material': 'minerals',
+  'res:rare': 'rare'
+}
+
 // Calculate pending resource costs from turnPlan commands (optimistic updates)
 const pendingResourceCosts = computed(() => {
   const costs = { energy: 0, minerals: 0, rare: 0 }
@@ -685,6 +695,7 @@ const resources = computed((): GameResource[] => {
     return surveyTech ? completed.includes(surveyTech) : true
   })
   const pending = pendingResourceCosts.value
+  const breakdownAll = playerId ? resourceProductionBreakdown(snapshot.value.planets, playerId) : null
 
   return list.map((resource) => {
     const meta = resourceMeta[resource.key] ?? { labelKey: resource.key, icon: 'circle', accent: 'text-neutral-300' }
@@ -697,13 +708,23 @@ const resources = computed((): GameResource[] => {
     else if (resource.key === 'res:material') amount -= pending.minerals
     else if (resource.key === 'res:rare') amount -= pending.rare
 
+    const kind = RESOURCE_KIND_BY_KEY[resource.key]
+    const breakdown = kind && breakdownAll
+      ? breakdownAll[kind].map(group => ({
+          planetName: group.planetName,
+          total: group.total,
+          sources: group.sources.map(source => ({ label: buildingDisplayName(source.buildingId), amount: source.amount }))
+        }))
+      : []
+
     return {
       key: resource.key,
       label: te(meta.labelKey) ? t(meta.labelKey) : meta.labelKey,
       amount,
       delta: deltaLabel,
       accent: meta.accent,
-      icon: meta.icon
+      icon: meta.icon,
+      breakdown
     }
   })
 })
@@ -729,6 +750,7 @@ const playerResources = computed(() => {
 })
 
 const buildingNameKey = (id: string) => `game.buildings.${id.replace('bld:', '')}.name`
+const buildingDisplayName = (id: string) => (te(buildingNameKey(id)) ? t(buildingNameKey(id)) : id)
 const buildingDescriptionKey = (id: string) => `game.buildings.${id.replace('bld:', '')}.description`
 const unitNameKey = (id: string) => `game.units.${id.replace('unit:', '')}.name`
 const unitRoleKey = (id: string) => `game.units.${id.replace('unit:', '')}.role`

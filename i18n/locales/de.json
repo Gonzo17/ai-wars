@@ -575,6 +575,8 @@
     },
     "top-bar": {
       "era": "A.E.",
+      "per-turn": "/Runde",
+      "no-production": "Noch keine Produktion",
       "fullscreen-enter": "Vollbild starten",
       "fullscreen-exit": "Vollbild verlassen"
     },
