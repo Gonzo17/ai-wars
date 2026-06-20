@@ -206,4 +206,11 @@ export class SupabaseGameRepository implements GameRepository {
       .update({ ready_turn: null, ready_at: null })
       .eq('game_id', gameId)
   }
+
+  async updateGameStatus(gameId: string, status: string): Promise<void> {
+    await this.client
+      .from('games')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', gameId)
+  }
 }

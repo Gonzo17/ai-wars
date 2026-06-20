@@ -6,6 +6,7 @@ import { createEventIdFactory } from './resolve/events'
 import { advanceFleets, resolveColonization, resolveCombat, resolveStarCapture } from './resolve/fleets'
 import { advanceQueues, updatePlanetsControlled } from './resolve/queues'
 import { advanceResearch } from './resolve/research'
+import { resolveVictory } from './resolve/victory'
 import {
   applyResourceProduction,
   applyStrategicProduction,
@@ -115,13 +116,22 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
     // megastructures), so this runs after capture/colonization AND queue completion.
     updatePlanetsControlled(nextSnapshot)
 
-    // Step 6: Update resource deltas for display (production for next turn)
+    // Step 6: Evaluate victory conditions on the final state. The new snapshot
+    // represents turn + 1, so that is the "current turn" for countdown bookkeeping.
+    const victoryResult = resolveVictory(nextSnapshot, turn + 1, nextEventId)
+
+    // Step 7: Update resource deltas for display (production for next turn)
     updateResourceDeltas(nextSnapshot)
 
     nextSnapshot = { ...nextSnapshot, turn: turn + 1 }
 
     await repo.insertGameState(gameId, turn + 1, nextSnapshot)
     await repo.updateGameTurn(gameId, turn + 1)
+
+    // A decided game stops accepting turns (submitTurn rejects `finished`).
+    if (victoryResult.winnerId) {
+      await repo.updateGameStatus(gameId, 'finished')
+    }
 
     return { resolved: true }
   } catch (error) {

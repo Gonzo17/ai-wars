@@ -161,6 +161,29 @@ export interface PlayerSnapshot {
   events: GameEvent[]
 }
 
+/** The three victory lines (see docs/VISION.md). Military is implemented first. */
+export type VictoryCondition = 'military' | 'expansion' | 'research'
+
+/** An in-progress victory countdown: a player meeting a trigger and holding it. */
+export interface VictoryProgress {
+  playerId: PlayerId
+  condition: VictoryCondition
+  /** Snapshot turn the trigger was first met (countdown start). */
+  startedTurn: number
+  /** Snapshot turn at which the hold completes and the player wins. */
+  winTurn: number
+}
+
+/**
+ * Victory bookkeeping carried on the snapshot (no DB migration needed; redacted
+ * like the rest). `pending` are active countdowns; `winnerId` ends the game.
+ */
+export interface VictoryState {
+  pending: VictoryProgress[]
+  winnerId?: PlayerId
+  winningCondition?: VictoryCondition
+}
+
 export interface GameSnapshot {
   turn: number
   players: PlayerSnapshot[]
@@ -168,4 +191,6 @@ export interface GameSnapshot {
   systems: SolarSystem[]
   planets: Planet[]
   fleets: Unit[]
+  /** Victory countdowns + final winner. Absent on legacy snapshots (treat as empty). */
+  victory?: VictoryState
 }

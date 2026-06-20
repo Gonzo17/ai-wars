@@ -68,4 +68,5 @@ export interface GameRepository {
   releaseResolveLock(gameId: string): Promise<void>
   listSubmittedPlans(gameId: string, turn: number): Promise<Array<{ user_id: string, plan_json: TurnPlan }>>
   updateGameTurn(gameId: string, nextTurn: number): Promise<void>
+  updateGameStatus(gameId: string, status: string): Promise<void>
 }

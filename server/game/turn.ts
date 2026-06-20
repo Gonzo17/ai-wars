@@ -41,6 +41,10 @@ export async function submitTurn(
 ): Promise<{ resolved: boolean }> {
   const game = await requireGame(repo, gameId)
 
+  if (game.status === 'finished') {
+    throw createError({ statusCode: 409, statusMessage: 'Game is finished' })
+  }
+
   if (game.turn !== turn) {
     throw createError({ statusCode: 409, statusMessage: 'Turn mismatch' })
   }

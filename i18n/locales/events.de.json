@@ -38,6 +38,14 @@
       "star-captured": {
         "title": "Stern übernommen",
         "description": "Dyson-Gerüst um {location} errichtet"
+      },
+      "victory-imminent": {
+        "title": "Sieg steht bevor",
+        "description": "Ein {condition}-Sieg ist in {turns} Runden vollendet, wenn er nicht gestoppt wird"
+      },
+      "victory": {
+        "title": "Spielende",
+        "description": "Ein {condition}-Sieg wurde errungen"
       }
     },
     "details": {
@@ -60,7 +68,10 @@
       "units": "{count} Einheit | {count} Einheiten",
       "victory": "Sieg",
       "defeat": "Niederlage",
-      "draw": "Unentschieden"
+      "draw": "Unentschieden",
+      "condition-military": "militärischen",
+      "condition-expansion": "Expansions-",
+      "condition-research": "Forschungs-"
     }
   }
 }

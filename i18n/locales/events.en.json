@@ -38,6 +38,14 @@
       "star-captured": {
         "title": "Star Claimed",
         "description": "Dyson scaffold built around {location}"
+      },
+      "victory-imminent": {
+        "title": "Victory Imminent",
+        "description": "A {condition} victory will complete in {turns} turns unless stopped"
+      },
+      "victory": {
+        "title": "Game Over",
+        "description": "A {condition} victory has been achieved"
       }
     },
     "details": {
@@ -60,7 +68,10 @@
       "units": "{count} unit | {count} units",
       "victory": "Victory",
       "defeat": "Defeat",
-      "draw": "Draw"
+      "draw": "Draw",
+      "condition-military": "military",
+      "condition-expansion": "expansion",
+      "condition-research": "research"
     }
   }
 }

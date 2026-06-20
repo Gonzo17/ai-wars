@@ -162,4 +162,9 @@ export class InMemoryGameRepository implements GameRepository {
       row.ready_at = null
     }
   }
+
+  async updateGameStatus(gameId: string, status: string): Promise<void> {
+    const game = this.data.games.find(row => row.id === gameId)
+    if (game) game.status = status
+  }
 }

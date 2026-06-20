@@ -6,6 +6,8 @@ export type GameEventType
     | 'combat'
     | 'colony-established'
     | 'star-captured'
+    | 'victory-imminent'
+    | 'victory'
     | 'discovery'
     | 'diplomatic'
 

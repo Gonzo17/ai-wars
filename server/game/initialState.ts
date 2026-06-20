@@ -362,6 +362,7 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
     galaxies,
     systems,
     planets,
-    fleets: []
+    fleets: [],
+    victory: { pending: [] }
   }
 }
