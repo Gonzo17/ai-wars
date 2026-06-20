@@ -41,9 +41,47 @@ milestone that unlocks new research, buildings and capabilities.
 
 ## Map
 
-Three zoom levels: **Universe → Galaxy → Solar system.** Travel happens on the
-star-lane graph between systems. Atmosphere comes from real space imagery in
-backgrounds and map objects.
+Three zoom levels: **Universe → Galaxy → Solar system.** These are *views* into
+**one single graph**, not three separate mechanics — see *Navigation & combat*
+below. Atmosphere comes from real space imagery in backgrounds and map objects.
+The top two levels should be laid out to reflect the **actual topology** (what is
+near vs. far, which nodes are adjacent), not arbitrary circles side by side.
+
+## Navigation & combat (refined June 2026)
+
+**The whole universe is one weighted graph.** Movement is *never* free — always
+**node-to-node along defined lanes**, on every level. Galaxies and systems are
+**sub-regions/clusters** of that single graph that you zoom in and out of; the
+three map levels are views, not separate movement systems. Today only the
+inter-system level is a real graph in code — this generalises it to all three.
+
+- **Nodes & gateways.** Leaf nodes are planets and stars. A system is a cluster of
+  leaf nodes plus **defined access points (entry/exit gateway nodes)** that link to
+  neighbouring systems; galaxies cluster systems the same way. You leave or enter a
+  region only through its gateways → **choke-points matter**.
+- **Distances & speed.** Every lane has a **fixed distance**; edges *within* a
+  system are short, *between* systems longer, *between* galaxies longest. Units have
+  a **speed**; travel time = distance / speed, **rounded up** (2.1 → 3 turns).
+  Movement is **upgradable** (non-linear improvements), not just "one lane / turn".
+- **Combat happens on the lane (edge-granular).** A unit travelling A→B that meets
+  an enemy fights **on the edge**, which **blocks that lane** until resolved. Units
+  in transit are drawn on the map (vision permitting). Combat **pins** units: while
+  fighting they cannot continue to their destination — only keep fighting or
+  **retreat back where they came from**.
+- **Round-based resolution with player agency.** Each unit has an **attack** and a
+  **defence** value, optionally **abilities**. A battle runs over **multiple
+  rounds**: both sides strike each round, deal and take damage; after each round the
+  player sees the result and **decides to keep fighting or flee**. Fleeing succeeds
+  with a **probability** that abilities modify (e.g. *Guerilla = 100 % escape*).
+  Several units can join one battle. Depth comes from **abilities, not mass**.
+- **Optional weapon systems** tied to **mined resources** (damage types / armour
+  penetration) are a later lever — details deliberately open.
+
+This **replaces the earlier "defence stays at system granularity"** idea (a
+stationed fleet defending a whole system): defence is now about holding gateways and
+intercepting on lanes, not area coverage. Megastructures are still only *damaged* by
+raids (stages knocked offline, repairable), never instantly destroyed — except by
+the planet-cracker / victory wonder, where destructibility is the counterplay.
 
 ## Known weak spots (design debt, as of June 2026)
 
@@ -53,10 +91,11 @@ These are the areas David explicitly flags as "not strategically interesting yet
   no terrain types, and there is little room for synergies. Placement should
   *matter*. Direction: per-slot terrain attributes, richer resource nodes,
   adjacency interactions worth planning around — depth without adding busywork.
-- **Unit movement & combat.** Pure planet-to-planet travel makes combat flat:
-  whoever has more units/upgrades wins. There must be *some* tactical element
-  (positioning, chokepoints, interception on lanes, stances) — but never per-unit
-  micromanagement. Fleets as stacks, few meaningful orders.
+- **Unit movement & combat.** *(Direction now settled — see Navigation & combat
+  below.)* Pure planet-to-planet travel made combat flat: whoever has more
+  units/upgrades wins. The fix is the unified node graph + round-based combat
+  (interception on lanes, flee decisions, abilities) — tactical depth without
+  per-unit micromanagement. Fleets as stacks, few meaningful orders.
 - **Tech tree.** The skeleton (Kardashev tiers + ascension gates) is right, the
   content is not mature. Ideas under consideration: civilization-type milestones
   unlocking whole capability classes, specialization points, repeatable research
@@ -130,11 +169,13 @@ universal disruptor of the two peaceful wins (crack the lynchpin) — but
 *conventional* fleets must also be able to damage a wonder, so military is never
 *mandatory* to stop a win.
 
-**Defense stays at system granularity.** A fleet stationed in a system defends
-everything in it; optional stationary orbital-defence buildings as an alternative.
-No separate guard micromanagement. Megastructures are *damaged* by raids (stages
-knocked offline, repairable), never instantly destroyed — except by the
-planet-cracker / the victory wonder, where destructibility is the counterplay.
+**Defense is gateway / lane based** (refined June 2026 — this supersedes the earlier
+"fleet defends the whole system" model; see *Navigation & combat*). You hold a
+region by controlling its access points and intercepting transiting fleets on lanes;
+optional stationary orbital-defence buildings sit at gateways as an alternative. No
+separate guard micromanagement. Megastructures are *damaged* by raids (stages knocked
+offline, repairable), never instantly destroyed — except by the planet-cracker / the
+victory wonder, where destructibility is the counterplay.
 
 **Kardashev tiers are game abstractions, not astronomy.** A "galaxy" is a cluster
 of ~5–8 systems. Each player starts in their own home galaxy (Civ-continents

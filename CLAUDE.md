@@ -119,8 +119,8 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 3. **`progressMemory`** stores per-build production progress so a cancelled or replaced build doesn't lose what was already invested. Lives on `Planet.progressMemory` (per-planet, per-buildId) and on `PlayerSnapshot.research.progressMemory` (per-tech).
    - **Production & research output goes through `slotOutput()` in [shared/utils/synergies.ts](shared/utils/synergies.ts)** (since June 2026), not raw `def.resourceProduction`. Three synergies make placement matter: ore-extraction (mineral building on ore node ×2 minerals), power-grid (energy building +25% per adjacent surface energy building), compute-uplink (data center +25% research per planet energy building, capped +100%). `economy.ts` sums `slotOutput` across slots; `activeSynergies()` drives the UI preview badges.
 4. **`productionCarryover`** rolls excess production from a completed build into the next turn's production pool on that planet.
-5. **Fleet movement runs on the star-lane graph** (since June 2026): `advanceFleets()` in resolveTurn moves en-route fleets one lane per turn along the BFS shortest path (`shared/utils/starlanes.ts`); validation rejects unreachable targets. Fleets get a unique instance `id` on completion — the definition lookup key is `Unit.defId`. `Galaxy.connections` is still unused.
-6. **Combat & colonization run after movement** (since June 2026): `resolveCombat()` clashes fleets where 2+ owners share a *system* (defense is system-granular, vision); pure math in `shared/utils/combat.ts` (offense = strength × type weight, weakest ships die first, ties = mutual destruction). `resolveColonization()` then lets an idle `unitType: 'colonizer'` fleet (`unit:colony-ship`) capture an unclaimed or undefended-enemy planet in its system, consuming the ship. `empireState.planetsControlled` is recomputed each resolve.
+5. **Fleet movement runs on the star-lane graph** (since June 2026): `advanceFleets()` in resolveTurn moves en-route fleets one lane per turn along the BFS shortest path (`shared/utils/starlanes.ts`); validation rejects unreachable targets. Fleets get a unique instance `id` on completion — the definition lookup key is `Unit.defId`. `Galaxy.connections` is still unused. **Planned rework** (see VISION *Navigation & combat*): unify all three zoom levels into one weighted graph (intra-system + inter-galaxy edges, gateway nodes, per-edge `distance`, per-unit `speed`); this is the largest navigation change ahead.
+6. **Combat & colonization run after movement** (since June 2026): `resolveCombat()` clashes fleets where 2+ owners share a *system*; pure one-shot math in `shared/utils/combat.ts` (offense = strength × type weight, weakest ships die first, ties = mutual destruction). **This is current impl only — the vision has moved on**: VISION *Navigation & combat* replaces it with edge-granular, round-based combat (attack/defence, abilities, per-round flee decisions, pinning) on lanes, and drops the "defence is system-granular" model for a gateway/interception one. `resolveColonization()` then lets an idle `unitType: 'colonizer'` fleet (`unit:colony-ship`) capture an unclaimed or undefended-enemy planet in its system, consuming the ship. `empireState.planetsControlled` is recomputed each resolve.
 7. **Fog of war is applied on read** (since June 2026): the DB stores the full snapshot, but `state.get` runs `redactSnapshotFor(snapshot, viewerId)` ([server/game/redactSnapshot.ts](server/game/redactSnapshot.ts)) before returning — enemy planet contents, enemy private state (resources/research/events) and out-of-sight enemy fleets are stripped. Server game logic (resolveTurn) always works on the full snapshot; only the API response is redacted. `turn_plans` SELECT is restricted to own rows via RLS so opponents can't read submitted plans pre-resolution.
 8. **Game phase `resolving` is a transient lock.** Clients cannot submit or unsubmit while phase is `resolving`. Resolution is fast and atomic — phase flips back to `planning` after the snapshot is written.
 9. **The `~~/` alias resolves at build time only**. Don't expect it inside string-based dynamic imports.
@@ -166,6 +166,39 @@ Beyond the original five, the **stellar progression spine** is now in (confirm s
 
 **Step 3 (tech-tree depth) is in progress.** First slice done (commits 35f924e, 3818fc3): **strategic resources** (exotic matter, antimatter) — discover via survey tech, mine on deposits, spend on Dyson/dreadnought (gotcha 13). Confirmed direction for the rest (all four principles): stars as a research gate, branching specializations with opportunity cost, techs that boost placement/synergies (not just unlock buildings), a stretched ladder, plus research-gated planet access and more resource variety. **Still to do:** restructure the `AscensionTier` ladder (short 0.6→2.0 on-ramp + stretched stellar era) and rebuild `TECH_DEFS` content into coherent branches — this is design-heavy and benefits from a review checkpoint with David before a full rewrite.
 
-**Later candidates** (confirm before starting): **planet terrain types** for deeper placement (Step 4), the three victory conditions + planet-cracker (see VISION.md), the K3.0 expansion gate (`galaxyStarFraction`), and a Star Fortress siege mechanic (currently an absolute block). Balance pass on all costs/outputs once the loop is playable.
+### Agreed phased roadmap (June 2026, David-approved)
+
+After a full-state assessment: the foundation is clean and well-tested, but the
+**game core is thin** at exactly the VISION weak spots, and **there is no victory
+condition implemented at all** (the three wins / countdown / planet-cracker exist
+nowhere — you can ascend tiers but cannot win). Priority order: *close & vision-align
+the loop, then deepen.* (No effort estimates — David doesn't want them.)
+
+- **Phase 0 — Quick wins.** Fix galaxy/universe map contrast (NOT a logic regress —
+  GameCanvas + node-feeding code unchanged recently; the imagery swap `8cfee53` is the
+  last map-area change; verify live with `pnpm dev`). Split `resolveTurn.ts` (754 lines)
+  into modules before Phases 1/3.
+- **Phase 1 — Victory scaffold (highest leverage).** Generic `condition → visible
+  countdown → hold` in resolve + winner declaration + game phase `finished`. Military
+  path first (all enemy homeworlds + moderate threshold, hold K turns); countdown UI.
+  Expansion (`galaxyStarFraction`) & Research (Temporal Ascension capstone) as configs
+  of the same scheme.
+- **Phase 2 — Rebuild the tech tree** (current `TECH_DEFS` is a placeholder, may be
+  discarded). Short on-ramp 0.6→2.0 + stretched 2.x band; remove `planetsControlled`
+  gates; add `galaxyStarFraction` to `EmpireRequirement`. Real specialization with
+  opportunity cost; **some planets only colonizable with the matching specialization**;
+  techs unlock buildings/units **and give buffs** to them. Design checkpoint with David
+  before the rewrite.
+- **Phase 3 — Navigation & combat rework** (biggest open design — see VISION
+  *Navigation & combat*): one unified node graph across all three levels (gateways,
+  distances, speed, upgradable movement), edge-granular round-based combat (flee
+  decisions, abilities, pinning). Plus the **planet-cracker** (siege tool + brutal win +
+  disruptor of peaceful wins). **Planet terrain types** fold in here (tied to Phase-2
+  specialization).
+- **Phase 4 — Balance & polish**, once the loop is end-to-end playable (~80–120 turns).
+  Megastructure values are placeholders; also a Star Fortress siege mechanic (currently
+  an absolute block).
+
+Critical path: Phase 0 split → Phase 1 Military win → Phase 2 checkpoint → Phase 3.
 
 **Explicitly out of scope right now:** hex map (the star-lane graph is the genre-idiomatic answer), asymmetric factions, diplomacy, trade, animations/polish, and any move off the Nuxt browser stack. Do not propose features outside the vision without checking first.
