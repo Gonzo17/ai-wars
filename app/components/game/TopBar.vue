@@ -92,6 +92,7 @@ onBeforeUnmount(() => {
         <UButton
           variant="ghost"
           color="neutral"
+          data-testid="research-button"
           class="relative flex items-center gap-3 h-9.5 px-4 rounded-md bg-neutral-900/60 border border-neutral-800 hover:border-info-500 transition-colors cursor-pointer shrink-0 min-w-100"
           @click="emit('open-research')"
         >
@@ -123,6 +124,7 @@ onBeforeUnmount(() => {
         </UButton>
         <GameTopBarIconButton
           icon="i-lucide-earth"
+          data-testid="planet-overview-button"
           :label="$t('game.planet.overview.aria')"
           :badge-count="props.planetActionCount"
           badge-color="warning"
@@ -153,6 +155,7 @@ onBeforeUnmount(() => {
         </UAvatarGroup>
         <GameTopBarIconButton
           icon="i-lucide-bell"
+          data-testid="event-log-button"
           :label="$t('game.event-log.title')"
           :badge-count="props.unreadEventCount"
           badge-color="primary"

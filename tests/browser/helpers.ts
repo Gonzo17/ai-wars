@@ -9,6 +9,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import type { GameSnapshot, PlanetSlotData, Unit, UnitId } from '../../shared/types/game'
 
 export const TEST_USERS = {
   alice: { email: 'alice@test.local', username: 'alice' },
@@ -62,8 +63,25 @@ function supabaseAdmin() {
     async delete(path: string): Promise<void> {
       const response = await fetch(`${url}/rest/v1/${path}`, { method: 'DELETE', headers })
       if (!response.ok) throw new Error(`[playtest] DELETE ${path} failed: ${response.status}`)
+    },
+    async patch(path: string, body: unknown): Promise<void> {
+      const response = await fetch(`${url}/rest/v1/${path}`, {
+        method: 'PATCH',
+        headers: { ...headers, Prefer: 'return=minimal' },
+        body: JSON.stringify(body)
+      })
+      if (!response.ok) throw new Error(`[playtest] PATCH ${path} failed: ${response.status} ${await response.text()}`)
     }
   }
+}
+
+/** Resolve a seeded test user's auth id (matches the `userId` on snapshot players). */
+export async function getUserId(username: string): Promise<string> {
+  const admin = supabaseAdmin()
+  const profiles = await admin.select<{ id: string }>(`profiles?username=eq.${username}&select=id`)
+  const id = profiles[0]?.id
+  if (!id) throw new Error(`[playtest] User '${username}' not found — run \`pnpm seed:test-users\``)
+  return id
 }
 
 /**
@@ -164,4 +182,126 @@ export async function playFullTurn(page: Page, buildingId = 'bld:mining-facility
   await expect(endTurn).toHaveAttribute('data-state', 'ready')
   await endTurn.click()
   await expect(endTurn).toHaveAttribute('data-state', 'waiting')
+}
+
+/**
+ * Lean lobby flow: alice creates, bob joins, alice starts. Returns the gameId
+ * (from the /game?gameId=… URL). Both pages end up on the game route.
+ */
+export async function startGame(alice: Page, bob: Page): Promise<string> {
+  const lobbyName = `tour-${Date.now()}`
+  await fillTestInput(alice, 'lobby-name-input', lobbyName)
+  await alice.getByTestId('create-lobby-button').click()
+  await expect(alice.getByTestId('start-game-button')).toBeVisible()
+
+  const lobbyRow = bob.locator(`[data-testid="lobby-row"][data-lobby-name="${lobbyName}"]`)
+  try {
+    await expect(lobbyRow).toBeVisible({ timeout: 10_000 })
+  } catch {
+    await bob.reload()
+    await expect(lobbyRow).toBeVisible({ timeout: 15_000 })
+  }
+  await lobbyRow.getByTestId('join-lobby-button').click()
+  await expect(bob.getByTestId('leave-lobby-button')).toBeVisible()
+  await expect(alice.getByText(TEST_USERS.bob.username, { exact: true })).toBeVisible({ timeout: 15_000 })
+  await alice.getByTestId('start-game-button').click()
+
+  await alice.waitForURL('**/game**', { timeout: 60_000 })
+  await bob.waitForURL('**/game**', { timeout: 60_000 })
+
+  const gameId = new URL(alice.url()).searchParams.get('gameId')
+  if (!gameId) throw new Error(`[playtest] Could not read gameId from URL: ${alice.url()}`)
+  return gameId
+}
+
+/** Fetch the latest game_state snapshot, mutate it in place, write it back, and
+ *  forward whatever the mutator returns (e.g. the seeded entity ids). */
+export async function patchGameState<T>(gameId: string, mutate: (snapshot: GameSnapshot) => T): Promise<T> {
+  const admin = supabaseAdmin()
+  const rows = await admin.select<{ turn: number, state_json: GameSnapshot }>(
+    `game_state?game_id=eq.${gameId}&order=turn.desc&limit=1&select=turn,state_json`
+  )
+  const row = rows[0]
+  if (!row) throw new Error(`[playtest] No game_state found for game ${gameId}`)
+  const result = mutate(row.state_json)
+  await admin.patch(`game_state?game_id=eq.${gameId}&turn=eq.${row.turn}`, { state_json: row.state_json })
+  return result
+}
+
+export interface SeedIds {
+  homeSystemId: string
+  homeworldId: string
+  barrenId: string | null
+  starId: string | null
+}
+
+const completedSlot = (index: number, buildingId: string, node: PlanetSlotData['resourceNode'] = null): PlanetSlotData => ({
+  index, zone: 'orbital', buildingId: buildingId as PlanetSlotData['buildingId'], buildingLevel: 1, isConstructing: false, constructionTimeLeft: 0, resourceNode: node
+})
+
+/**
+ * Inject a rich state for `userId` so every dialog is reachable in one tour:
+ * a captured home star with a Dyson stage + Stellar Shipyard, an owned barren
+ * world (exotic deposit), an idle fleet in the home system, full resources
+ * (incl. strategic), and the survey/shipyard techs researched.
+ */
+export function seedRichState(snapshot: GameSnapshot, userId: string): SeedIds {
+  const player = snapshot.players.find(p => p.userId === userId)
+  if (!player) throw new Error(`[playtest] Player for user ${userId} not in snapshot`)
+  const playerId = player.id
+
+  const homeworld = snapshot.planets.find(p => p.owner === playerId && p.kind !== 'star')
+  if (!homeworld) throw new Error('[playtest] Homeworld not found in snapshot')
+  const homeSystemId = homeworld.systemId
+
+  // Resources: plenty of base + some strategic so builds are affordable and shown.
+  const setRes = (key: string, current: number) => {
+    const res = player.resources.find(r => r.key === key)
+    if (res) res.current = current
+  }
+  setRes('res:energy', 6000)
+  setRes('res:material', 6000)
+  setRes('res:rare', 2000)
+  setRes('res:exotic-matter', 120)
+  setRes('res:antimatter', 120)
+
+  // Unlock the build options the tour touches.
+  for (const tech of ['tech:exotic-matter-survey', 'tech:antimatter-containment', 'tech:first-shipyard', 'tech:colony-ship-design']) {
+    if (!player.research.completedTechIds.includes(tech)) player.research.completedTechIds.push(tech)
+  }
+
+  // Capture the home star with a Dyson stage + Stellar Shipyard.
+  const star = snapshot.planets.find(p => p.kind === 'star' && p.systemId === homeSystemId)
+  if (star) {
+    star.owner = playerId
+    star.slots[0] = completedSlot(0, 'bld:dyson-sphere')
+    star.slots[1] = completedSlot(1, 'bld:orbital-shipyard-mega')
+  }
+
+  // Own a barren world (carries an exotic-matter deposit) for the extractor menu.
+  const barren = snapshot.planets.find(p => p.type === 'barren' && p.owner === 'unclaimed')
+  if (barren) {
+    barren.owner = playerId
+    if (!player.planets.includes(barren.id)) player.planets.push(barren.id)
+  }
+
+  // An idle fleet in the home system → fleet panel + move select.
+  const fleet: Unit = {
+    id: 'unit:frigate#tour' as UnitId,
+    defId: 'unit:frigate' as UnitId,
+    type: 'battleship',
+    name: 'Frigate',
+    status: 'idle',
+    location: homeSystemId,
+    strength: 4,
+    ownerId: playerId
+  }
+  snapshot.fleets.push(fleet)
+
+  return { homeSystemId, homeworldId: homeworld.id, barrenId: barren?.id ?? null, starId: star?.id ?? null }
+}
+
+/** Save a screenshot artifact under test-results/ui-tour for manual/AI review. */
+export async function shot(page: Page, name: string): Promise<void> {
+  await page.screenshot({ path: `test-results/ui-tour/${name}.png` })
 }

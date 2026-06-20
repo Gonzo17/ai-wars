@@ -201,6 +201,7 @@ const handleZoomEnd = () => {
       size="md"
       :icon="'i-lucide-sparkles'"
       :label="$t('game.navigation.back-to-system')"
+      data-testid="map-back"
       class="relative z-10"
       @click="emit('update:view-mode', 'system')"
     />
@@ -211,6 +212,7 @@ const handleZoomEnd = () => {
       size="md"
       :icon="'i-lucide-sparkles'"
       :label="$t('game.navigation.back-to-galaxy')"
+      data-testid="map-back"
       class="relative z-10"
       @click="emit('update:view-mode', 'galaxy')"
     />
@@ -221,6 +223,7 @@ const handleZoomEnd = () => {
       size="md"
       :icon="'i-lucide-sparkles'"
       :label="$t('game.navigation.back-to-universe')"
+      data-testid="map-back"
       class="relative z-10"
       @click="emit('update:view-mode', 'universe')"
     />

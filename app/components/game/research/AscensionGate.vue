@@ -28,6 +28,7 @@ const totalTechCount = computed(() =>
 <template>
   <div
     v-if="gateStatus"
+    :data-testid="`ascension-gate-${toTier}`"
     class="relative my-6"
   >
     <!-- Connector Line -->

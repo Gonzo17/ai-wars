@@ -77,7 +77,10 @@ const needsAction = (planet: PlanetOverviewItem) => planet.buildQueue.length < p
       @click="emit('close')"
     />
 
-    <div class="relative w-full max-w-5xl h-[calc(100vh-16rem)] flex flex-col rounded-lg border border-warning-500/30 bg-neutral-900/95 shadow-lg shadow-warning-500/10 overflow-hidden">
+    <div
+      data-testid="planet-overview-panel"
+      class="relative w-full max-w-5xl h-[calc(100vh-16rem)] flex flex-col rounded-lg border border-warning-500/30 bg-neutral-900/95 shadow-lg shadow-warning-500/10 overflow-hidden"
+    >
       <div class="flex items-center justify-between px-5 py-4 border-b border-neutral-700/50">
         <div class="flex items-center gap-3">
           <UIcon
@@ -98,6 +101,7 @@ const needsAction = (planet: PlanetOverviewItem) => planet.buildQueue.length < p
           color="neutral"
           variant="ghost"
           size="sm"
+          data-testid="planet-overview-close"
           @click="emit('close')"
         />
       </div>
