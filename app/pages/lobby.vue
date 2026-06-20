@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { PLAYER_COLORS, UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
+import { PLAYER_COLORS, UNCLAIMED_COLOR, nextFreeColor } from '~~/shared/defs/playerColors'
 
 const { t } = useI18n()
 const supabase = useSupabaseClient()
@@ -246,7 +246,7 @@ const createLobby = async () => {
   } else if (data) {
     const { error: joinError } = await supabase
       .from('lobby_players')
-      .upsert({ lobby_id: data.id, user_id: userId, is_host: true })
+      .upsert({ lobby_id: data.id, user_id: userId, is_host: true, color: nextFreeColor([]) })
 
     if (joinError) {
       displayError(joinError)
@@ -270,9 +270,16 @@ const joinLobby = async (lobbyId: string) => {
   joining.value = lobbyId
   await leaveCurrentLobby()
 
+  // Auto-assign the next free colour so there's never a "no colour" state.
+  const { data: existingPlayers } = await supabase
+    .from('lobby_players')
+    .select('color')
+    .eq('lobby_id', lobbyId)
+  const color = nextFreeColor((existingPlayers ?? []).map(p => p.color))
+
   const { error } = await supabase
     .from('lobby_players')
-    .upsert({ lobby_id: lobbyId, user_id: userId, is_host: false })
+    .upsert({ lobby_id: lobbyId, user_id: userId, is_host: false, color })
 
   if (error) displayError(error)
   else {

@@ -17,6 +17,16 @@ export const PLAYER_COLORS = [
 export const UNCLAIMED_COLOR = '#9ca3af' // neutral grey
 
 /**
+ * First palette colour not already taken — used to auto-assign a colour the
+ * moment a player joins a lobby, so the "no colour chosen" state never exists.
+ * Falls back to the first colour if the palette is exhausted.
+ */
+export function nextFreeColor(taken: Array<string | null | undefined>): string {
+  const used = new Set(taken.filter((c): c is string => Boolean(c)))
+  return (PLAYER_COLORS as readonly string[]).find(c => !used.has(c)) ?? PLAYER_COLORS[0]
+}
+
+/**
  * Fill in a colour for every player: keep any colour they picked, and assign
  * remaining players the next free palette colour (avoiding collisions). Falls
  * back to cycling the palette if there are more players than colours.
