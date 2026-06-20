@@ -120,6 +120,25 @@ export const UNIT_DEFS: UnitDefinition[] = [
 export const getBuildingDef = (id: BuildingId) => BUILDING_DEFS.find(def => def.id === id)
 export const getUnitDef = (id: UnitId) => UNIT_DEFS.find(def => def.id === id)
 
+/** Per-existing-worker cost growth for the `unit:worker` robot (escalating; tunable placeholder). */
+export const WORKER_COST_GROWTH = 0.5
+
+/**
+ * Resource cost to build a unit on a planet. The `unit:worker` robot gets more
+ * expensive the more workers a planet already has, so production can't be ramped
+ * up for free; every other unit keeps its flat def cost. Strategic costs are
+ * unaffected.
+ */
+export function getUnitBuildCost(def: UnitDefinition, planetWorkers: number): { energy: number, minerals: number, rare: number } {
+  if (def.id !== 'unit:worker') return def.resourceCosts
+  const mult = 1 + WORKER_COST_GROWTH * Math.max(0, planetWorkers - 1)
+  return {
+    energy: Math.round(def.resourceCosts.energy * mult),
+    minerals: Math.round(def.resourceCosts.minerals * mult),
+    rare: Math.round(def.resourceCosts.rare * mult)
+  }
+}
+
 /** Everything a tech unlocks (buildings/units that list it as a research requirement). */
 export function getUnlocksForTech(techId: ResearchId): { buildings: BuildingDefinition[], units: UnitDefinition[] } {
   return {

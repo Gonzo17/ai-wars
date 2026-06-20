@@ -14,7 +14,7 @@ import {
   deductStrategicCosts,
   updateResourceDeltas
 } from './resolve/resources'
-import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
+import { getBuildingDef, getUnitBuildCost, getUnitDef } from '~~/shared/defs/production'
 import type { GameSnapshot, Planet, PlayerSnapshot } from '~~/shared/types/game'
 import type { TurnPlan } from '~~/shared/types/turn'
 import { calculateResourceProduction, calculateStrategicProduction } from '~~/shared/utils/economy'
@@ -82,7 +82,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
           const inShipyard = planet.queues.shipyard.some(u => u.id === command.unitId)
           const memory = planet.progressMemory?.[command.unitId]
           if (!inShipyard && !memory?.resourcePaid) {
-            deductResourceCosts(player, def.resourceCosts)
+            deductResourceCosts(player, getUnitBuildCost(def, planet.workers))
             deductStrategicCosts(player, def.strategicCosts)
           }
         }

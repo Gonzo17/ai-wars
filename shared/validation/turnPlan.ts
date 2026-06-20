@@ -1,6 +1,6 @@
 import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/game'
 import type { TurnPlan, ValidationError } from '../types/turn'
-import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
+import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitBuildCost, getUnitDef } from '../defs/production'
 import type { StrategicCosts } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
@@ -234,10 +234,11 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       }
       // Resource cost (only new builds)
       if (!isResumingUnitBuild(planet, command.unitId)) {
-        if (!canAfford(availableResources, unit.resourceCosts) || !canAffordStrategic(availableStrategic, unit.strategicCosts)) {
+        const unitCost = getUnitBuildCost(unit, planet.workers)
+        if (!canAfford(availableResources, unitCost) || !canAffordStrategic(availableStrategic, unit.strategicCosts)) {
           errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path })
         } else {
-          availableResources = subtractCosts(availableResources, unit.resourceCosts)
+          availableResources = subtractCosts(availableResources, unitCost)
           subtractStrategic(availableStrategic, unit.strategicCosts)
         }
       }

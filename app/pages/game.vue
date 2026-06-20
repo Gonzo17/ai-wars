@@ -200,7 +200,7 @@
 </template>
 
 <script setup lang="ts">
-import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitDef } from '~~/shared/defs/production'
+import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitBuildCost, getUnitDef } from '~~/shared/defs/production'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -816,22 +816,27 @@ const allBuildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.ma
 const buildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site !== 'star'))
 const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site === 'star'))
 
-const unitCatalog = computed((): UnitDefinition[] => UNIT_DEFS.map((def) => {
-  const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
-  return {
-    id: def.id,
-    name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
-    role: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
-    category: def.category,
-    resourceCosts: def.resourceCosts,
-    productionCost: def.productionCost,
-    icon: def.icon ?? 'i-lucide-rocket',
-    requiresFacility: (def.requirements.buildings?.length ?? 0) > 0,
-    strategicCosts: def.strategicCosts,
-    locked: missingResearch.length > 0,
-    lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
-  }
-}))
+const unitCatalog = computed((): UnitDefinition[] => {
+  // Worker cost escalates with the open planet's worker count; default to a fresh
+  // planet (1) when none is open. Other units are unaffected.
+  const planetWorkers = selectedPlanetWithQueue.value?.workers ?? 1
+  return UNIT_DEFS.map((def) => {
+    const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
+    return {
+      id: def.id,
+      name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
+      role: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
+      category: def.category,
+      resourceCosts: getUnitBuildCost(def, planetWorkers),
+      productionCost: def.productionCost,
+      icon: def.icon ?? 'i-lucide-rocket',
+      requiresFacility: (def.requirements.buildings?.length ?? 0) > 0,
+      strategicCosts: def.strategicCosts,
+      locked: missingResearch.length > 0,
+      lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
+    }
+  })
+})
 
 const getStationedUnits = (planet: Planet): Array<{ unitDefId: string, count: number }> => {
   const result: Array<{ unitDefId: string, count: number }> = []
