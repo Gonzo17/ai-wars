@@ -160,10 +160,30 @@ export async function enterGame(page: Page): Promise<void> {
 export async function playFullTurn(page: Page, buildingId = 'bld:mining-facility'): Promise<void> {
   const endTurn = page.getByTestId('end-turn-button')
 
-  // Queue a build on every planet flagged as needing action
-  while (await endTurn.getAttribute('data-state') === 'needs-production') {
+  // Queue a build on every planet flagged as needing action. The end-turn state
+  // ('needs-production') and the per-planet 'needs-action' flag derive from the
+  // same data but settle on separate reactive ticks: right after a build the
+  // state can still read 'needs-production' for a moment while no planet is
+  // actually needy anymore. So we re-open the overview each pass, wait briefly
+  // for a still-needy planet, and stop cleanly when none appears (rather than
+  // blindly clicking .first() and hanging until the test timeout). The guard caps
+  // the loop so a genuine inconsistency fails fast instead of spinning.
+  for (let guard = 0; guard < 20; guard++) {
+    if ((await endTurn.getAttribute('data-state')) !== 'needs-production') break
+
     await endTurn.click() // opens the planet overview
-    await page.locator('[data-testid^="overview-planet-"][data-needs-action="true"]').first().click()
+    await expect(page.getByTestId('planet-overview-panel')).toBeVisible()
+
+    const needy = page.locator('[data-testid^="overview-planet-"][data-needs-action="true"]').first()
+    try {
+      await needy.waitFor({ state: 'visible', timeout: 5_000 })
+    } catch {
+      // State just hasn't caught up — nothing left to build this pass.
+      await page.getByTestId('planet-overview-close').click()
+      break
+    }
+
+    await needy.click()
     await page.locator('[data-testid^="surface-slot-"][data-state="empty"]').first().click()
     await page.getByTestId(`build-option-${buildingId}`).click()
     await page.getByTestId('slot-view-close').click()
