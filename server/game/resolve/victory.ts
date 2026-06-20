@@ -1,6 +1,26 @@
 import type { GameSnapshot, PlayerId, VictoryCondition, VictoryProgress, VictoryState } from '~~/shared/types/game'
-import { MILITARY_HOLD_TURNS, playerMeetsMilitary } from '~~/shared/utils/victory'
+import {
+  EXPANSION_HOLD_TURNS,
+  MILITARY_HOLD_TURNS,
+  RESEARCH_HOLD_TURNS,
+  playerMeetsExpansion,
+  playerMeetsMilitary,
+  playerMeetsResearch
+} from '~~/shared/utils/victory'
 import { addEvent } from './events'
+
+/** All victory paths share the `met → countdown → hold` machinery below. */
+type ConditionRule = {
+  condition: VictoryCondition
+  holdTurns: number
+  meets: (snapshot: GameSnapshot, playerId: PlayerId) => boolean
+}
+
+const CONDITION_RULES: ConditionRule[] = [
+  { condition: 'military', holdTurns: MILITARY_HOLD_TURNS, meets: playerMeetsMilitary },
+  { condition: 'expansion', holdTurns: EXPANSION_HOLD_TURNS, meets: playerMeetsExpansion },
+  { condition: 'research', holdTurns: RESEARCH_HOLD_TURNS, meets: playerMeetsResearch }
+]
 
 /** i18n value key for a condition name (mirrors the combat `outcome` param pattern). */
 const conditionValueKey = (condition: VictoryCondition) => `events.values.condition-${condition}`
@@ -41,7 +61,7 @@ function announce(
  * returns the winner id (if any) so the orchestrator can finish the game.
  *
  * `newTurn` is the turn of the snapshot being written (i.e. resolving turn + 1).
- * Only the Military path is implemented; Expansion/Research slot in here later.
+ * All three paths run through the shared `CONDITION_RULES` machinery.
  */
 export function resolveVictory(snapshot: GameSnapshot, newTurn: number, nextEventId: () => string): { winnerId?: PlayerId } {
   const victory: VictoryState = snapshot.victory ?? { pending: [] }
@@ -56,28 +76,30 @@ export function resolveVictory(snapshot: GameSnapshot, newTurn: number, nextEven
   let winner: { playerId: PlayerId, condition: VictoryCondition } | undefined
 
   for (const player of snapshot.players) {
-    if (!playerMeetsMilitary(snapshot, player.id)) continue
+    for (const rule of CONDITION_RULES) {
+      if (!rule.meets(snapshot, player.id)) continue
 
-    const existing = victory.pending.find(p => p.playerId === player.id && p.condition === 'military')
-    const entry: VictoryProgress = existing ?? {
-      playerId: player.id,
-      condition: 'military',
-      startedTurn: newTurn,
-      winTurn: newTurn + MILITARY_HOLD_TURNS
-    }
-    nextPending.push(entry)
+      const existing = victory.pending.find(p => p.playerId === player.id && p.condition === rule.condition)
+      const entry: VictoryProgress = existing ?? {
+        playerId: player.id,
+        condition: rule.condition,
+        startedTurn: newTurn,
+        winTurn: newTurn + rule.holdTurns
+      }
+      nextPending.push(entry)
 
-    if (!existing) {
-      announce(snapshot, nextEventId, player.id, newTurn, {
-        type: 'victory-imminent',
-        titleKey: 'events.types.victory-imminent.title',
-        descriptionKey: 'events.types.victory-imminent.description',
-        descriptionParams: { condition: conditionValueKey('military'), turns: MILITARY_HOLD_TURNS }
-      })
-    }
+      if (!existing) {
+        announce(snapshot, nextEventId, player.id, newTurn, {
+          type: 'victory-imminent',
+          titleKey: 'events.types.victory-imminent.title',
+          descriptionKey: 'events.types.victory-imminent.description',
+          descriptionParams: { condition: conditionValueKey(rule.condition), turns: rule.holdTurns }
+        })
+      }
 
-    if (newTurn >= entry.winTurn && !winner) {
-      winner = { playerId: player.id, condition: 'military' }
+      if (newTurn >= entry.winTurn && !winner) {
+        winner = { playerId: player.id, condition: rule.condition }
+      }
     }
   }
 
