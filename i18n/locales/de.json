@@ -124,6 +124,19 @@
       "back-to-system": "Zurück zum System",
       "home": "Heim"
     },
+    "victory": {
+      "condition": {
+        "military": "militärische Eroberung",
+        "expansion": "Expansion",
+        "research": "Forschung"
+      },
+      "countdown-you": "Dein Sieg durch {condition} in {turns} Runden",
+      "countdown-rival": "{name} steht kurz vor dem Sieg durch {condition} — {turns} Runden zum Stoppen",
+      "over-win": "Sieg",
+      "over-lose": "Niederlage",
+      "over-subtitle": "{name} hat durch {condition} gewonnen",
+      "back-home": "Zurück zur Lobby"
+    },
     "research": {
       "none-short": "Keine Forschung",
       "compute-label": "Compute:",

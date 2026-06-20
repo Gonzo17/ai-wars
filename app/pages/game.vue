@@ -21,6 +21,12 @@
         @open-planet-overview="planetOverviewOpen = true"
       />
 
+      <!-- Victory countdown (telegraphed to everyone once a player qualifies) -->
+      <GameVictoryBanner
+        v-if="victoryCountdown"
+        :countdown="victoryCountdown"
+      />
+
       <!-- Full-screen Map Container -->
       <div class="relative flex-1 overflow-hidden">
         <GameCanvas
@@ -182,6 +188,13 @@
           @open-research="researchStore.toggle"
         />
       </div>
+
+      <!-- Game over -->
+      <GameVictoryOverlay
+        v-if="victoryResult"
+        :result="victoryResult"
+        @home="navigateTo('/lobby')"
+      />
     </div>
   </div>
 </template>
@@ -1156,6 +1169,32 @@ const colorById = computed<Record<string, string>>(() => {
     for (const id of ownedMapIds.value) result[id] ??= mine
   }
   return result
+})
+
+// ── Victory: countdown banner + game-over overlay ──────────────────────
+const victoryResult = computed(() => {
+  const v = snapshot.value?.victory
+  if (!v?.winnerId) return null
+  return {
+    isMine: v.winnerId === myPlayerId.value,
+    winnerName: playerNameById.value.get(v.winnerId) ?? v.winnerId,
+    condition: v.winningCondition ?? 'military',
+    color: playerColorByOwner.value.get(v.winnerId) ?? UNCLAIMED_COLOR
+  }
+})
+
+const victoryCountdown = computed(() => {
+  const v = snapshot.value?.victory
+  if (!v || v.winnerId || !v.pending.length) return null
+  // Surface the most advanced countdown (soonest win).
+  const entry = [...v.pending].sort((a, b) => a.winTurn - b.winTurn)[0]!
+  return {
+    isMine: entry.playerId === myPlayerId.value,
+    playerName: playerNameById.value.get(entry.playerId) ?? entry.playerId,
+    condition: entry.condition,
+    turns: Math.max(0, entry.winTurn - gameTurn.value),
+    color: playerColorByOwner.value.get(entry.playerId) ?? UNCLAIMED_COLOR
+  }
 })
 
 /** The star of the currently viewed system (rendered as the central sun, carries an ownership ring). */
