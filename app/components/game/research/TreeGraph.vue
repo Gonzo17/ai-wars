@@ -593,6 +593,7 @@ onMounted(() => {
           <div
             v-for="gatePos in gatePositions"
             :key="`gate-${gatePos.gate.toTier}`"
+            :data-testid="`ascension-gate-${gatePos.gate.toTier}`"
             class="absolute z-20 cursor-pointer transition-all duration-500 ease-in-out"
             :style="{
               left: `${gatePos.x - viewBoxDimensions.minX}px`,

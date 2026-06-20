@@ -242,415 +242,287 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
 </script>
 
 <template>
-  <div class="absolute inset-0 z-30 flex items-center justify-center overflow-hidden">
-    <!-- Backdrop -->
-    <div
-      class="absolute inset-0 bg-neutral-950/90 backdrop-blur-sm"
-      @click="emit('close')"
-    />
-
-    <div class="relative flex flex-col items-center gap-4 star-slot-zoom-in">
-      <!-- Header -->
-      <div class="flex items-center gap-4 z-20">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-amber-400/50 star-header-glow"
-            :style="{ backgroundImage: `url('/sun.webp')` }"
-          />
-          <div>
-            <h2 class="text-lg font-bold text-neutral-100">
-              {{ star.name }}
-            </h2>
-            <p class="text-xs text-neutral-400">
-              {{ $t('game.star.subtitle') }} ·
-              <span v-if="canBuild">{{ $t('game.star.owner', { owner: star.ownerLabel }) }}</span>
-              <span
-                v-else
-                class="text-amber-300/80"
-              >{{ $t('game.star.unclaimed') }}</span>
-            </p>
-          </div>
-        </div>
-        <UButton
-          icon="i-lucide-x"
-          color="neutral"
-          variant="ghost"
-          size="sm"
-          class="ml-4"
-          data-testid="star-view-close"
-          @click="emit('close')"
-        />
-      </div>
-
-      <!-- Dyson progress chip -->
-      <div class="flex items-center gap-2 z-20 text-[11px]">
-        <UIcon
-          name="i-lucide-orbit"
-          class="w-3.5 h-3.5 text-amber-300"
-        />
-        <span
-          v-if="dysonLevel > 0"
-          class="text-amber-200"
-        >{{ $t('game.star.dyson-progress', { level: dysonLevel, max: dysonMax }) }}</span>
-        <span
-          v-else
-          class="text-neutral-500"
-        >{{ $t('game.star.dyson-empty') }}</span>
-      </div>
-
-      <!-- Capture hint (read-only stars) -->
+  <!-- Teleported to body so the overlay escapes the map container's stacking
+       context and sits above the sticky TopBar (its controls stay clickable). -->
+  <Teleport to="body">
+    <div class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+      <!-- Backdrop -->
       <div
-        v-if="!canBuild"
-        class="z-20 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200"
-      >
-        <UIcon
-          name="i-lucide-sun"
-          class="w-4 h-4"
-        />
-        {{ $t('game.star.capture-hint') }}
-      </div>
+        class="absolute inset-0 bg-neutral-950/90 backdrop-blur-sm"
+        @click="emit('close')"
+      />
 
-      <!-- Star + shells canvas -->
-      <div
-        class="relative z-10"
-        :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
-      >
-        <!-- Concentric shell guide lines -->
-        <div
-          v-for="shell in shells"
-          :key="`ring-${shell.index}`"
-          class="absolute rounded-full border border-dashed border-amber-500/15 pointer-events-none"
-          :style="{
-            width: `${shell.radius * 2}px`,
-            height: `${shell.radius * 2}px`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }"
-        />
-
-        <!-- Dyson hull: a ring whose arc closes as stages complete -->
-        <div
-          class="absolute rounded-full pointer-events-none dyson-hull"
-          :class="{ 'dyson-hull-pulse': dysonConstructing }"
-          :style="{
-            width: `${DYSON_RING_RADIUS * 2}px`,
-            height: `${DYSON_RING_RADIUS * 2}px`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: `conic-gradient(from -90deg, rgba(251,191,36,0.85) 0 ${dysonPercent}%, rgba(251,191,36,0.08) ${dysonPercent}% 100%)`
-          }"
-        />
-
-        <!-- Star core -->
-        <div
-          class="absolute rounded-full overflow-hidden pointer-events-none star-core-glow"
-          :style="{
-            width: `${STAR_RADIUS * 2}px`,
-            height: `${STAR_RADIUS * 2}px`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }"
-        >
-          <img
-            src="/sun.webp"
-            alt=""
-            class="w-full h-full object-cover"
-          >
-        </div>
-
-        <!-- Shell slots -->
-        <div
-          v-for="shell in shells"
-          :key="`slot-${shell.index}`"
-          class="absolute z-10"
-          :style="{
-            left: `calc(50% + ${shell.px}px)`,
-            top: `calc(50% + ${shell.py}px)`,
-            width: `${SHELL_SLOT_SIZE * 2}px`,
-            height: `${SHELL_SLOT_SIZE * 2}px`,
-            transform: 'translate(-50%, -50%)'
-          }"
-          @mouseenter="hoveredSlotIndex = shell.index"
-          @mouseleave="hoveredSlotIndex = null"
-        >
-          <button
-            type="button"
-            :data-testid="`star-shell-${shell.index}`"
-            :data-state="shell.state"
-            class="w-full h-full rounded-full transition-all duration-200 relative border bg-neutral-950"
-            :class="[
-              shell.state === 'empty' && canBuild
-                ? 'cursor-pointer border-amber-500/30 hover:border-amber-400/60'
-                : 'cursor-default border-amber-500/40',
-              hoveredSlotIndex === shell.index && shell.state === 'empty' && canBuild ? 'scale-110' : ''
-            ]"
-            @click="shell.state === 'empty' && openBuildMenu(shell.index)"
-          >
+      <div class="relative flex flex-col items-center gap-4 star-slot-zoom-in">
+        <!-- Header -->
+        <div class="flex items-center gap-4 z-20">
+          <div class="flex items-center gap-3">
             <div
-              class="absolute inset-0 rounded-full transition-colors duration-200"
-              :class="{
-                'bg-amber-950/70 hover:bg-amber-900/50': shell.state === 'empty',
-                'bg-amber-900/70': shell.state === 'under-construction',
-                'bg-amber-900/50': shell.state === 'completed'
-              }"
+              class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-amber-400/50 star-header-glow"
+              :style="{ backgroundImage: `url('/sun.webp')` }"
             />
-            <!-- Empty -->
-            <div
-              v-if="shell.state === 'empty'"
-              class="absolute inset-0 flex items-center justify-center"
-            >
-              <UIcon
-                v-if="canBuild"
-                name="i-lucide-plus"
-                class="w-5 h-5 text-amber-500/50 transition-colors"
-                :class="{ 'text-amber-300': hoveredSlotIndex === shell.index }"
-              />
-              <UIcon
-                v-else
-                name="i-lucide-lock"
-                class="w-4 h-4 text-neutral-600"
-              />
-            </div>
-            <!-- Completed -->
-            <div
-              v-if="shell.state === 'completed' && shell.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(shell.buildingId)"
-                class="w-5 h-5 text-amber-200"
-              />
-              <span class="text-[8px] text-amber-200/80 text-center leading-tight px-1 max-w-full truncate">
-                {{ getBuildingName(shell.buildingId) }}
-              </span>
-            </div>
-            <!-- Under construction -->
-            <div
-              v-if="shell.state === 'under-construction' && shell.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(shell.buildingId)"
-                class="w-4 h-4 text-warning-300 animate-pulse"
-              />
-              <span class="text-[9px] text-warning-200 font-semibold">
-                {{ shell.progress }}%
-              </span>
-            </div>
-          </button>
-        </div>
-
-        <!-- Build menu -->
-        <Transition name="fade">
-          <div
-            v-if="buildMenuSlotIndex !== null"
-            class="absolute z-40 w-72 rounded-lg border border-amber-500/30 bg-neutral-900 shadow-2xl shadow-amber-500/10 overflow-hidden"
-            :style="{
-              left: `calc(50% + ${buildMenuPosition.x + 90}px)`,
-              top: `calc(50% + ${buildMenuPosition.y}px)`,
-              transform: 'translateY(-50%)'
-            }"
-          >
-            <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
-              <span class="text-sm font-semibold text-neutral-200">
-                {{ $t('game.star.choose-megastructure') }}
-              </span>
-              <UButton
-                icon="i-lucide-x"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click="closeBuildMenu()"
-              />
-            </div>
-            <div class="max-h-64 overflow-y-auto p-2 space-y-1">
-              <button
-                v-for="building in buildingCatalog"
-                :key="building.id"
-                type="button"
-                :data-testid="`star-build-option-${building.id}`"
-                class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts))) }"
-                :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts)))"
-                @click="handleBuild(building.id, buildMenuSlotIndex!)"
-              >
-                <div class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-900/40 shrink-0">
-                  <UIcon
-                    :name="building.icon"
-                    class="h-4 w-4 text-amber-200"
-                  />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-neutral-100 truncate">
-                    {{ building.name }}
-                  </p>
-                  <div class="flex items-center gap-2 text-[10px] text-neutral-500">
-                    <span
-                      v-if="building.resourceCosts.energy"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-zap"
-                        class="w-2.5 h-2.5 text-warning-300"
-                      />
-                      {{ building.resourceCosts.energy }}
-                    </span>
-                    <span
-                      v-if="building.resourceCosts.minerals"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-pickaxe"
-                        class="w-2.5 h-2.5 text-neutral-300"
-                      />
-                      {{ building.resourceCosts.minerals }}
-                    </span>
-                    <span
-                      v-if="building.resourceCosts.rare"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-atom"
-                        class="w-2.5 h-2.5 text-primary-300"
-                      />
-                      {{ building.resourceCosts.rare }}
-                    </span>
-                    <span
-                      v-for="sc in strategicCostList(building.strategicCosts)"
-                      :key="sc.key"
-                      class="flex items-center gap-0.5 text-fuchsia-300"
-                    >
-                      <UIcon
-                        :name="sc.icon"
-                        class="w-2.5 h-2.5"
-                      />
-                      {{ sc.amount }}
-                    </span>
-                    <span class="text-neutral-600">·</span>
-                    <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(building.productionCost) }) }}</span>
-                  </div>
-                </div>
-              </button>
+            <div>
+              <h2 class="text-lg font-bold text-neutral-100">
+                {{ star.name }}
+              </h2>
+              <p class="text-xs text-neutral-400">
+                {{ $t('game.star.subtitle') }} ·
+                <span v-if="canBuild">{{ $t('game.star.owner', { owner: star.ownerLabel }) }}</span>
+                <span
+                  v-else
+                  class="text-amber-300/80"
+                >{{ $t('game.star.unclaimed') }}</span>
+              </p>
             </div>
           </div>
-        </Transition>
-      </div>
+          <UButton
+            icon="i-lucide-x"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            class="ml-4"
+            data-testid="star-view-close"
+            @click="emit('close')"
+          />
+        </div>
 
-      <!-- Stellar Shipyard: stationed units + training -->
-      <div
-        v-if="canBuild && hasShipyard"
-        class="flex items-center gap-2 z-20"
-      >
-        <span class="text-[11px] text-neutral-500 uppercase tracking-wider mr-1">
-          {{ $t('game.star.shipyard-title') }}
-        </span>
+        <!-- Dyson progress chip -->
+        <div class="flex items-center gap-2 z-20 text-[11px]">
+          <UIcon
+            name="i-lucide-orbit"
+            class="w-3.5 h-3.5 text-amber-300"
+          />
+          <span
+            v-if="dysonLevel > 0"
+            class="text-amber-200"
+          >{{ $t('game.star.dyson-progress', { level: dysonLevel, max: dysonMax }) }}</span>
+          <span
+            v-else
+            class="text-neutral-500"
+          >{{ $t('game.star.dyson-empty') }}</span>
+        </div>
+
+        <!-- Capture hint (read-only stars) -->
         <div
-          v-for="(unit, idx) in star.stationedUnits"
-          :key="idx"
-          class="relative w-11 h-11 rounded-md border border-amber-700/40 bg-amber-950/40 flex flex-col items-center justify-center gap-0.5 cursor-default"
+          v-if="!canBuild"
+          class="z-20 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200"
         >
           <UIcon
-            :name="getUnitIcon(unit.unitDefId)"
-            class="w-4 h-4 text-amber-200"
+            name="i-lucide-sun"
+            class="w-4 h-4"
           />
-          <span class="text-[8px] text-neutral-400 truncate max-w-10 text-center leading-tight">
-            {{ getUnitName(unit.unitDefId) }}
-          </span>
-          <span
-            v-if="unit.count > 1"
-            class="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-neutral-700 border border-neutral-600 rounded-full w-4.5 h-4.5 flex items-center justify-center text-neutral-200"
-          >
-            {{ unit.count }}
-          </span>
+          {{ $t('game.star.capture-hint') }}
         </div>
-        <div class="relative">
-          <button
-            type="button"
-            data-testid="star-train-unit"
-            class="w-11 h-11 rounded-md border border-dashed border-amber-600/50 bg-amber-950/30 flex items-center justify-center transition-colors"
-            :class="unitTrainingMenuOpen ? 'border-amber-400/60 bg-amber-900/40' : 'hover:border-amber-400/60 hover:bg-amber-900/40'"
-            @click="unitTrainingMenuOpen = !unitTrainingMenuOpen"
+
+        <!-- Star + shells canvas -->
+        <div
+          class="relative z-10"
+          :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
+        >
+          <!-- Concentric shell guide lines -->
+          <div
+            v-for="shell in shells"
+            :key="`ring-${shell.index}`"
+            class="absolute rounded-full border border-dashed border-amber-500/15 pointer-events-none"
+            :style="{
+              width: `${shell.radius * 2}px`,
+              height: `${shell.radius * 2}px`,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)'
+            }"
+          />
+
+          <!-- Dyson hull: a ring whose arc closes as stages complete -->
+          <div
+            class="absolute rounded-full pointer-events-none dyson-hull"
+            :class="{ 'dyson-hull-pulse': dysonConstructing }"
+            :style="{
+              width: `${DYSON_RING_RADIUS * 2}px`,
+              height: `${DYSON_RING_RADIUS * 2}px`,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: `conic-gradient(from -90deg, rgba(251,191,36,0.85) 0 ${dysonPercent}%, rgba(251,191,36,0.08) ${dysonPercent}% 100%)`
+            }"
+          />
+
+          <!-- Star core -->
+          <div
+            class="absolute rounded-full overflow-hidden pointer-events-none star-core-glow"
+            :style="{
+              width: `${STAR_RADIUS * 2}px`,
+              height: `${STAR_RADIUS * 2}px`,
+              left: '50%',
+              top: '50%',
+              transform: 'translate(-50%, -50%)'
+            }"
           >
-            <UIcon
-              name="i-lucide-plus"
-              class="w-4 h-4"
-              :class="unitTrainingMenuOpen ? 'text-amber-300' : 'text-neutral-500'"
-            />
-          </button>
+            <img
+              src="/sun.webp"
+              alt=""
+              class="w-full h-full object-cover"
+            >
+          </div>
+
+          <!-- Shell slots -->
+          <div
+            v-for="shell in shells"
+            :key="`slot-${shell.index}`"
+            class="absolute z-10"
+            :style="{
+              left: `calc(50% + ${shell.px}px)`,
+              top: `calc(50% + ${shell.py}px)`,
+              width: `${SHELL_SLOT_SIZE * 2}px`,
+              height: `${SHELL_SLOT_SIZE * 2}px`,
+              transform: 'translate(-50%, -50%)'
+            }"
+            @mouseenter="hoveredSlotIndex = shell.index"
+            @mouseleave="hoveredSlotIndex = null"
+          >
+            <button
+              type="button"
+              :data-testid="`star-shell-${shell.index}`"
+              :data-state="shell.state"
+              class="w-full h-full rounded-full transition-all duration-200 relative border bg-neutral-950"
+              :class="[
+                shell.state === 'empty' && canBuild
+                  ? 'cursor-pointer border-amber-500/30 hover:border-amber-400/60'
+                  : 'cursor-default border-amber-500/40',
+                hoveredSlotIndex === shell.index && shell.state === 'empty' && canBuild ? 'scale-110' : ''
+              ]"
+              @click="shell.state === 'empty' && openBuildMenu(shell.index)"
+            >
+              <div
+                class="absolute inset-0 rounded-full transition-colors duration-200"
+                :class="{
+                  'bg-amber-950/70 hover:bg-amber-900/50': shell.state === 'empty',
+                  'bg-amber-900/70': shell.state === 'under-construction',
+                  'bg-amber-900/50': shell.state === 'completed'
+                }"
+              />
+              <!-- Empty -->
+              <div
+                v-if="shell.state === 'empty'"
+                class="absolute inset-0 flex items-center justify-center"
+              >
+                <UIcon
+                  v-if="canBuild"
+                  name="i-lucide-plus"
+                  class="w-5 h-5 text-amber-500/50 transition-colors"
+                  :class="{ 'text-amber-300': hoveredSlotIndex === shell.index }"
+                />
+                <UIcon
+                  v-else
+                  name="i-lucide-lock"
+                  class="w-4 h-4 text-neutral-600"
+                />
+              </div>
+              <!-- Completed -->
+              <div
+                v-if="shell.state === 'completed' && shell.buildingId"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
+              >
+                <UIcon
+                  :name="getBuildingIcon(shell.buildingId)"
+                  class="w-5 h-5 text-amber-200"
+                />
+                <span class="text-[8px] text-amber-200/80 text-center leading-tight px-1 max-w-full truncate">
+                  {{ getBuildingName(shell.buildingId) }}
+                </span>
+              </div>
+              <!-- Under construction -->
+              <div
+                v-if="shell.state === 'under-construction' && shell.buildingId"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
+              >
+                <UIcon
+                  :name="getBuildingIcon(shell.buildingId)"
+                  class="w-4 h-4 text-warning-300 animate-pulse"
+                />
+                <span class="text-[9px] text-warning-200 font-semibold">
+                  {{ shell.progress }}%
+                </span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Build menu -->
           <Transition name="fade">
             <div
-              v-if="unitTrainingMenuOpen"
-              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg border border-amber-500/30 bg-neutral-900 shadow-2xl shadow-amber-500/10 overflow-hidden z-50"
+              v-if="buildMenuSlotIndex !== null"
+              class="absolute z-40 w-72 rounded-lg border border-amber-500/30 bg-neutral-900 shadow-2xl shadow-amber-500/10 overflow-hidden"
+              :style="{
+                left: `calc(50% + ${buildMenuPosition.x + 90}px)`,
+                top: `calc(50% + ${buildMenuPosition.y}px)`,
+                transform: 'translateY(-50%)'
+              }"
             >
               <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
                 <span class="text-sm font-semibold text-neutral-200">
-                  {{ $t('game.star.choose-ship') }}
+                  {{ $t('game.star.choose-megastructure') }}
                 </span>
                 <UButton
                   icon="i-lucide-x"
                   color="neutral"
                   variant="ghost"
                   size="xs"
-                  @click="unitTrainingMenuOpen = false"
+                  @click="closeBuildMenu()"
                 />
               </div>
-              <div class="max-h-48 overflow-y-auto p-2 space-y-1">
+              <div class="max-h-64 overflow-y-auto p-2 space-y-1">
                 <button
-                  v-for="unit in shipyardUnits"
-                  :key="unit.id"
+                  v-for="building in buildingCatalog"
+                  :key="building.id"
                   type="button"
-                  :data-testid="`star-train-option-${unit.id}`"
+                  :data-testid="`star-build-option-${building.id}`"
                   class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                  :class="{ 'opacity-40 cursor-not-allowed': !canTrainUnit(unit) }"
-                  :disabled="!canTrainUnit(unit)"
-                  @click="handleTrainUnit(unit.id)"
+                  :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts))) }"
+                  :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts)))"
+                  @click="handleBuild(building.id, buildMenuSlotIndex!)"
                 >
                   <div class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-900/40 shrink-0">
                     <UIcon
-                      :name="unit.icon"
+                      :name="building.icon"
                       class="h-4 w-4 text-amber-200"
                     />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-semibold text-neutral-100 truncate">
-                      {{ unit.name }}
+                      {{ building.name }}
                     </p>
                     <div class="flex items-center gap-2 text-[10px] text-neutral-500">
                       <span
-                        v-if="unit.resourceCosts.energy"
+                        v-if="building.resourceCosts.energy"
                         class="flex items-center gap-0.5"
                       >
                         <UIcon
                           name="i-lucide-zap"
                           class="w-2.5 h-2.5 text-warning-300"
                         />
-                        {{ unit.resourceCosts.energy }}
+                        {{ building.resourceCosts.energy }}
                       </span>
                       <span
-                        v-if="unit.resourceCosts.minerals"
+                        v-if="building.resourceCosts.minerals"
                         class="flex items-center gap-0.5"
                       >
                         <UIcon
                           name="i-lucide-pickaxe"
                           class="w-2.5 h-2.5 text-neutral-300"
                         />
-                        {{ unit.resourceCosts.minerals }}
+                        {{ building.resourceCosts.minerals }}
                       </span>
                       <span
-                        v-if="unit.resourceCosts.rare"
+                        v-if="building.resourceCosts.rare"
                         class="flex items-center gap-0.5"
                       >
                         <UIcon
                           name="i-lucide-atom"
                           class="w-2.5 h-2.5 text-primary-300"
                         />
-                        {{ unit.resourceCosts.rare }}
+                        {{ building.resourceCosts.rare }}
                       </span>
                       <span
-                        v-for="sc in strategicCostList(unit.strategicCosts)"
+                        v-for="sc in strategicCostList(building.strategicCosts)"
                         :key="sc.key"
                         class="flex items-center gap-0.5 text-fuchsia-300"
                       >
@@ -661,44 +533,176 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
                         {{ sc.amount }}
                       </span>
                       <span class="text-neutral-600">·</span>
-                      <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(unit.productionCost) }) }}</span>
+                      <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(building.productionCost) }) }}</span>
                     </div>
-                  </div>
-                  <div
-                    v-if="unit.locked"
-                    class="shrink-0"
-                  >
-                    <UBadge
-                      color="info"
-                      variant="subtle"
-                      size="xs"
-                    >
-                      <UIcon
-                        name="i-lucide-lock"
-                        class="w-3 h-3 mr-0.5"
-                      />
-                      {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
-                    </UBadge>
                   </div>
                 </button>
               </div>
             </div>
           </Transition>
         </div>
-      </div>
 
-      <!-- Back button -->
-      <UButton
-        :label="$t('game.star.back-to-system')"
-        icon="i-lucide-arrow-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="z-10"
-        @click="emit('close')"
-      />
+        <!-- Stellar Shipyard: stationed units + training -->
+        <div
+          v-if="canBuild && hasShipyard"
+          class="flex items-center gap-2 z-20"
+        >
+          <span class="text-[11px] text-neutral-500 uppercase tracking-wider mr-1">
+            {{ $t('game.star.shipyard-title') }}
+          </span>
+          <div
+            v-for="(unit, idx) in star.stationedUnits"
+            :key="idx"
+            class="relative w-11 h-11 rounded-md border border-amber-700/40 bg-amber-950/40 flex flex-col items-center justify-center gap-0.5 cursor-default"
+          >
+            <UIcon
+              :name="getUnitIcon(unit.unitDefId)"
+              class="w-4 h-4 text-amber-200"
+            />
+            <span class="text-[8px] text-neutral-400 truncate max-w-10 text-center leading-tight">
+              {{ getUnitName(unit.unitDefId) }}
+            </span>
+            <span
+              v-if="unit.count > 1"
+              class="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-neutral-700 border border-neutral-600 rounded-full w-4.5 h-4.5 flex items-center justify-center text-neutral-200"
+            >
+              {{ unit.count }}
+            </span>
+          </div>
+          <div class="relative">
+            <button
+              type="button"
+              data-testid="star-train-unit"
+              class="w-11 h-11 rounded-md border border-dashed border-amber-600/50 bg-amber-950/30 flex items-center justify-center transition-colors"
+              :class="unitTrainingMenuOpen ? 'border-amber-400/60 bg-amber-900/40' : 'hover:border-amber-400/60 hover:bg-amber-900/40'"
+              @click="unitTrainingMenuOpen = !unitTrainingMenuOpen"
+            >
+              <UIcon
+                name="i-lucide-plus"
+                class="w-4 h-4"
+                :class="unitTrainingMenuOpen ? 'text-amber-300' : 'text-neutral-500'"
+              />
+            </button>
+            <Transition name="fade">
+              <div
+                v-if="unitTrainingMenuOpen"
+                class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg border border-amber-500/30 bg-neutral-900 shadow-2xl shadow-amber-500/10 overflow-hidden z-50"
+              >
+                <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
+                  <span class="text-sm font-semibold text-neutral-200">
+                    {{ $t('game.star.choose-ship') }}
+                  </span>
+                  <UButton
+                    icon="i-lucide-x"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    @click="unitTrainingMenuOpen = false"
+                  />
+                </div>
+                <div class="max-h-48 overflow-y-auto p-2 space-y-1">
+                  <button
+                    v-for="unit in shipyardUnits"
+                    :key="unit.id"
+                    type="button"
+                    :data-testid="`star-train-option-${unit.id}`"
+                    class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
+                    :class="{ 'opacity-40 cursor-not-allowed': !canTrainUnit(unit) }"
+                    :disabled="!canTrainUnit(unit)"
+                    @click="handleTrainUnit(unit.id)"
+                  >
+                    <div class="flex h-8 w-8 items-center justify-center rounded-md bg-amber-900/40 shrink-0">
+                      <UIcon
+                        :name="unit.icon"
+                        class="h-4 w-4 text-amber-200"
+                      />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold text-neutral-100 truncate">
+                        {{ unit.name }}
+                      </p>
+                      <div class="flex items-center gap-2 text-[10px] text-neutral-500">
+                        <span
+                          v-if="unit.resourceCosts.energy"
+                          class="flex items-center gap-0.5"
+                        >
+                          <UIcon
+                            name="i-lucide-zap"
+                            class="w-2.5 h-2.5 text-warning-300"
+                          />
+                          {{ unit.resourceCosts.energy }}
+                        </span>
+                        <span
+                          v-if="unit.resourceCosts.minerals"
+                          class="flex items-center gap-0.5"
+                        >
+                          <UIcon
+                            name="i-lucide-pickaxe"
+                            class="w-2.5 h-2.5 text-neutral-300"
+                          />
+                          {{ unit.resourceCosts.minerals }}
+                        </span>
+                        <span
+                          v-if="unit.resourceCosts.rare"
+                          class="flex items-center gap-0.5"
+                        >
+                          <UIcon
+                            name="i-lucide-atom"
+                            class="w-2.5 h-2.5 text-primary-300"
+                          />
+                          {{ unit.resourceCosts.rare }}
+                        </span>
+                        <span
+                          v-for="sc in strategicCostList(unit.strategicCosts)"
+                          :key="sc.key"
+                          class="flex items-center gap-0.5 text-fuchsia-300"
+                        >
+                          <UIcon
+                            :name="sc.icon"
+                            class="w-2.5 h-2.5"
+                          />
+                          {{ sc.amount }}
+                        </span>
+                        <span class="text-neutral-600">·</span>
+                        <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(unit.productionCost) }) }}</span>
+                      </div>
+                    </div>
+                    <div
+                      v-if="unit.locked"
+                      class="shrink-0"
+                    >
+                      <UBadge
+                        color="info"
+                        variant="subtle"
+                        size="xs"
+                      >
+                        <UIcon
+                          name="i-lucide-lock"
+                          class="w-3 h-3 mr-0.5"
+                        />
+                        {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
+                      </UBadge>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+        </div>
+
+        <!-- Back button -->
+        <UButton
+          :label="$t('game.star.back-to-system')"
+          icon="i-lucide-arrow-left"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          class="z-10"
+          @click="emit('close')"
+        />
+      </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <style scoped>
