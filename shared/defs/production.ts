@@ -64,8 +64,10 @@ export type UnitDefinition = {
   icon?: string
 }
 
-export const BUILD_QUEUE_LIMIT = 1
-export const SHIPYARD_QUEUE_LIMIT = 1
+// Max items in a planet's shared production queue (buildings + units, ordered).
+// Tunable placeholder — large enough to plan ahead, small enough that the queue
+// strip stays readable and energy (paid up-front on enqueue) is the real cap.
+export const BUILD_QUEUE_LIMIT = 6
 export const PLANET_PRODUCTION_PER_TURN = 20
 
 // Production note: a planet makes PLANET_PRODUCTION_PER_TURN (20) production per

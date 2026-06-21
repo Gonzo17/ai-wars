@@ -6,11 +6,19 @@ import { InMemoryGameRepository } from '../../server/game/inMemoryRepository'
 import { toPlayerId } from '../../server/game/playerId'
 import { findLanePath } from '../../shared/utils/starlanes'
 import type { GameSnapshot, PlayerSnapshot, ResourceId } from '../../shared/types/game'
-import type { TurnPlan } from '../../shared/types/turn'
+import type { TurnCommand, TurnPlan } from '../../shared/types/turn'
 
 const U1 = 'u1'
 const U2 = 'u2'
 const EMPTY: TurnPlan = { commands: [] }
+
+/** Single-building production queue for a planet. */
+const buildCmd = (planetId: string, buildingId: string, slotIndex: number): TurnCommand =>
+  ({ type: 'setProductionQueue', planetId: planetId as never, items: [{ kind: 'building', slotIndex, buildingId: buildingId as never }] })
+
+/** Single-unit production queue for a planet. */
+const unitCmd = (planetId: string, unitId: string): TurnCommand =>
+  ({ type: 'setProductionQueue', planetId: planetId as never, items: [{ kind: 'unit', unitId: unitId as never }] })
 
 function seedTwoPlayerGame(repo?: InMemoryGameRepository) {
   return repo ?? new InMemoryGameRepository({
@@ -123,7 +131,7 @@ describe('building construction cycle', () => {
     const plan: TurnPlan = {
       // Slot 2 on the primary planet is empty and has an ore node →
       // mining facility gets the −5 % adjusted production cost (60 → 57).
-      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:mining-facility', slotIndex: 2 }]
+      commands: [buildCmd('pl:aurora', 'bld:mining-facility', 2)]
     }
 
     await playTurn(repo, 1, { [U1]: plan })
@@ -159,7 +167,7 @@ describe('building construction cycle', () => {
   it('resuming the same build in the same slot does not charge again', async () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
-      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:solar-array', slotIndex: 3 }]
+      commands: [buildCmd('pl:aurora', 'bld:solar-array', 3)]
     }
 
     // Solar array costs 60 → 3 turns; re-submit the identical command each turn,
@@ -179,7 +187,7 @@ describe('building construction cycle', () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
       // pl:meridian is player 2's home world
-      commands: [{ type: 'buildStructure', planetId: 'pl:meridian', buildingId: 'bld:solar-array', slotIndex: 3 }]
+      commands: [buildCmd('pl:meridian', 'bld:solar-array', 3)]
     }
 
     await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({ statusCode: 400 })
@@ -225,7 +233,7 @@ describe('unit production cycle', () => {
   it('a finished worker increases the planet worker count', async () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
-      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:worker' }]
+      commands: [unitCmd('pl:aurora', 'unit:worker')]
     }
 
     await playTurn(repo, 1, { [U1]: plan })
@@ -243,7 +251,7 @@ describe('unit production cycle', () => {
     getPlayer(seedState, U1).research.completedTechIds.push('tech:probe-design')
 
     const plan: TurnPlan = {
-      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:probe' }]
+      commands: [unitCmd('pl:aurora', 'unit:probe')]
     }
 
     // Probe costs 60 production at 20/turn → finishes after 3 resolves
@@ -261,7 +269,7 @@ describe('unit production cycle', () => {
     })
     // Instance id is unique, not the def id
     expect(final.fleets[0]!.id).not.toBe('unit:probe')
-    expect(final.planets.find(p => p.id === 'pl:aurora')!.queues.shipyard).toHaveLength(0)
+    expect(final.planets.find(p => p.id === 'pl:aurora')!.queues.production).toHaveLength(0)
   })
 })
 
@@ -270,7 +278,7 @@ describe('tech gating', () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
       // rare-extractor requires tech:autonomous-resource-allocation
-      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:rare-extractor', slotIndex: 3 }]
+      commands: [buildCmd('pl:aurora', 'bld:rare-extractor', 3)]
     }
 
     await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({
@@ -285,7 +293,7 @@ describe('tech gating', () => {
     getPlayer(seedState, U1).research.completedTechIds.push('tech:autonomous-resource-allocation')
 
     const plan: TurnPlan = {
-      commands: [{ type: 'buildStructure', planetId: 'pl:aurora', buildingId: 'bld:rare-extractor', slotIndex: 3 }]
+      commands: [buildCmd('pl:aurora', 'bld:rare-extractor', 3)]
     }
 
     await playTurn(repo, 1, { [U1]: plan })
@@ -304,7 +312,7 @@ describe('tech gating', () => {
 
     const plan: TurnPlan = {
       // frigate requires tech:first-shipyard
-      commands: [{ type: 'buildUnit', planetId: 'pl:aurora', unitId: 'unit:frigate' }]
+      commands: [unitCmd('pl:aurora', 'unit:frigate')]
     }
 
     await expect(submitTurn(repo, U1, 'g1', 1, plan)).rejects.toMatchObject({

@@ -185,15 +185,15 @@ describe('star megastructures', () => {
     for (const r of u1.resources) r.current = 5000
 
     // Megastructure on the captured star → allowed
-    const onStar: TurnPlan = { commands: [{ type: 'buildStructure', planetId: star.id, buildingId: 'bld:dyson-sphere' as BuildingId, slotIndex: 0 }] }
+    const onStar: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), onStar)).toHaveLength(0)
 
     // Megastructure on a planet → rejected
-    const megaOnPlanet: TurnPlan = { commands: [{ type: 'buildStructure', planetId: homeworld.id, buildingId: 'bld:dyson-sphere' as BuildingId, slotIndex: 0 }] }
+    const megaOnPlanet: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: homeworld.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), megaOnPlanet).length).toBeGreaterThan(0)
 
     // Normal building on the star → rejected
-    const planetBldOnStar: TurnPlan = { commands: [{ type: 'buildStructure', planetId: star.id, buildingId: 'bld:solar-array' as BuildingId, slotIndex: 0 }] }
+    const planetBldOnStar: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:solar-array' as BuildingId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), planetBldOnStar).length).toBeGreaterThan(0)
   })
 
@@ -203,7 +203,7 @@ describe('star megastructures', () => {
     const { star } = ownHomeStar(state)
     // Seed a nearly-finished Dyson stage so one empty turn completes it.
     star.slots[0] = { index: 0, zone: 'orbital', buildingId: 'bld:dyson-sphere' as BuildingId, buildingLevel: 1, isConstructing: true, constructionTimeLeft: 20, resourceNode: null }
-    star.queues.build = [{ slotIndex: 0 }]
+    star.queues.production = [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }]
 
     await playTurn(repo, 1)
 
@@ -229,12 +229,12 @@ describe('star megastructures', () => {
     u1.research.completedTechIds.push('tech:first-shipyard')
 
     // Without a shipyard the star cannot build ships (no orbital dock).
-    const noYard: TurnPlan = { commands: [{ type: 'buildUnit', planetId: star.id, unitId: 'unit:frigate' as UnitId }] }
+    const noYard: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'unit', unitId: 'unit:frigate' as UnitId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), noYard).length).toBeGreaterThan(0)
 
     // A completed Stellar Shipyard substitutes for the orbital-dock requirement.
     star.slots[0] = { index: 0, zone: 'orbital', buildingId: 'bld:orbital-shipyard-mega' as BuildingId, buildingLevel: 1, isConstructing: false, constructionTimeLeft: 0, resourceNode: null }
-    const withYard: TurnPlan = { commands: [{ type: 'buildUnit', planetId: star.id, unitId: 'unit:frigate' as UnitId }] }
+    const withYard: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'unit', unitId: 'unit:frigate' as UnitId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), withYard)).toHaveLength(0)
   })
 

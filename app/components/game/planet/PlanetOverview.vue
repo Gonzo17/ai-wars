@@ -67,7 +67,8 @@ const getProgressPercent = (planetId: string, entry: { id: string, kind: 'buildi
   return Math.min(100, Math.round((spent / cost) * 100))
 }
 
-const needsAction = (planet: PlanetOverviewItem) => planet.buildQueue.length < props.buildQueueLimit
+// A planet wants attention only when its queue is empty (idle → wasting production).
+const needsAction = (planet: PlanetOverviewItem) => planet.buildQueue.length === 0
 </script>
 
 <template>

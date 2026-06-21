@@ -1,9 +1,10 @@
 import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/game'
 import type { TurnPlan, ValidationError } from '../types/turn'
-import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitBuildCost, getUnitDef } from '../defs/production'
+import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
 import type { StrategicCosts } from '../defs/production'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
+import { queueItemCosts, reconcileProductionQueue } from '../utils/productionQueue'
 import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
 
 interface ResourceCosts {
@@ -76,21 +77,6 @@ function subtractStrategic(available: Record<string, number>, costs: StrategicCo
   }
 }
 
-/**
- * A build on a slot is a "resume" (no new resource cost) if the slot
- * already has the same buildingId assigned and is under construction (resources were paid earlier).
- */
-function isResumingSlotBuild(planet: Planet, slotIndex: number, buildingId: string): boolean {
-  const slot = planet.slots[slotIndex]
-  if (!slot) return false
-  return slot.buildingId === buildingId && slot.isConstructing
-}
-
-function isResumingUnitBuild(planet: Planet, unitId: string): boolean {
-  return planet.queues.shipyard.some(u => u.id === unitId)
-    || Boolean(planet.progressMemory?.[unitId]?.resourcePaid)
-}
-
 export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan: TurnPlan): ValidationError[] {
   const errors: ValidationError[] = []
   const player = snapshot.players.find(p => p.id === playerId)
@@ -100,7 +86,6 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   }
 
   let hasResearchCommand = false
-  const queueCounts = new Map<string, number>()
   let availableResources = getPlayerResources(player)
   const availableStrategic: Record<string, number> = {}
   for (const r of player.resources) availableStrategic[r.key] = r.current
@@ -121,7 +106,7 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       continue
     }
 
-    if (command.type === 'buildStructure') {
+    if (command.type === 'setProductionQueue') {
       const planet = snapshot.planets.find(p => p.id === command.planetId)
       if (!planet) {
         errors.push({ code: 'NOT_FOUND', message: 'Planet not found', path })
@@ -130,128 +115,101 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       if (planet.owner !== playerId) {
         errors.push({ code: 'NOT_OWNER', message: 'Planet not owned by player', path })
       }
-      const building = getBuildingDef(command.buildingId)
-      if (!building) {
-        errors.push({ code: 'NOT_FOUND', message: 'Building not found', path })
-        continue
+      if (command.items.length > BUILD_QUEUE_LIMIT) {
+        errors.push({ code: 'INVALID_STATE', message: 'Build queue full', path })
       }
 
-      // Validate slot index against this site's actual slot count
-      if (command.slotIndex < 0 || command.slotIndex >= planet.slots.length) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'Slot index out of range', path })
-        continue
-      }
-      const slot = planet.slots[command.slotIndex]
-      if (!slot) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'Slot not found', path })
-        continue
-      }
-
-      // Site check: megastructures only on stars, planet buildings only on planets
+      // Which items are newly added (and therefore must be paid for) — same
+      // classification the engine uses, so validation and resolve agree. Costs
+      // include per-queued-worker escalation.
+      const { isNew } = reconcileProductionQueue(planet, command.items)
+      const itemCosts = queueItemCosts(planet, command.items, isNew)
       const isStar = planet.kind === 'star'
-      if (buildingSite(building) === 'star' && !isStar) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'Megastructure can only be built on a star', path })
-        continue
-      }
-      if (buildingSite(building) !== 'star' && isStar) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'This building cannot be built on a star', path })
-        continue
-      }
+      const seenSlots = new Set<number>()
 
-      // Zone check (planets only — star shells are not surface/orbital zoned)
-      if (!isStar && !isBuildingAllowedInZone(command.buildingId, slot.zone)) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'Building not allowed in this zone', path })
-        continue
-      }
+      for (const [j, item] of command.items.entries()) {
+        const itemPath = `${path}.items.${j}`
 
-      // Slot availability: must be empty or resuming the same build
-      if (slot.buildingId !== null && slot.buildingId !== command.buildingId) {
-        errors.push({ code: 'INVALID_STATE', message: 'Slot already occupied by a different building', path })
-        continue
-      }
-      if (slot.buildingId === command.buildingId && !slot.isConstructing) {
-        errors.push({ code: 'INVALID_STATE', message: 'Building already completed in this slot', path })
-        continue
-      }
+        if (item.kind === 'building') {
+          if (seenSlots.has(item.slotIndex)) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Two builds target the same slot', path: itemPath })
+            continue
+          }
+          seenSlots.add(item.slotIndex)
 
-      // Requirements
-      if (building.requirements.buildings && !hasSlotBuildingRequirement(planet, building.requirements.buildings)) {
-        errors.push({ code: 'INVALID_STATE', message: 'Building requirements not met', path })
-      }
-      if (building.requirements.research && !hasResearchRequirement(player, building.requirements.research)) {
-        errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path })
-      }
+          const building = getBuildingDef(item.buildingId)
+          if (!building) {
+            errors.push({ code: 'NOT_FOUND', message: 'Building not found', path: itemPath })
+            continue
+          }
+          if (item.slotIndex < 0 || item.slotIndex >= planet.slots.length) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Slot index out of range', path: itemPath })
+            continue
+          }
+          const slot = planet.slots[item.slotIndex]!
 
-      // Extractors must sit ON their matching strategic deposit
-      if (building.strategicProduction && slot.resourceNode !== building.strategicProduction.requiresNode) {
-        errors.push({ code: 'INVALID_COMMAND', message: 'Extractor must be built on the matching deposit', path })
-      }
-
-      // Resource cost (only for new builds, not resumes)
-      if (!isResumingSlotBuild(planet, command.slotIndex, command.buildingId)) {
-        if (!canAfford(availableResources, building.resourceCosts) || !canAffordStrategic(availableStrategic, building.strategicCosts)) {
-          errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path })
-        } else {
-          availableResources = subtractCosts(availableResources, building.resourceCosts)
-          subtractStrategic(availableStrategic, building.strategicCosts)
+          if (buildingSite(building) === 'star' && !isStar) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Megastructure can only be built on a star', path: itemPath })
+            continue
+          }
+          if (buildingSite(building) !== 'star' && isStar) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'This building cannot be built on a star', path: itemPath })
+            continue
+          }
+          if (!isStar && !isBuildingAllowedInZone(item.buildingId, slot.zone)) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Building not allowed in this zone', path: itemPath })
+            continue
+          }
+          if (slot.buildingId !== null && slot.buildingId !== item.buildingId) {
+            errors.push({ code: 'INVALID_STATE', message: 'Slot already occupied by a different building', path: itemPath })
+            continue
+          }
+          if (slot.buildingId === item.buildingId && !slot.isConstructing) {
+            errors.push({ code: 'INVALID_STATE', message: 'Building already completed in this slot', path: itemPath })
+            continue
+          }
+          if (building.requirements.buildings && !hasSlotBuildingRequirement(planet, building.requirements.buildings)) {
+            errors.push({ code: 'INVALID_STATE', message: 'Building requirements not met', path: itemPath })
+          }
+          if (building.requirements.research && !hasResearchRequirement(player, building.requirements.research)) {
+            errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path: itemPath })
+          }
+          if (building.strategicProduction && slot.resourceNode !== building.strategicProduction.requiresNode) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Extractor must be built on the matching deposit', path: itemPath })
+          }
+          if (isNew[j]) {
+            const cost = itemCosts[j]!
+            if (!canAfford(availableResources, cost) || !canAffordStrategic(availableStrategic, cost.strategic)) {
+              errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path: itemPath })
+            } else {
+              availableResources = subtractCosts(availableResources, cost)
+              subtractStrategic(availableStrategic, cost.strategic)
+            }
+          }
+          continue
         }
-      }
 
-      // Queue limit
-      const pending = queueCounts.get(planet.id) ?? 0
-      const existing = planet.queues.build.length + planet.queues.shipyard.length
-      if (existing + pending + 1 > BUILD_QUEUE_LIMIT) {
-        if (existing >= BUILD_QUEUE_LIMIT && pending === 0) {
-          queueCounts.set(planet.id, 1)
-        } else {
-          errors.push({ code: 'INVALID_STATE', message: 'Build queue full', path })
+        // Unit item
+        const unit = getUnitDef(item.unitId)
+        if (!unit) {
+          errors.push({ code: 'NOT_FOUND', message: 'Unit not found', path: itemPath })
+          continue
         }
-      } else {
-        queueCounts.set(planet.id, pending + 1)
-      }
-      continue
-    }
-
-    if (command.type === 'buildUnit') {
-      const planet = snapshot.planets.find(p => p.id === command.planetId)
-      if (!planet) {
-        errors.push({ code: 'NOT_FOUND', message: 'Planet not found', path })
-        continue
-      }
-      if (planet.owner !== playerId) {
-        errors.push({ code: 'NOT_OWNER', message: 'Planet not owned by player', path })
-      }
-      const unit = getUnitDef(command.unitId)
-      if (!unit) {
-        errors.push({ code: 'NOT_FOUND', message: 'Unit not found', path })
-        continue
-      }
-      if (unit.requirements.buildings && !hasSlotBuildingRequirement(planet, unit.requirements.buildings)) {
-        errors.push({ code: 'INVALID_STATE', message: 'Unit requirements not met', path })
-      }
-      if (unit.requirements.research && !hasResearchRequirement(player, unit.requirements.research)) {
-        errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path })
-      }
-      // Resource cost (only new builds)
-      if (!isResumingUnitBuild(planet, command.unitId)) {
-        const unitCost = getUnitBuildCost(unit, planet.workers)
-        if (!canAfford(availableResources, unitCost) || !canAffordStrategic(availableStrategic, unit.strategicCosts)) {
-          errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path })
-        } else {
-          availableResources = subtractCosts(availableResources, unitCost)
-          subtractStrategic(availableStrategic, unit.strategicCosts)
+        if (unit.requirements.buildings && !hasSlotBuildingRequirement(planet, unit.requirements.buildings)) {
+          errors.push({ code: 'INVALID_STATE', message: 'Unit requirements not met', path: itemPath })
         }
-      }
-      const pending = queueCounts.get(planet.id) ?? 0
-      const existing = planet.queues.build.length + planet.queues.shipyard.length
-      if (existing + pending + 1 > BUILD_QUEUE_LIMIT) {
-        if (existing >= BUILD_QUEUE_LIMIT && pending === 0) {
-          queueCounts.set(planet.id, 1)
-        } else {
-          errors.push({ code: 'INVALID_STATE', message: 'Build queue full', path })
+        if (unit.requirements.research && !hasResearchRequirement(player, unit.requirements.research)) {
+          errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path: itemPath })
         }
-      } else {
-        queueCounts.set(planet.id, pending + 1)
+        if (isNew[j]) {
+          const cost = itemCosts[j]!
+          if (!canAfford(availableResources, cost) || !canAffordStrategic(availableStrategic, cost.strategic)) {
+            errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path: itemPath })
+          } else {
+            availableResources = subtractCosts(availableResources, cost)
+            subtractStrategic(availableStrategic, cost.strategic)
+          }
+        }
       }
       continue
     }

@@ -40,7 +40,7 @@ describe('escalating worker cost is enforced in validation', () => {
     setRes(player, 'res:energy', worker.resourceCosts.energy)
     setRes(player, 'res:material', worker.resourceCosts.minerals)
     setRes(player, 'res:rare', worker.resourceCosts.rare)
-    const plan: TurnPlan = { commands: [{ type: 'buildUnit', planetId: homeworld.id, unitId: 'unit:worker' }] }
+    const plan: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: homeworld.id, items: [{ kind: 'unit', unitId: 'unit:worker' }] }] }
     return { snap, p1, homeworld, plan }
   }
 

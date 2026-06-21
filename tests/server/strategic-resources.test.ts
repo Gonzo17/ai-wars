@@ -95,10 +95,10 @@ describe('strategic resources', () => {
     const depositIndex = barren.slots.findIndex(s => s.resourceNode === 'exotic-matter')
     const emptyNonDeposit = barren.slots.findIndex((s, i) => i !== depositIndex && s.zone === 'surface' && !s.resourceNode && !s.buildingId)
 
-    const offDeposit: TurnPlan = { commands: [{ type: 'buildStructure', planetId: barren.id, buildingId: 'bld:exotic-extractor' as BuildingId, slotIndex: emptyNonDeposit }] }
+    const offDeposit: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: barren.id, items: [{ kind: 'building', slotIndex: emptyNonDeposit, buildingId: 'bld:exotic-extractor' as BuildingId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), offDeposit).length).toBeGreaterThan(0)
 
-    const onDeposit: TurnPlan = { commands: [{ type: 'buildStructure', planetId: barren.id, buildingId: 'bld:exotic-extractor' as BuildingId, slotIndex: depositIndex }] }
+    const onDeposit: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: barren.id, items: [{ kind: 'building', slotIndex: depositIndex, buildingId: 'bld:exotic-extractor' as BuildingId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), onDeposit)).toHaveLength(0)
   })
 
@@ -112,7 +112,7 @@ describe('strategic resources', () => {
     setResource(state, U1, 'res:material', 5000)
     setResource(state, U1, 'res:rare', 5000)
 
-    const dyson: TurnPlan = { commands: [{ type: 'buildStructure', planetId: star.id, buildingId: 'bld:dyson-sphere' as BuildingId, slotIndex: 0 }] }
+    const dyson: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }] }] }
     // No exotic matter yet → rejected.
     expect(validateTurnPlan(state, toPlayerId(U1), dyson).length).toBeGreaterThan(0)
 
@@ -135,7 +135,7 @@ describe('strategic resources', () => {
     setResource(state, U1, 'res:rare', 5000)
     state.players.find(p => p.id === toPlayerId(U1))!.research.completedTechIds.push('tech:antimatter-containment')
 
-    const dreadnought: TurnPlan = { commands: [{ type: 'buildUnit', planetId: homeworld.id, unitId: 'unit:dreadnought' as UnitId }] }
+    const dreadnought: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: homeworld.id, items: [{ kind: 'unit', unitId: 'unit:dreadnought' as UnitId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), dreadnought).length).toBeGreaterThan(0)
 
     setResource(state, U1, 'res:antimatter', 50)

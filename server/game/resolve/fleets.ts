@@ -166,7 +166,7 @@ export function resolveColonization(snapshot: GameSnapshot, turn: number, nextEv
 
     const previousOwner = target.owner
     target.owner = colonizer.ownerId
-    target.queues = { build: [], shipyard: [] }
+    target.queues = { production: [] }
     if (target.workers < 1) target.workers = 1
 
     for (const player of snapshot.players) {

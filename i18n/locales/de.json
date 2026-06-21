@@ -445,7 +445,20 @@
       "locked": "Gesperrt",
       "synergy-ore": "×2 Mineralien",
       "synergy-power": "+25% Energie",
-      "synergy-compute": "+Forschung"
+      "synergy-compute": "+Forschung",
+      "tab-buildings": "Gebäude",
+      "tab-units": "Einheiten",
+      "pick-building-hint": "Gebäude wählen, dann auf einem Feld platzieren.",
+      "placement-hint": "Feld zum Platzieren wählen. Esc zum Abbrechen.",
+      "queue-title": "Warteschlange",
+      "queue-empty": "Warteschlange leer — wähle etwas zum Bauen.",
+      "no-base-yield": "Kein direkter Ertrag",
+      "tooltip-effects": "Effekte",
+      "tooltip-cost": "Kosten",
+      "tooltip-free": "Kostenlos",
+      "tooltip-insufficient": "Nicht genug Ressourcen",
+      "tooltip-requires-dock": "Benötigt ein Orbitaldock",
+      "none-researched": "Noch nichts verfügbar — Forschung schaltet mehr frei."
     },
     "buildings": {
       "solar-array": {
@@ -559,12 +572,16 @@
       "back-to-system": "Zurück zum System",
       "no-megastructures": "Noch keine Megastrukturen",
       "shipyard-title": "Werft",
-      "choose-ship": "Schiff bauen"
+      "choose-ship": "Schiff bauen",
+      "tab-megastructures": "Megastrukturen",
+      "tab-ships": "Schiffe",
+      "pick-megastructure-hint": "Megastruktur wählen, dann auf einer Schale platzieren."
     },
     "errors": {
       "submit-failed": "Zug konnte nicht übermittelt werden",
       "unsubmit-failed": "Zug konnte nicht zurückgezogen werden",
-      "not-owner": "Du besitzt diesen Planeten nicht"
+      "not-owner": "Du besitzt diesen Planeten nicht",
+      "queue-full": "Bau-Warteschlange ist voll"
     },
     "systems": {
       "intel": {

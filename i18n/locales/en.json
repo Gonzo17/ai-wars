@@ -445,7 +445,20 @@
       "locked": "Locked",
       "synergy-ore": "×2 Minerals",
       "synergy-power": "+25% Energy",
-      "synergy-compute": "+Research"
+      "synergy-compute": "+Research",
+      "tab-buildings": "Buildings",
+      "tab-units": "Units",
+      "pick-building-hint": "Pick a building, then place it on a slot.",
+      "placement-hint": "Choose a slot to place it. Esc to cancel.",
+      "queue-title": "Queue",
+      "queue-empty": "Queue empty — pick something to build.",
+      "no-base-yield": "No direct yield",
+      "tooltip-effects": "Effects",
+      "tooltip-cost": "Cost",
+      "tooltip-free": "Free",
+      "tooltip-insufficient": "Not enough resources",
+      "tooltip-requires-dock": "Requires an orbital dock",
+      "none-researched": "Nothing available yet — research unlocks more."
     },
     "buildings": {
       "solar-array": {
@@ -559,12 +572,16 @@
       "back-to-system": "Back to system",
       "no-megastructures": "No megastructures yet",
       "shipyard-title": "Shipyard",
-      "choose-ship": "Build Ship"
+      "choose-ship": "Build Ship",
+      "tab-megastructures": "Megastructures",
+      "tab-ships": "Ships",
+      "pick-megastructure-hint": "Pick a megastructure, then place it on a shell."
     },
     "errors": {
       "submit-failed": "Failed to submit turn",
       "unsubmit-failed": "Failed to unsubmit turn",
-      "not-owner": "You do not own this planet"
+      "not-owner": "You do not own this planet",
+      "queue-full": "Build queue is full"
     },
     "systems": {
       "intel": {

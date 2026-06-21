@@ -59,29 +59,17 @@
           {{ $t('game.navigation.home') }}
         </UButton>
 
-        <GamePlanetPanel
-          v-if="planetPanelOpen && selectedPlanetWithQueue"
-          :planet="selectedPlanetWithQueue"
-          :building-catalog="buildingCatalog"
-          :unit-catalog="unitCatalog"
-          :build-queue-limit="buildQueueLimit"
-          :progress-memory="selectedPlanetProgressMemory"
-          :show-back-to-overview="planetPanelFromOverview"
-          :player-resources="playerResources"
-          @close="planetPanelOpen = false"
-          @back-to-overview="handleBackToOverview"
-          @queue-build="handleQueueBuild"
-          @cancel-build="handleCancelBuild"
-        />
-
         <GamePlanetSlotView
           v-if="viewMode === 'planet' && selectedPlanetWithQueue"
           :planet="selectedPlanetWithQueue"
           :building-catalog="buildingCatalog"
           :unit-catalog="unitCatalog"
+          :build-queue-limit="buildQueueLimit"
           :player-resources="playerResources"
           @close="handleExitPlanetView"
           @queue-build="handleQueueBuild"
+          @remove-queue-item="handleRemoveQueueItem"
+          @reorder-queue="handleReorderQueue"
         />
 
         <GameStarSlotView
@@ -90,9 +78,12 @@
           :building-catalog="starBuildingCatalog"
           :unit-catalog="unitCatalog"
           :can-build="starCanBuild"
+          :build-queue-limit="buildQueueLimit"
           :player-resources="playerResources"
           @close="handleExitPlanetView"
           @queue-build="handleQueueBuild"
+          @remove-queue-item="handleRemoveQueueItem"
+          @reorder-queue="handleReorderQueue"
         />
 
         <GamePlanetOverview
@@ -200,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitBuildCost, getUnitDef } from '~~/shared/defs/production'
+import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitBuildCost } from '~~/shared/defs/production'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -208,6 +199,7 @@ import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
 import { STRATEGIC_RESOURCES, getStrategicResource, isStrategicResource } from '~~/shared/defs/strategicResources'
 import { getResearchPointsPerTurn, resourceProductionBreakdown } from '~~/shared/utils/economy'
 import type { ProductionResourceKind } from '~~/shared/utils/economy'
+import { queueItemCosts, reconcileProductionQueue } from '~~/shared/utils/productionQueue'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
 type MapViewMode = 'universe' | 'galaxy' | 'system' | 'planet'
@@ -266,6 +258,9 @@ interface BuildingDefinition {
   productionCost: number
   icon: string
   site: 'planet' | 'star'
+  resourceProduction?: Partial<Record<'energy' | 'minerals' | 'rare', number>>
+  researchPoints?: number
+  strategicProduction?: { resource: string, amount: number, requiresNode: string }
   strategicCosts?: Partial<Record<string, number>>
   locked: boolean
   lockedByTechName: string | null
@@ -363,23 +358,6 @@ const handleEventNavigate = (entityType: string, entityId: string) => {
 
 const turnPlan = ref<TurnPlan>({ commands: [] })
 
-const upsertBuildCommand = (planetId: string, kind: 'building' | 'unit', buildId: string, slotIndex?: number) => {
-  const next: TurnCommand[] = turnPlan.value.commands.filter((command) => {
-    if (command.type === 'buildStructure' || command.type === 'buildUnit') {
-      return command.planetId !== planetId
-    }
-    return true
-  })
-
-  if (kind === 'building' && slotIndex !== undefined) {
-    next.push({ type: 'buildStructure', planetId: planetId as PlanetId, buildingId: buildId as BuildingId, slotIndex })
-  } else if (kind === 'unit') {
-    next.push({ type: 'buildUnit', planetId: planetId as PlanetId, unitId: buildId as UnitId })
-  }
-
-  turnPlan.value = { commands: next }
-}
-
 const setResearchCommand = (researchId: string) => {
   const next: TurnCommand[] = turnPlan.value.commands.filter(command => command.type !== 'startResearch')
   next.push({ type: 'startResearch', researchId: researchId as ResearchId })
@@ -387,7 +365,6 @@ const setResearchCommand = (researchId: string) => {
 }
 
 const planetOverviewOpen = ref(false)
-const planetPanelFromOverview = ref(false)
 
 const readyPlayers = computed(() => gamePlayers.value.map(player => ({
   id: player.id,
@@ -642,40 +619,22 @@ const RESOURCE_KIND_BY_KEY: Record<string, ProductionResourceKind> = {
   'res:rare': 'rare'
 }
 
-// Calculate pending resource costs from turnPlan commands (optimistic updates)
+// Calculate pending resource costs from turnPlan commands (optimistic updates).
+// Mirrors the server: only newly-added queue items are charged (resumes are free),
+// classified by the same reconcileProductionQueue helper.
 const pendingResourceCosts = computed(() => {
   const costs = { energy: 0, minerals: 0, rare: 0 }
   if (!snapshot.value) return costs
 
   for (const command of turnPlan.value.commands) {
-    if (command.type === 'buildStructure') {
-      const planet = snapshot.value.planets.find(p => p.id === command.planetId)
-      if (!planet) continue
-      // Check if this slot already has this building under construction (resources already paid)
-      const slot = planet.slots[command.slotIndex]
-      const isResume = slot?.buildingId === command.buildingId && slot?.isConstructing
-      if (!isResume) {
-        const def = getBuildingDef(command.buildingId)
-        if (def) {
-          costs.energy += def.resourceCosts.energy
-          costs.minerals += def.resourceCosts.minerals
-          costs.rare += def.resourceCosts.rare
-        }
-      }
-    } else if (command.type === 'buildUnit') {
-      const planet = snapshot.value.planets.find(p => p.id === command.planetId)
-      if (!planet) continue
-      // Check if this build is already in the server queue (resources already paid)
-      const alreadyInQueue = planet.queues.shipyard.some(u => u.id === command.unitId)
-      const alreadyPaid = planet.progressMemory?.[command.unitId]?.resourcePaid
-      if (!alreadyInQueue && !alreadyPaid) {
-        const def = getUnitDef(command.unitId)
-        if (def) {
-          costs.energy += def.resourceCosts.energy
-          costs.minerals += def.resourceCosts.minerals
-          costs.rare += def.resourceCosts.rare
-        }
-      }
+    if (command.type !== 'setProductionQueue') continue
+    const planet = snapshot.value.planets.find(p => p.id === command.planetId)
+    if (!planet) continue
+    const { isNew } = reconcileProductionQueue(planet, command.items)
+    for (const cost of queueItemCosts(planet, command.items, isNew)) {
+      costs.energy += cost.energy
+      costs.minerals += cost.minerals
+      costs.rare += cost.rare
     }
   }
 
@@ -828,6 +787,9 @@ const allBuildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.ma
     productionCost: def.productionCost,
     icon: def.icon ?? 'i-lucide-hammer',
     site: def.site ?? 'planet',
+    resourceProduction: def.resourceProduction,
+    researchPoints: def.researchPoints,
+    strategicProduction: def.strategicProduction,
     strategicCosts: def.strategicCosts,
     locked: missingResearch.length > 0,
     lockedByTechName: missingResearch.length > 0 ? techDisplayName(missingResearch[0]!) : null
@@ -839,9 +801,12 @@ const buildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.
 const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site === 'star'))
 
 const unitCatalog = computed((): UnitDefinition[] => {
-  // Worker cost escalates with the open planet's worker count; default to a fresh
-  // planet (1) when none is open. Other units are unaffected.
-  const planetWorkers = selectedPlanetWithQueue.value?.workers ?? 1
+  // Worker cost escalates with the open planet's worker count AND the robots already
+  // queued this turn (so the *next* robot's shown cost climbs as you stack them).
+  // Default to a fresh planet (1) when none is open; other units are unaffected.
+  const planet = selectedPlanetWithQueue.value
+  const queuedWorkers = planet?.buildQueue.filter(e => e.kind === 'unit' && e.id === 'unit:worker').length ?? 0
+  const planetWorkers = (planet?.workers ?? 1) + queuedWorkers
   return UNIT_DEFS.map((def) => {
     const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
     return {
@@ -955,35 +920,28 @@ const toPlanetView = (planet: Planet): GamePlanet => ({
     zone: s.zone,
     resourceNode: s.resourceNode
   })),
-  buildQueue: [
-    ...planet.queues.build.map((entry) => {
+  buildQueue: (planet.queues.production ?? []).map((entry) => {
+    if (entry.kind === 'building') {
       const slot = planet.slots[entry.slotIndex]
       if (!slot?.buildingId) return null
       const def = getBuildingDef(slot.buildingId)
       const productionCost = def?.productionCost ?? 0
-      const remaining = slot.constructionTimeLeft
-      const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
+      const spent = Math.max(0, productionCost - slot.constructionTimeLeft)
       return {
         id: slot.buildingId,
         kind: 'building' as const,
-        productionSpent: Math.max(0, Math.round(progress * productionCost)),
+        productionSpent: spent,
         resourcePaid: true,
         slotIndex: entry.slotIndex
       }
-    }).filter((e): e is NonNullable<typeof e> => e !== null),
-    ...planet.queues.shipyard.map((entry) => {
-      const def = getUnitDef(entry.id)
-      const productionCost = def?.productionCost ?? 0
-      const remaining = entry.eta ?? productionCost
-      const progress = productionCost > 0 ? (productionCost - remaining) / productionCost : 0
-      return {
-        id: entry.id,
-        kind: 'unit' as const,
-        productionSpent: Math.max(0, Math.round(progress * productionCost)),
-        resourcePaid: true
-      }
-    })
-  ].slice(0, BUILD_QUEUE_LIMIT),
+    }
+    return {
+      id: entry.unitId,
+      kind: 'unit' as const,
+      productionSpent: entry.productionSpent,
+      resourcePaid: true
+    }
+  }).filter((e): e is NonNullable<typeof e> => e !== null).slice(0, BUILD_QUEUE_LIMIT),
   shipyardQueue: [],
   stationedUnits: getStationedUnits(planet),
   location: planet.location
@@ -1009,11 +967,6 @@ const selectedPlanetWithQueue = computed(() => {
   }
 })
 
-const selectedPlanetProgressMemory = computed(() => {
-  if (!selectedPlanet.value) return {}
-  return buildProgressMemory.value[selectedPlanet.value.id] ?? {}
-})
-
 const planetsWithEffectiveQueue = computed(() => {
   const playerId = currentUserId.value ? toPlayerId(currentUserId.value) : null
   return planetsView.value
@@ -1024,114 +977,86 @@ const planetsWithEffectiveQueue = computed(() => {
     }))
 })
 
+// A planet "needs action" when its production queue is empty (idle → wasting output).
 const planetActionCount = computed(() => {
-  return planetsWithEffectiveQueue.value.filter(planet => planet.buildQueue.length < buildQueueLimit).length
+  return planetsWithEffectiveQueue.value.filter(planet => planet.buildQueue.length === 0).length
 })
 
+// Kept only as a template guard (the dedicated PlanetPanel was removed; the slot
+// view is the single planet builder now). Always false.
 const planetPanelOpen = ref(false)
 
 const handleOpenPlanetFromOverview = (planetId: string) => {
   planetOverviewOpen.value = false
   handleSelectPlanet(planetId)
-  planetPanelFromOverview.value = true
 }
 
-const handleBackToOverview = () => {
-  planetPanelOpen.value = false
-  planetOverviewOpen.value = true
-}
+type QueueEntry = { id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }
 
-const handleQueueBuild = (planetId: string, buildingId: string, kind: 'building' | 'unit', slotIndex?: number) => {
+// The override is the client's desired queue for a planet. It starts as a copy of
+// the server queue (so in-progress builds are preserved) the first time the player
+// touches the planet; planets the player never touches send no command and keep
+// their server queue across turns.
+const effectiveQueue = (planetId: string): QueueEntry[] => {
+  const existing = buildQueueOverrides.value[planetId]
+  if (existing) return existing
   const planet = buildSites.value.find(item => item.id === planetId)
-  if (!planet) return
-  if (currentUserId.value) {
-    const playerId = toPlayerId(currentUserId.value)
-    if (planet.owner !== playerId) {
-      notifyError(t('game.errors.not-owner'))
-      return
-    }
-  }
-  upsertBuildCommand(planetId, kind, buildingId, slotIndex)
-  const currentRaw = buildQueueOverrides.value[planetId] ?? planet.buildQueue
-  const current = currentRaw.slice(0, buildQueueLimit)
-  const saved = buildProgressMemory.value[planetId]?.[buildingId]
-  const entry = {
-    id: buildingId,
-    kind,
-    productionSpent: saved?.productionSpent ?? 0,
-    resourcePaid: saved?.resourcePaid ?? false,
-    slotIndex
-  }
-  let nextQueue = [...current]
-  if (current.length < buildQueueLimit) {
-    nextQueue = [...current, entry]
-  } else {
-    const replaceIndex = Math.max(0, buildQueueLimit - 1)
-    const replaced = current[replaceIndex]
-    if (replaced) {
-      buildProgressMemory.value = {
-        ...buildProgressMemory.value,
-        [planetId]: {
-          ...(buildProgressMemory.value[planetId] ?? {}),
-          [replaced.id]: {
-            productionSpent: replaced.productionSpent,
-            resourcePaid: replaced.resourcePaid
-          }
-        }
-      }
-    }
-    nextQueue = current.map((item, index) => (index === replaceIndex ? entry : item))
-  }
-  buildQueueOverrides.value = {
-    ...buildQueueOverrides.value,
-    [planetId]: nextQueue.slice(0, buildQueueLimit)
-  }
+  return [...(planet?.buildQueue ?? [])]
 }
 
-const handleCancelBuild = (planetId: string) => {
+const isOwnedSite = (planetId: string): boolean => {
   const planet = buildSites.value.find(item => item.id === planetId)
-  if (!planet) return
-
-  // Get current queue (with overrides)
-  const currentQueue = buildQueueOverrides.value[planetId] ?? planet.buildQueue
-  if (currentQueue.length === 0) return
-
-  const activeBuild = currentQueue[0]
-  if (!activeBuild) return
-
-  // Save progress to memory if production has started
-  if (activeBuild.productionSpent > 0) {
-    buildProgressMemory.value = {
-      ...buildProgressMemory.value,
-      [planetId]: {
-        ...(buildProgressMemory.value[planetId] ?? {}),
-        [activeBuild.id]: {
-          productionSpent: activeBuild.productionSpent,
-          resourcePaid: activeBuild.resourcePaid
-        }
-      }
-    }
+  if (!planet) return false
+  if (!currentUserId.value) return true
+  if (planet.owner !== toPlayerId(currentUserId.value)) {
+    notifyError(t('game.errors.not-owner'))
+    return false
   }
+  return true
+}
 
-  // Remove from turnPlan commands
-  turnPlan.value = {
-    commands: turnPlan.value.commands.filter((command) => {
-      if (command.type === 'buildStructure') {
-        return command.planetId !== planetId || command.buildingId !== activeBuild.id
-      }
-      if (command.type === 'buildUnit') {
-        return command.planetId !== planetId || command.unitId !== activeBuild.id
-      }
-      return true
-    })
-  }
+// Rebuild the planet's single setProductionQueue command from its desired queue and
+// store the override. Declarative: add/remove/reorder all funnel through here.
+const commitQueue = (planetId: string, queue: QueueEntry[]) => {
+  buildQueueOverrides.value = { ...buildQueueOverrides.value, [planetId]: queue }
+  const items: ProductionQueueCommandItem[] = queue.map(entry =>
+    entry.kind === 'building'
+      ? { kind: 'building', slotIndex: entry.slotIndex ?? 0, buildingId: entry.id as BuildingId }
+      : { kind: 'unit', unitId: entry.id as UnitId }
+  )
+  const next: TurnCommand[] = turnPlan.value.commands.filter(command =>
+    !(command.type === 'setProductionQueue' && command.planetId === planetId))
+  next.push({ type: 'setProductionQueue', planetId: planetId as PlanetId, items })
+  turnPlan.value = { commands: next }
+}
 
-  // Remove from queue override (shift queue up)
-  const newQueue = currentQueue.slice(1)
-  buildQueueOverrides.value = {
-    ...buildQueueOverrides.value,
-    [planetId]: newQueue
+const handleQueueBuild = (planetId: string, buildId: string, kind: 'building' | 'unit', slotIndex?: number) => {
+  if (!isOwnedSite(planetId)) return
+  const current = effectiveQueue(planetId)
+  if (current.length >= buildQueueLimit) {
+    notifyError(t('game.errors.queue-full'))
+    return
   }
+  // Buildings target a free slot; refuse a slot already targeted by a queued build.
+  if (kind === 'building' && current.some(e => e.kind === 'building' && e.slotIndex === slotIndex)) return
+  commitQueue(planetId, [...current, { id: buildId, kind, productionSpent: 0, resourcePaid: false, slotIndex }])
+}
+
+const handleRemoveQueueItem = (planetId: string, index: number) => {
+  if (!isOwnedSite(planetId)) return
+  const current = effectiveQueue(planetId)
+  if (index < 0 || index >= current.length) return
+  commitQueue(planetId, current.filter((_, i) => i !== index))
+}
+
+const handleReorderQueue = (planetId: string, from: number, to: number) => {
+  if (!isOwnedSite(planetId)) return
+  const current = [...effectiveQueue(planetId)]
+  if (from < 0 || from >= current.length || to < 0 || to >= current.length || from === to) return
+  const [moved] = current.splice(from, 1)
+  if (!moved) return
+  current.splice(to, 0, moved)
+  commitQueue(planetId, current)
 }
 
 const handleStartResearch = (techId: string) => {
@@ -1412,7 +1337,6 @@ const handleSelectSystem = (id: string) => {
 const handleSelectPlanet = (id: string) => {
   setSelection('planet', id)
   viewMode.value = 'planet'
-  planetPanelFromOverview.value = false
 }
 
 const handleExitPlanetView = () => {

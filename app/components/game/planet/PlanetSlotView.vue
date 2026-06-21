@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { BuildingId, Planet, ResourceNodeType } from '~~/shared/types/game'
-import type { AdjacencyBonus, PlanetSlot, SlotZone } from '~~/shared/types/planetSlots'
+import type { PlanetSlot, SlotZone } from '~~/shared/types/planetSlots'
 import {
   ORBITAL_BUILDING_IDS,
   ORBITAL_SLOT_COUNT,
   SURFACE_SLOT_COORDS,
   computeAdjacencyBonuses,
+  isBuildingAllowedInZone,
   isSurfaceBuilding
 } from '~~/shared/types/planetSlots'
 import { activeSynergies } from '~~/shared/utils/synergies'
@@ -27,6 +28,9 @@ interface BuildingDefinition {
   resourceCosts: BuildCosts
   productionCost: number
   icon: string
+  resourceProduction?: Partial<Record<'energy' | 'minerals' | 'rare', number>>
+  researchPoints?: number
+  strategicProduction?: { resource: string, amount: number, requiresNode: string }
   strategicCosts?: Partial<Record<string, number>>
   locked?: boolean
   lockedByTechName?: string | null
@@ -46,6 +50,14 @@ interface UnitDefinition {
   lockedByTechName?: string | null
 }
 
+interface QueueEntry {
+  id: string
+  kind: 'building' | 'unit'
+  productionSpent: number
+  resourcePaid: boolean
+  slotIndex?: number
+}
+
 interface PlanetData {
   id: string
   name: string
@@ -59,9 +71,8 @@ interface PlanetData {
   systemName: string
   workers: number
   productionPerWorker: number
-  buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
-  buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
+  buildQueue: QueueEntry[]
   stationedUnits: Array<{ unitDefId: string, count: number }>
 }
 
@@ -76,269 +87,120 @@ const props = defineProps<{
   planet: PlanetData
   buildingCatalog: BuildingDefinition[]
   unitCatalog: UnitDefinition[]
+  buildQueueLimit: number
   playerResources?: PlayerResources
 }>()
 
 const emit = defineEmits<{
   'close': []
   'queue-build': [planetId: string, buildId: string, kind: 'building' | 'unit', slotIndex?: number]
+  'remove-queue-item': [planetId: string, index: number]
+  'reorder-queue': [planetId: string, from: number, to: number]
 }>()
 
+const { t } = useI18n()
+
 // ── Layout constants ──────────────────────────────────────────────────
-const PLANET_RADIUS = 150
-const HEX_SIZE = 48
+const PLANET_RADIUS = 140
+const HEX_SIZE = 46
 const HEX_GAP = 6
-const ORBITAL_RING_RADIUS = PLANET_RADIUS + 70
-const ORBITAL_SLOT_SIZE = 44
+const ORBITAL_RING_RADIUS = PLANET_RADIUS + 64
+const ORBITAL_SLOT_SIZE = 42
+const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 28) * 2
+const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)'
 
-// ── Local slot → building assignments (for current turn plan) ─────────
-const surfaceAssignments = ref(new Map<number, string>())
-const orbitalAssignments = ref(new Map<number, string>())
-const unitAssignment = ref<string | null>(null)
-const unitTrainingMenuOpen = ref(false)
+// ── Placement + catalog state ─────────────────────────────────────────
+const catalogTab = ref<'buildings' | 'units'>('buildings')
+const placementBuildingId = ref<string | null>(null)
+const hoveredSlotIndex = ref<number | null>(null)
+const dragIndex = ref<number | null>(null)
 
-// ── Surface slots: server state + local assignment overlay ────────────
-const surfaceSlots = computed<PlanetSlot[]>(() => {
-  return SURFACE_SLOT_COORDS.map((coord, index) => {
-    const serverSlot = props.planet.slots[index]
-    const resourceNode = (serverSlot?.resourceNode as ResourceNodeType) ?? null
-    const localAssignment = surfaceAssignments.value.get(index)
+const cancelPlacement = () => {
+  placementBuildingId.value = null
+}
 
-    // Local assignment takes priority (current turn plan)
-    if (localAssignment) {
-      const def = props.buildingCatalog.find(b => b.id === localAssignment)
-      const cost = def?.productionCost ?? 1
-      // If server already had this building under construction, carry progress
-      const isResume = serverSlot?.buildingId === localAssignment && serverSlot?.isConstructing
-      const spent = isResume ? Math.max(0, cost - (serverSlot?.constructionTimeLeft ?? 0)) : 0
-      return {
-        index,
-        coord,
-        zone: 'surface' as const,
-        state: 'under-construction' as const,
-        buildingId: localAssignment as BuildingId,
-        progress: Math.min(100, Math.round((spent / cost) * 100)),
-        resourceNode
-      }
-    }
-
-    // Server state: completed building
-    if (serverSlot?.buildingId && !serverSlot.isConstructing) {
-      return {
-        index,
-        coord,
-        zone: 'surface' as const,
-        state: 'completed' as const,
-        buildingId: serverSlot.buildingId as BuildingId,
-        progress: 100,
-        resourceNode
-      }
-    }
-
-    // Server state: building under construction (from previous turn queue)
-    if (serverSlot?.buildingId && serverSlot.isConstructing) {
-      const def = props.buildingCatalog.find(b => b.id === serverSlot.buildingId)
-      const cost = def?.productionCost ?? 1
-      const spent = Math.max(0, cost - serverSlot.constructionTimeLeft)
-      return {
-        index,
-        coord,
-        zone: 'surface' as const,
-        state: 'under-construction' as const,
-        buildingId: serverSlot.buildingId as BuildingId,
-        progress: Math.min(100, Math.round((spent / cost) * 100)),
-        resourceNode
-      }
-    }
-
-    return {
-      index,
-      coord,
-      zone: 'surface' as const,
-      state: 'empty' as const,
-      buildingId: null,
-      progress: 0,
-      resourceNode
-    }
-  })
+// Reset transient state when switching planets (component is reused).
+watch(() => props.planet.id, () => {
+  placementBuildingId.value = null
+  hoveredSlotIndex.value = null
+  catalogTab.value = 'buildings'
 })
 
-// ── Orbital slots: ring around planet, server state + local overlay ───
-const orbitalSlots = computed<PlanetSlot[]>(() => {
-  return Array.from({ length: ORBITAL_SLOT_COUNT }, (_, index) => {
-    const globalIndex = SURFACE_SLOT_COORDS.length + index
-    const serverSlot = props.planet.slots[globalIndex]
-    const localAssignment = orbitalAssignments.value.get(index)
+const onKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && placementBuildingId.value) {
+    e.stopPropagation()
+    cancelPlacement()
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKeydown, true))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
 
-    if (localAssignment) {
-      const def = props.buildingCatalog.find(b => b.id === localAssignment)
-      const cost = def?.productionCost ?? 1
-      const isResume = serverSlot?.buildingId === localAssignment && serverSlot?.isConstructing
-      const spent = isResume ? Math.max(0, cost - (serverSlot?.constructionTimeLeft ?? 0)) : 0
-      return {
-        index: globalIndex,
-        coord: { q: 0, r: 0 },
-        zone: 'orbital' as const,
-        state: 'under-construction' as const,
-        buildingId: localAssignment as BuildingId,
-        progress: Math.min(100, Math.round((spent / cost) * 100)),
-        resourceNode: null
-      }
-    }
-
-    if (serverSlot?.buildingId && !serverSlot.isConstructing) {
-      return {
-        index: globalIndex,
-        coord: { q: 0, r: 0 },
-        zone: 'orbital' as const,
-        state: 'completed' as const,
-        buildingId: serverSlot.buildingId as BuildingId,
-        progress: 100,
-        resourceNode: null
-      }
-    }
-
-    if (serverSlot?.buildingId && serverSlot.isConstructing) {
-      const def = props.buildingCatalog.find(b => b.id === serverSlot.buildingId)
-      const cost = def?.productionCost ?? 1
-      const spent = Math.max(0, cost - serverSlot.constructionTimeLeft)
-      return {
-        index: globalIndex,
-        coord: { q: 0, r: 0 },
-        zone: 'orbital' as const,
-        state: 'under-construction' as const,
-        buildingId: serverSlot.buildingId as BuildingId,
-        progress: Math.min(100, Math.round((spent / cost) * 100)),
-        resourceNode: null
-      }
-    }
-
-    return {
-      index: globalIndex,
-      coord: { q: 0, r: 0 },
-      zone: 'orbital' as const,
-      state: 'empty' as const,
-      buildingId: null,
-      progress: 0,
-      resourceNode: null
+// ── Slots: server state → render state ────────────────────────────────
+// A slot still empty on the server but referenced by a queued building is shown
+// as "pending" (placed this turn, not yet building).
+const queuedBuildingBySlot = computed(() => {
+  const map = new Map<number, { buildingId: string, queueIndex: number }>()
+  props.planet.buildQueue.forEach((entry, queueIndex) => {
+    if (entry.kind === 'building' && entry.slotIndex !== undefined) {
+      const slot = props.planet.slots[entry.slotIndex]
+      if (slot && !slot.isConstructing) map.set(entry.slotIndex, { buildingId: entry.id, queueIndex })
     }
   })
+  return map
 })
 
-// ── Surface hex → pixel positioning ───────────────────────────────────
+const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | null): PlanetSlot & { queuedBuildingId?: string, queueIndex?: number } => {
+  const serverSlot = props.planet.slots[index]
+  const base = { index, coord: SURFACE_SLOT_COORDS[index] ?? { q: 0, r: 0 }, zone, resourceNode }
+
+  if (serverSlot?.buildingId && !serverSlot.isConstructing) {
+    return { ...base, state: 'completed', buildingId: serverSlot.buildingId as BuildingId, progress: 100 }
+  }
+  if (serverSlot?.buildingId && serverSlot.isConstructing) {
+    const def = props.buildingCatalog.find(b => b.id === serverSlot.buildingId)
+    const cost = def?.productionCost ?? 1
+    const spent = Math.max(0, cost - serverSlot.constructionTimeLeft)
+    return { ...base, state: 'under-construction', buildingId: serverSlot.buildingId as BuildingId, progress: Math.min(100, Math.round((spent / cost) * 100)) }
+  }
+  const queued = queuedBuildingBySlot.value.get(index)
+  if (queued) {
+    return { ...base, state: 'under-construction', buildingId: queued.buildingId as BuildingId, progress: 0, queuedBuildingId: queued.buildingId, queueIndex: queued.queueIndex }
+  }
+  return { ...base, state: 'empty', buildingId: null, progress: 0 }
+}
+
+const surfaceSlots = computed(() =>
+  SURFACE_SLOT_COORDS.map((_, index) => toSlot(index, 'surface', (props.planet.slots[index]?.resourceNode as ResourceNodeType) ?? null)))
+
+const orbitalSlots = computed(() =>
+  Array.from({ length: ORBITAL_SLOT_COUNT }, (_, i) => toSlot(SURFACE_SLOT_COORDS.length + i, 'orbital', null)))
+
+const allSlots = computed(() => [...surfaceSlots.value, ...orbitalSlots.value])
+
 const hexToPixel = (q: number, r: number) => {
   const size = HEX_SIZE + HEX_GAP / 2
-  const x = size * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r)
-  const y = size * (1.5 * r)
-  return { x, y }
+  return { x: size * (Math.sqrt(3) * q + (Math.sqrt(3) / 2) * r), y: size * (1.5 * r) }
 }
 
-type PositionedSlot = PlanetSlot & { px: number, py: number }
-
-const surfacePositions = computed<PositionedSlot[]>(() => {
-  return surfaceSlots.value.map((slot) => {
+const surfacePositions = computed(() =>
+  surfaceSlots.value.map((slot) => {
     const { x, y } = hexToPixel(slot.coord.q, slot.coord.r)
     return { ...slot, px: x, py: y }
-  })
-})
+  }))
 
-// ── Orbital slot positions on ring ────────────────────────────────────
-const orbitalPositions = computed<PositionedSlot[]>(() => {
-  return orbitalSlots.value.map((slot, i) => {
+const orbitalPositions = computed(() =>
+  orbitalSlots.value.map((slot, i) => {
     const angle = (2 * Math.PI * i) / ORBITAL_SLOT_COUNT - Math.PI / 2
-    const px = Math.cos(angle) * ORBITAL_RING_RADIUS
-    const py = Math.sin(angle) * ORBITAL_RING_RADIUS
-    return { ...slot, px, py }
-  })
-})
+    return { ...slot, px: Math.cos(angle) * ORBITAL_RING_RADIUS, py: Math.sin(angle) * ORBITAL_RING_RADIUS }
+  }))
 
-// ── All slots for tooltip logic ───────────────────────────────────────
-const allPositions = computed(() => [...surfacePositions.value, ...orbitalPositions.value])
+// ── Catalog split per zone (only researched items are listed) ─────────
+const surfaceBuildings = computed(() => props.buildingCatalog.filter(b => isSurfaceBuilding(b.id as BuildingId)))
+const orbitalBuildings = computed(() => props.buildingCatalog.filter(b => ORBITAL_BUILDING_IDS.includes(b.id as BuildingId)))
+const buildingList = computed(() => [...surfaceBuildings.value, ...orbitalBuildings.value].filter(b => !b.locked))
+const unitList = computed(() => props.unitCatalog.filter(u => !u.locked))
 
-// ── Hover / build menu state ──────────────────────────────────────────
-const hoveredSlotIndex = ref<number | null>(null)
-const buildMenuSlotIndex = ref<number | null>(null)
-const buildMenuZone = ref<SlotZone>('surface')
-
-// The component instance is reused when the user switches planets, so all local
-// (per-turn-plan) state must be reset on planet change — otherwise the previous
-// planet's pending builds and open menus bleed into the new one.
-watch(() => props.planet.id, () => {
-  surfaceAssignments.value = new Map()
-  orbitalAssignments.value = new Map()
-  unitAssignment.value = null
-  unitTrainingMenuOpen.value = false
-  buildMenuSlotIndex.value = null
-  hoveredSlotIndex.value = null
-})
-
-const hoveredSlot = computed(() => {
-  if (hoveredSlotIndex.value === null) return null
-  return allPositions.value.find(s => s.index === hoveredSlotIndex.value) ?? null
-})
-
-const hoveredAdjacencyBonuses = computed<AdjacencyBonus[]>(() => {
-  if (!hoveredSlot.value) return []
-  if (hoveredSlot.value.state !== 'empty') return []
-  if (hoveredSlot.value.zone !== 'surface') return []
-  return computeAdjacencyBonuses(
-    hoveredSlot.value.index,
-    'bld:mining-facility' as BuildingId,
-    surfaceSlots.value
-  )
-})
-
-// ── Build catalogs per zone ───────────────────────────────────────────
-const surfaceBuildingCatalog = computed(() =>
-  props.buildingCatalog.filter(b => isSurfaceBuilding(b.id as BuildingId))
-)
-
-const orbitalBuildingCatalog = computed(() =>
-  props.buildingCatalog.filter(b => ORBITAL_BUILDING_IDS.includes(b.id as BuildingId))
-)
-
-const activeBuildCatalog = computed(() =>
-  buildMenuZone.value === 'surface'
-    ? surfaceBuildingCatalog.value
-    : orbitalBuildingCatalog.value
-)
-
-// ── Build menu logic ──────────────────────────────────────────────────
-const openBuildMenu = (slotIndex: number, zone: SlotZone) => {
-  buildMenuSlotIndex.value = slotIndex
-  buildMenuZone.value = zone
-}
-
-const closeBuildMenu = () => {
-  buildMenuSlotIndex.value = null
-}
-
-const buildMenuPosition = computed(() => {
-  if (buildMenuSlotIndex.value === null) return { x: 0, y: 0 }
-  const pos = allPositions.value.find(s => s.index === buildMenuSlotIndex.value)
-  if (!pos) return { x: 0, y: 0 }
-  return { x: pos.px, y: pos.py }
-})
-
-const previewBonuses = (buildingId: string, slotIndex: number): AdjacencyBonus[] => {
-  if (buildMenuZone.value === 'orbital') return []
-  return computeAdjacencyBonuses(slotIndex, buildingId as BuildingId, surfaceSlots.value)
-}
-
-const synergyLabelKeys: Record<string, string> = {
-  'ore-extraction': 'game.slots.synergy-ore',
-  'power-grid': 'game.slots.synergy-power',
-  'compute-uplink': 'game.slots.synergy-compute'
-}
-
-// Which production synergies a building would trigger if placed in this slot.
-const previewSynergies = (buildingId: string, slotIndex: number): string[] => {
-  const planet = { slots: props.planet.slots } as unknown as Planet
-  return activeSynergies(planet, slotIndex, buildingId as BuildingId)
-    .map(type => synergyLabelKeys[type])
-    .filter((key): key is string => Boolean(key))
-}
-
+// ── Affordability ─────────────────────────────────────────────────────
 const canAfford = (costs: BuildCosts): boolean => {
   if (!props.playerResources) return true
   return props.playerResources.energy >= costs.energy
@@ -363,145 +225,264 @@ const canAffordStrategic = (costs?: Partial<Record<string, number>>): boolean =>
   return Object.entries(costs).every(([key, amount]) => (stock[key] ?? 0) >= (amount ?? 0))
 }
 
-const isAlreadyPaid = (buildId: string, slotIndex: number): boolean => {
-  // Check if this slot already has this building under construction (resources were paid)
-  const serverSlot = props.planet.slots[slotIndex]
-  if (serverSlot?.buildingId === buildId && serverSlot.isConstructing) return true
-  // Check if it's in the current queue override
-  return props.planet.buildQueue.some(b => b.id === buildId && b.slotIndex === slotIndex)
-}
+const queueFull = computed(() => props.planet.buildQueue.length >= props.buildQueueLimit)
 
-const handleBuild = (buildingId: string, slotIndex: number) => {
-  // Clear ALL previous assignments (only one active build per planet)
-  surfaceAssignments.value = new Map()
-  orbitalAssignments.value = new Map()
-  unitAssignment.value = null
-  unitTrainingMenuOpen.value = false
+const canQueueBuilding = (b: BuildingDefinition) =>
+  !b.locked && !queueFull.value && canAfford(b.resourceCosts) && canAffordStrategic(b.strategicCosts)
 
-  if (buildMenuZone.value === 'surface') {
-    surfaceAssignments.value.set(slotIndex, buildingId)
-  } else {
-    const orbitalLocalIndex = slotIndex - SURFACE_SLOT_COORDS.length
-    orbitalAssignments.value.set(orbitalLocalIndex, buildingId)
-  }
-  emit('queue-build', props.planet.id, buildingId, 'building', slotIndex)
-  closeBuildMenu()
-}
-
-const handleTrainUnit = (unitId: string) => {
-  // Clear ALL building assignments (buildings + units share one queue)
-  surfaceAssignments.value = new Map()
-  orbitalAssignments.value = new Map()
-  unitAssignment.value = unitId
-  unitTrainingMenuOpen.value = false
-  emit('queue-build', props.planet.id, unitId, 'unit')
-}
-
-const activeBuildDisplay = computed(() => {
-  const queueItem = props.planet.buildQueue[0]
-  if (!queueItem) return null
-
-  if (queueItem.kind === 'building') {
-    const def = props.buildingCatalog.find(b => b.id === queueItem.id)
-    if (!def) return null
-    const totalCost = def.productionCost
-    const spent = queueItem.productionSpent
-    const progress = totalCost > 0 ? Math.min(100, Math.round((spent / totalCost) * 100)) : 0
-    return {
-      id: queueItem.id,
-      kind: 'building' as const,
-      name: def.name,
-      icon: def.icon,
-      progress,
-      roundsLeft: estimateRounds(totalCost - spent)
-    }
-  }
-
-  if (queueItem.kind === 'unit') {
-    const def = props.unitCatalog.find(u => u.id === queueItem.id)
-    if (!def) return null
-    const totalCost = def.productionCost
-    const spent = queueItem.productionSpent
-    const progress = totalCost > 0 ? Math.min(100, Math.round((spent / totalCost) * 100)) : 0
-    return {
-      id: queueItem.id,
-      kind: 'unit' as const,
-      name: def.name,
-      icon: def.icon,
-      progress,
-      roundsLeft: estimateRounds(totalCost - spent)
-    }
-  }
-
-  return null
-})
-
-const getUnitName = (unitId: string): string => {
-  const def = props.unitCatalog.find(u => u.id === unitId)
-  return def?.name ?? unitId
-}
-
-const getUnitIcon = (unitId: string): string => {
-  const def = props.unitCatalog.find(u => u.id === unitId)
-  return def?.icon ?? 'i-lucide-rocket'
-}
-
-const canTrainUnit = (unit: UnitDefinition): boolean => {
-  if (!unit.requiresFacility) return true
-  return props.planet.slots.some(s => s.buildingId === 'bld:orbital-dock' && !s.isConstructing)
-}
-
-// ── Building name helpers ─────────────────────────────────────────────
-const getBuildingName = (buildingId: string): string => {
-  const def = props.buildingCatalog.find(b => b.id === buildingId)
-  return def?.name ?? buildingId
-}
-
-const getBuildingIcon = (buildingId: string): string => {
-  const def = props.buildingCatalog.find(b => b.id === buildingId)
-  return def?.icon ?? 'i-lucide-hammer'
-}
+const hasOrbitalDock = computed(() => props.planet.slots.some(s => s.buildingId === 'bld:orbital-dock' && !s.isConstructing))
+const canTrainUnit = (u: UnitDefinition) => (!u.requiresFacility || hasOrbitalDock.value)
+const canQueueUnit = (u: UnitDefinition) =>
+  !u.locked && !queueFull.value && canTrainUnit(u) && canAfford(u.resourceCosts) && canAffordStrategic(u.strategicCosts)
 
 const productionPerRound = computed(() => props.planet.workers * props.planet.productionPerWorker)
+const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
+
+// ── Tooltip content (costs/yields/hints live in the row's hover tooltip) ──
+const buildingYields = (b: BuildingDefinition) => {
+  const out: Array<{ icon: string, amount: number }> = []
+  const p = b.resourceProduction ?? {}
+  if (p.energy) out.push({ icon: 'i-lucide-zap', amount: p.energy })
+  if (p.minerals) out.push({ icon: 'i-lucide-pickaxe', amount: p.minerals })
+  if (p.rare) out.push({ icon: 'i-lucide-atom', amount: p.rare })
+  if (b.researchPoints) out.push({ icon: 'i-lucide-flask-conical', amount: b.researchPoints })
+  if (b.strategicProduction) out.push({ icon: STRATEGIC_ICONS[b.strategicProduction.resource] ?? 'i-lucide-sparkles', amount: b.strategicProduction.amount })
+  return out
+}
+
+const costLines = (costs: BuildCosts, strategic?: Partial<Record<string, number>>) => {
+  const r = props.playerResources
+  const lines: Array<{ icon: string, amount: number, ok: boolean }> = []
+  if (costs.energy) lines.push({ icon: 'i-lucide-zap', amount: costs.energy, ok: !r || r.energy >= costs.energy })
+  if (costs.minerals) lines.push({ icon: 'i-lucide-pickaxe', amount: costs.minerals, ok: !r || r.minerals >= costs.minerals })
+  if (costs.rare) lines.push({ icon: 'i-lucide-atom', amount: costs.rare, ok: !r || r.rare >= costs.rare })
+  for (const sc of strategicCostList(strategic)) {
+    const stock = r?.strategic?.[sc.key] ?? Number.POSITIVE_INFINITY
+    lines.push({ icon: sc.icon, amount: sc.amount, ok: stock >= sc.amount })
+  }
+  return lines
+}
+
+const buildingHint = (b: BuildingDefinition): string | null =>
+  (!canAfford(b.resourceCosts) || !canAffordStrategic(b.strategicCosts)) ? t('game.slots.tooltip-insufficient') : null
+
+const unitHint = (u: UnitDefinition): string | null => {
+  if (!canTrainUnit(u)) return t('game.slots.tooltip-requires-dock')
+  if (!canAfford(u.resourceCosts) || !canAffordStrategic(u.strategicCosts)) return t('game.slots.tooltip-insufficient')
+  return null
+}
+
+// ── Placement ─────────────────────────────────────────────────────────
+const placementDef = computed(() => props.buildingCatalog.find(b => b.id === placementBuildingId.value) ?? null)
+
+const validPlacementSlots = computed(() => {
+  const set = new Set<number>()
+  const def = placementDef.value
+  if (!def) return set
+  for (const slot of allSlots.value) {
+    if (slot.state !== 'empty') continue
+    if (!isBuildingAllowedInZone(def.id as BuildingId, slot.zone)) continue
+    if (def.strategicProduction && slot.resourceNode !== def.strategicProduction.requiresNode) continue
+    set.add(slot.index)
+  }
+  return set
+})
+
+const selectBuildingForPlacement = (b: BuildingDefinition) => {
+  if (!canQueueBuilding(b)) return
+  placementBuildingId.value = placementBuildingId.value === b.id ? null : b.id
+}
+
+const placeAt = (slotIndex: number, zone: SlotZone) => {
+  const def = placementDef.value
+  if (!def || !validPlacementSlots.value.has(slotIndex)) return
+  void zone
+  emit('queue-build', props.planet.id, def.id, 'building', slotIndex)
+  placementBuildingId.value = null
+}
+
+const selectUnit = (u: UnitDefinition) => {
+  if (!canQueueUnit(u)) return
+  emit('queue-build', props.planet.id, u.id, 'unit')
+}
+
+const synergyLabelKeys: Record<string, string> = {
+  'ore-extraction': 'game.slots.synergy-ore',
+  'power-grid': 'game.slots.synergy-power',
+  'compute-uplink': 'game.slots.synergy-compute'
+}
+
+const previewSynergies = (buildingId: string, slotIndex: number): string[] => {
+  const planet = { slots: props.planet.slots } as unknown as Planet
+  return activeSynergies(planet, slotIndex, buildingId as BuildingId)
+    .map(type => synergyLabelKeys[type])
+    .filter((key): key is string => Boolean(key))
+}
+
+const previewHasOreBonus = (buildingId: string, slotIndex: number): boolean =>
+  computeAdjacencyBonuses(slotIndex, buildingId as BuildingId, surfaceSlots.value).length > 0
+
+// Base-yield + bonus preview shown while hovering a valid placement target.
+const hoverPreview = computed(() => {
+  const def = placementDef.value
+  const index = hoveredSlotIndex.value
+  if (!def || index === null || !validPlacementSlots.value.has(index)) return null
+  const slot = allSlots.value.find(s => s.index === index)
+  const yields: Array<{ icon: string, label: string, amount: number }> = []
+  const prod = def.resourceProduction ?? {}
+  if (prod.energy) yields.push({ icon: 'i-lucide-zap', label: 'energy', amount: prod.energy })
+  if (prod.minerals) yields.push({ icon: 'i-lucide-pickaxe', label: 'minerals', amount: prod.minerals })
+  if (prod.rare) yields.push({ icon: 'i-lucide-atom', label: 'rare', amount: prod.rare })
+  if (def.researchPoints) yields.push({ icon: 'i-lucide-flask-conical', label: 'research', amount: def.researchPoints })
+  if (def.strategicProduction && slot?.resourceNode === def.strategicProduction.requiresNode) {
+    yields.push({ icon: STRATEGIC_ICONS[def.strategicProduction.resource] ?? 'i-lucide-sparkles', label: 'strategic', amount: def.strategicProduction.amount })
+  }
+  return {
+    name: def.name,
+    yields,
+    synergies: slot?.zone === 'surface' ? previewSynergies(def.id, index) : [],
+    oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(def.id, index) : false
+  }
+})
+
+// ── Queue strip ───────────────────────────────────────────────────────
+const queueItems = computed(() =>
+  props.planet.buildQueue.map((entry, index) => {
+    const def = entry.kind === 'building'
+      ? props.buildingCatalog.find(b => b.id === entry.id)
+      : props.unitCatalog.find(u => u.id === entry.id)
+    const cost = def?.productionCost ?? 0
+    const progress = cost > 0 ? Math.min(100, Math.round((entry.productionSpent / cost) * 100)) : 0
+    return {
+      index,
+      kind: entry.kind,
+      name: def?.name ?? entry.id,
+      icon: def?.icon ?? (entry.kind === 'building' ? 'i-lucide-hammer' : 'i-lucide-rocket'),
+      progress,
+      roundsLeft: estimateRounds(Math.max(0, cost - entry.productionSpent)),
+      isFront: index === 0
+    }
+  }))
+
+const onDragStart = (index: number) => {
+  dragIndex.value = index
+}
+const onDrop = (toIndex: number) => {
+  const from = dragIndex.value
+  dragIndex.value = null
+  if (from === null || from === toIndex) return
+  emit('reorder-queue', props.planet.id, from, toIndex)
+}
+
+const getBuildingName = (id: string) => props.buildingCatalog.find(b => b.id === id)?.name ?? id
+const getBuildingIcon = (id: string) => props.buildingCatalog.find(b => b.id === id)?.icon ?? 'i-lucide-hammer'
+const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.icon ?? 'i-lucide-rocket'
 
 const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
 const planetImageSrc = computed(() =>
   `/planets/${KNOWN_PLANET_TYPES.has(props.planet.type) ? props.planet.type : 'terrestrial'}.webp`)
-
-const estimateRounds = (productionCost: number) => {
-  if (productionPerRound.value <= 0) return 0
-  return Math.max(1, Math.ceil(productionCost / productionPerRound.value))
-}
-
-const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)'
 
 const resourceNodeIcons: Record<ResourceNodeType, string> = {
   'ore': 'i-lucide-mountain',
   'exotic-matter': 'i-lucide-gem',
   'antimatter': 'i-lucide-orbit'
 }
-
-const resourceNodeLabels: Record<ResourceNodeType, string> = {
-  'ore': 'Ore',
-  'exotic-matter': 'Exotic Matter',
-  'antimatter': 'Antimatter'
-}
-
-const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
 </script>
 
 <template>
-  <div class="absolute inset-0 z-30 flex items-center justify-center overflow-hidden">
-    <!-- Backdrop (stars) -->
+  <div class="absolute inset-0 z-30 flex overflow-hidden">
     <div
       class="absolute inset-0 bg-neutral-950/90 backdrop-blur-sm"
       @click="emit('close')"
     />
 
-    <!-- Main zoom-in container -->
-    <div class="relative flex flex-col items-center gap-4 planet-slot-zoom-in">
+    <!-- ═══════ Catalog rail ═══════ -->
+    <aside class="relative z-10 flex w-80 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/95">
+      <div class="flex items-center gap-2 px-3 py-2 border-b border-neutral-800">
+        <button
+          type="button"
+          data-testid="build-list-tab-buildings"
+          class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
+          :class="catalogTab === 'buildings' ? 'bg-primary-900/50 text-primary-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
+          @click="catalogTab = 'buildings'"
+        >
+          {{ $t('game.slots.tab-buildings') }}
+        </button>
+        <button
+          type="button"
+          data-testid="build-list-tab-units"
+          class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
+          :class="catalogTab === 'units' ? 'bg-sky-900/50 text-sky-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
+          @click="catalogTab = 'units'"
+        >
+          {{ $t('game.slots.tab-units') }}
+        </button>
+      </div>
+
+      <p
+        v-if="catalogTab === 'buildings'"
+        class="px-3 pt-2 text-[11px] text-neutral-500"
+      >
+        {{ placementBuildingId ? $t('game.slots.placement-hint') : $t('game.slots.pick-building-hint') }}
+      </p>
+
+      <div class="flex-1 overflow-y-auto p-2 space-y-1">
+        <!-- Buildings -->
+        <template v-if="catalogTab === 'buildings'">
+          <GameBuildListRow
+            v-for="b in buildingList"
+            :key="b.id"
+            :testid="`build-list-option-${b.id}`"
+            :name="b.name"
+            :icon="b.icon"
+            :rounds="estimateRounds(b.productionCost)"
+            :disabled="!canQueueBuilding(b)"
+            :selected="placementBuildingId === b.id"
+            accent="primary"
+            :description="b.description"
+            :yields="buildingYields(b)"
+            :costs="costLines(b.resourceCosts, b.strategicCosts)"
+            :hint="buildingHint(b)"
+            @select="selectBuildingForPlacement(b)"
+          />
+          <p
+            v-if="!buildingList.length"
+            class="px-2 py-4 text-center text-xs text-neutral-500"
+          >
+            {{ $t('game.slots.none-researched') }}
+          </p>
+        </template>
+
+        <!-- Units -->
+        <template v-else>
+          <GameBuildListRow
+            v-for="u in unitList"
+            :key="u.id"
+            :testid="`build-list-option-${u.id}`"
+            :name="u.name"
+            :icon="u.icon"
+            :rounds="estimateRounds(u.productionCost)"
+            :disabled="!canQueueUnit(u)"
+            accent="sky"
+            :description="u.role"
+            :costs="costLines(u.resourceCosts, u.strategicCosts)"
+            :hint="unitHint(u)"
+            @select="selectUnit(u)"
+          />
+          <p
+            v-if="!unitList.length"
+            class="px-2 py-4 text-center text-xs text-neutral-500"
+          >
+            {{ $t('game.slots.none-researched') }}
+          </p>
+        </template>
+      </div>
+    </aside>
+
+    <!-- ═══════ Main column: header + canvas + queue strip ═══════ -->
+    <div class="relative z-10 flex flex-1 flex-col items-center overflow-hidden">
       <!-- Header -->
-      <div class="flex items-center gap-4 z-20">
+      <div class="flex items-center gap-4 pt-4 z-20">
         <div class="flex items-center gap-3">
           <div
             class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-primary-500/40"
@@ -516,742 +497,324 @@ const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 32) * 2
             </p>
           </div>
         </div>
-        <div class="flex items-center gap-4 ml-4 text-xs text-neutral-400">
-          <span class="flex items-center gap-1">
-            <UIcon
-              name="i-lucide-hammer"
-              class="w-3.5 h-3.5 text-primary-300"
-            />
-            {{ productionPerRound }}/{{ $t('game.slots.round-short') }}
-          </span>
-        </div>
+        <span class="flex items-center gap-1 ml-2 text-xs text-neutral-400">
+          <UIcon
+            name="i-lucide-hammer"
+            class="w-3.5 h-3.5 text-primary-300"
+          />
+          {{ productionPerRound }}/{{ $t('game.slots.round-short') }}
+        </span>
         <UButton
           icon="i-lucide-x"
           color="neutral"
           variant="ghost"
           size="sm"
-          class="ml-4"
+          class="ml-2"
           data-testid="slot-view-close"
           @click="emit('close')"
         />
       </div>
 
-      <!-- Zone legend -->
-      <div class="flex items-center gap-5 z-20 text-[11px] text-neutral-500">
-        <span class="flex items-center gap-1.5">
-          <span class="inline-block w-2.5 h-2.5 rounded-sm bg-neutral-700/80" />
-          {{ $t('game.slots.zone-surface') }}
-        </span>
-        <span class="flex items-center gap-1.5">
-          <span class="inline-block w-2.5 h-2.5 rounded-full border border-sky-500/50 bg-sky-900/40" />
-          {{ $t('game.slots.zone-orbital') }}
-        </span>
-        <span class="flex items-center gap-1.5">
-          <UIcon
-            name="i-lucide-mountain"
-            class="w-3 h-3 text-amber-400"
-          />
-          {{ $t('game.slots.legend-resource') }}
-        </span>
-      </div>
-
-      <!-- Build Queue Bar -->
-      <div class="flex items-center gap-3 px-4 py-2 rounded-lg border border-neutral-700/40 bg-neutral-900/60 z-20 min-w-80">
-        <template v-if="activeBuildDisplay">
+      <!-- Planet canvas -->
+      <div class="flex flex-1 items-center justify-center">
+        <div
+          class="relative"
+          :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
+        >
+          <!-- Orbital ring -->
           <div
-            class="flex h-9 w-9 items-center justify-center rounded-md shrink-0"
-            :class="activeBuildDisplay.kind === 'building' ? 'bg-primary-900/50' : 'bg-sky-900/50'"
-          >
-            <UIcon
-              :name="activeBuildDisplay.icon"
-              class="h-5 w-5"
-              :class="activeBuildDisplay.kind === 'building' ? 'text-primary-200' : 'text-sky-200'"
-            />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-semibold text-neutral-100 truncate">
-                {{ activeBuildDisplay.name }}
-              </p>
-              <UBadge
-                :color="activeBuildDisplay.kind === 'building' ? 'primary' : 'info'"
-                variant="subtle"
-                size="xs"
-              >
-                {{ activeBuildDisplay.kind === 'building' ? $t('game.slots.badge-building') : $t('game.slots.badge-unit') }}
-              </UBadge>
-            </div>
-            <div class="flex items-center gap-2 mt-0.5">
-              <div class="flex-1 h-1.5 rounded-full bg-neutral-700/60 overflow-hidden">
-                <div
-                  class="h-full rounded-full transition-all duration-500"
-                  :class="activeBuildDisplay.kind === 'building' ? 'bg-primary-500' : 'bg-sky-500'"
-                  :style="{ width: `${activeBuildDisplay.progress}%` }"
-                />
-              </div>
-              <span class="text-[10px] text-neutral-400 shrink-0">
-                {{ activeBuildDisplay.progress }}% · {{ $t('game.common.duration-rounds', { count: activeBuildDisplay.roundsLeft }) }}
-              </span>
-            </div>
-          </div>
-        </template>
-        <template v-else>
-          <UIcon
-            name="i-lucide-hammer"
-            class="h-5 w-5 text-neutral-600"
+            class="absolute rounded-full border border-dashed border-sky-500/20 pointer-events-none"
+            :style="{ width: `${ORBITAL_RING_RADIUS * 2}px`, height: `${ORBITAL_RING_RADIUS * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           />
-          <span class="text-sm text-neutral-500">
-            {{ $t('game.slots.no-active-build') }}
-          </span>
-        </template>
-      </div>
-
-      <!-- Planet + slots canvas -->
-      <div
-        class="relative z-10"
-        :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
-      >
-        <!-- Orbital ring line -->
-        <div
-          class="absolute rounded-full border border-dashed border-sky-500/20 pointer-events-none"
-          :style="{
-            width: `${ORBITAL_RING_RADIUS * 2}px`,
-            height: `${ORBITAL_RING_RADIUS * 2}px`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }"
-        />
-
-        <!-- Planet sphere (behind everything) -->
-        <div
-          class="absolute rounded-full overflow-hidden pointer-events-none planet-glow"
-          :style="{
-            width: `${PLANET_RADIUS * 2}px`,
-            height: `${PLANET_RADIUS * 2}px`,
-            left: '50%',
-            top: '50%',
-            transform: 'translate(-50%, -50%)'
-          }"
-        >
-          <img
-            :src="planetImageSrc"
-            alt=""
-            class="w-full h-full object-cover opacity-70"
+          <!-- Planet sphere -->
+          <div
+            class="absolute rounded-full overflow-hidden pointer-events-none planet-glow"
+            :style="{ width: `${PLANET_RADIUS * 2}px`, height: `${PLANET_RADIUS * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           >
-          <!-- Atmosphere gradient overlay -->
-          <div class="absolute inset-0 rounded-full bg-linear-to-b from-transparent via-transparent to-primary-950/60" />
-        </div>
+            <img
+              :src="planetImageSrc"
+              alt=""
+              class="w-full h-full object-cover opacity-70"
+            >
+            <div class="absolute inset-0 rounded-full bg-linear-to-b from-transparent via-transparent to-primary-950/60" />
+          </div>
 
-        <!-- ═══════ SURFACE SLOTS (hex grid on planet) ═══════ -->
-        <div
-          v-for="slotPos in surfacePositions"
-          :key="`s-${slotPos.index}`"
-          class="absolute z-10"
-          :style="{
-            left: `calc(50% + ${slotPos.px}px)`,
-            top: `calc(50% + ${slotPos.py}px)`,
-            width: `${HEX_SIZE * 2}px`,
-            height: `${HEX_SIZE * 2}px`,
-            transform: 'translate(-50%, -50%)'
-          }"
-          @mouseenter="hoveredSlotIndex = slotPos.index"
-          @mouseleave="hoveredSlotIndex = null"
-        >
-          <button
-            type="button"
-            :data-testid="`surface-slot-${slotPos.index}`"
-            :data-state="slotPos.state"
-            class="w-full h-full transition-all duration-200 relative"
-            :class="[
-              slotPos.state === 'empty' ? 'cursor-pointer' : 'cursor-default',
-              hoveredSlotIndex === slotPos.index && slotPos.state === 'empty' ? 'scale-110' : ''
-            ]"
-            :style="{ clipPath: hexClipPath }"
-            @click="slotPos.state === 'empty' && openBuildMenu(slotPos.index, 'surface')"
+          <!-- Surface slots -->
+          <div
+            v-for="slotPos in surfacePositions"
+            :key="`s-${slotPos.index}`"
+            class="absolute z-10"
+            :style="{ left: `calc(50% + ${slotPos.px}px)`, top: `calc(50% + ${slotPos.py}px)`, width: `${HEX_SIZE * 2}px`, height: `${HEX_SIZE * 2}px`, transform: 'translate(-50%, -50%)' }"
+            @mouseenter="hoveredSlotIndex = slotPos.index"
+            @mouseleave="hoveredSlotIndex = null"
           >
-            <!-- Hex background -->
-            <div
-              class="absolute inset-0 transition-colors duration-200"
-              :class="{
-                'bg-neutral-800/50 hover:bg-neutral-700/60': slotPos.state === 'empty' && !slotPos.resourceNode,
-                'bg-amber-900/30 hover:bg-amber-800/40': slotPos.state === 'empty' && slotPos.resourceNode,
-                'bg-primary-900/50': slotPos.state === 'under-construction',
-                'bg-primary-800/40': slotPos.state === 'completed'
-              }"
-            />
-            <!-- Hover border -->
-            <div
-              v-if="hoveredSlotIndex === slotPos.index"
-              class="absolute inset-0.5 border-2 border-primary-400/60"
+            <button
+              type="button"
+              :data-testid="`surface-slot-${slotPos.index}`"
+              :data-state="slotPos.state"
+              class="w-full h-full transition-all duration-200 relative"
+              :class="[
+                placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-105' : 'cursor-default'
+              ]"
               :style="{ clipPath: hexClipPath }"
-            />
-            <!-- Empty slot: + icon (always visible when empty) -->
-            <div
-              v-if="slotPos.state === 'empty'"
-              class="absolute inset-0 flex items-center justify-center"
+              @click="placeAt(slotPos.index, 'surface')"
             >
-              <UIcon
-                name="i-lucide-plus"
-                class="w-6 h-6 text-neutral-500/70 transition-colors"
-                :class="{ 'text-primary-300': hoveredSlotIndex === slotPos.index }"
-              />
-            </div>
-            <!-- Resource node marker (small badge in top-left, ON the hex) -->
-            <div
-              v-if="slotPos.resourceNode && slotPos.state === 'empty'"
-              class="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none"
-            >
-              <UIcon
-                :name="resourceNodeIcons[slotPos.resourceNode]"
-                class="w-4 h-4 text-amber-400/80"
-              />
-            </div>
-            <!-- Completed building -->
-            <div
-              v-if="slotPos.state === 'completed' && slotPos.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(slotPos.buildingId)"
-                class="w-5 h-5 text-primary-200"
-              />
-              <span class="text-[9px] text-neutral-200 text-center leading-tight px-1 max-w-full truncate">
-                {{ getBuildingName(slotPos.buildingId) }}
-              </span>
-              <!-- Resource node overlay when building present -->
               <div
-                v-if="slotPos.resourceNode"
-                class="absolute top-1 right-2"
+                class="absolute inset-0 transition-colors duration-200"
+                :class="{
+                  'bg-neutral-800/50': slotPos.state === 'empty' && !slotPos.resourceNode,
+                  'bg-amber-900/30': slotPos.state === 'empty' && slotPos.resourceNode,
+                  'bg-primary-900/50': slotPos.state === 'under-construction',
+                  'bg-primary-800/40': slotPos.state === 'completed'
+                }"
+              />
+              <!-- Valid placement highlight -->
+              <div
+                v-if="placementBuildingId && validPlacementSlots.has(slotPos.index)"
+                class="absolute inset-0.5 border-2 border-primary-400/80 animate-pulse"
+                :style="{ clipPath: hexClipPath }"
+              />
+              <div
+                v-if="slotPos.state === 'empty'"
+                class="absolute inset-0 flex items-center justify-center"
+              >
+                <UIcon
+                  name="i-lucide-plus"
+                  class="w-5 h-5"
+                  :class="placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'text-primary-200' : 'text-neutral-600/70'"
+                />
+              </div>
+              <div
+                v-if="slotPos.resourceNode && slotPos.state === 'empty'"
+                class="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none"
               >
                 <UIcon
                   :name="resourceNodeIcons[slotPos.resourceNode]"
-                  class="w-3 h-3 text-amber-400/60"
+                  class="w-4 h-4 text-amber-400/80"
                 />
               </div>
-            </div>
-            <!-- Under construction -->
-            <div
-              v-if="slotPos.state === 'under-construction' && slotPos.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(slotPos.buildingId)"
-                class="w-4 h-4 text-warning-300 animate-pulse"
-              />
-              <span class="text-[9px] text-warning-200 font-semibold">
-                {{ slotPos.progress }}%
-              </span>
               <div
-                class="absolute bottom-0 left-0 right-0 bg-warning-500/20 transition-all duration-500"
-                :style="{ height: `${slotPos.progress}%`, clipPath: hexClipPath }"
-              />
-              <!-- Resource node overlay when building under construction -->
-              <div
-                v-if="slotPos.resourceNode"
-                class="absolute top-1 right-2"
+                v-if="(slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
               >
                 <UIcon
-                  :name="resourceNodeIcons[slotPos.resourceNode]"
-                  class="w-3 h-3 text-amber-400/60"
+                  :name="getBuildingIcon(slotPos.buildingId)"
+                  class="w-5 h-5"
+                  :class="slotPos.state === 'completed' ? 'text-primary-200' : 'text-warning-300'"
                 />
+                <span
+                  v-if="slotPos.state === 'under-construction'"
+                  class="text-[9px] text-warning-200 font-semibold"
+                >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
+                <span
+                  v-else
+                  class="text-[9px] text-neutral-200 text-center leading-tight px-1 max-w-full truncate"
+                >{{ getBuildingName(slotPos.buildingId) }}</span>
               </div>
-            </div>
-          </button>
-        </div>
+            </button>
+          </div>
 
-        <!-- ═══════ ORBITAL SLOTS (ring around planet) ═══════ -->
-        <div
-          v-for="slotPos in orbitalPositions"
-          :key="`o-${slotPos.index}`"
-          class="absolute z-10"
-          :style="{
-            left: `calc(50% + ${slotPos.px}px)`,
-            top: `calc(50% + ${slotPos.py}px)`,
-            width: `${ORBITAL_SLOT_SIZE * 2}px`,
-            height: `${ORBITAL_SLOT_SIZE * 2}px`,
-            transform: 'translate(-50%, -50%)'
-          }"
-          @mouseenter="hoveredSlotIndex = slotPos.index"
-          @mouseleave="hoveredSlotIndex = null"
-        >
-          <button
-            type="button"
-            class="w-full h-full rounded-full transition-all duration-200 relative border bg-neutral-950"
-            :class="[
-              slotPos.state === 'empty'
-                ? 'cursor-pointer border-sky-500/30 hover:border-sky-400/60'
-                : 'cursor-default border-sky-500/40',
-              hoveredSlotIndex === slotPos.index && slotPos.state === 'empty' ? 'scale-110' : ''
-            ]"
-            @click="slotPos.state === 'empty' && openBuildMenu(slotPos.index, 'orbital')"
-          >
-            <!-- Background -->
-            <div
-              class="absolute inset-0 rounded-full transition-colors duration-200"
-              :class="{
-                'bg-sky-950/80 hover:bg-sky-900/60': slotPos.state === 'empty',
-                'bg-sky-900/70': slotPos.state === 'under-construction',
-                'bg-sky-900/50': slotPos.state === 'completed'
-              }"
-            />
-            <!-- Hover glow -->
-            <div
-              v-if="hoveredSlotIndex === slotPos.index"
-              class="absolute inset-0.5 rounded-full border border-sky-400/50"
-            />
-            <!-- Empty: + icon -->
-            <div
-              v-if="slotPos.state === 'empty'"
-              class="absolute inset-0 flex items-center justify-center"
-            >
-              <UIcon
-                name="i-lucide-plus"
-                class="w-5 h-5 text-sky-500/50 transition-colors"
-                :class="{ 'text-sky-300': hoveredSlotIndex === slotPos.index }"
-              />
-            </div>
-            <!-- Completed -->
-            <div
-              v-if="slotPos.state === 'completed' && slotPos.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(slotPos.buildingId)"
-                class="w-5 h-5 text-sky-200"
-              />
-              <span class="text-[8px] text-sky-200/80 text-center leading-tight px-1 max-w-full truncate">
-                {{ getBuildingName(slotPos.buildingId) }}
-              </span>
-            </div>
-            <!-- Under construction -->
-            <div
-              v-if="slotPos.state === 'under-construction' && slotPos.buildingId"
-              class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
-            >
-              <UIcon
-                :name="getBuildingIcon(slotPos.buildingId)"
-                class="w-4 h-4 text-warning-300 animate-pulse"
-              />
-              <span class="text-[9px] text-warning-200 font-semibold">
-                {{ slotPos.progress }}%
-              </span>
-            </div>
-          </button>
-        </div>
-
-        <!-- ═══════ TOOLTIP ═══════ -->
-        <Transition name="fade">
+          <!-- Orbital slots -->
           <div
-            v-if="hoveredSlot"
-            class="absolute z-30 pointer-events-none px-4 py-3 rounded-lg border border-neutral-700/60 bg-neutral-900 shadow-xl text-sm max-w-72"
-            :style="{
-              left: `calc(50% + ${hoveredSlot.px}px)`,
-              top: `calc(50% + ${hoveredSlot.py - (hoveredSlot.zone === 'orbital' ? ORBITAL_SLOT_SIZE : HEX_SIZE) - 12}px)`,
-              transform: 'translateX(-50%)'
-            }"
+            v-for="slotPos in orbitalPositions"
+            :key="`o-${slotPos.index}`"
+            class="absolute z-10"
+            :style="{ left: `calc(50% + ${slotPos.px}px)`, top: `calc(50% + ${slotPos.py}px)`, width: `${ORBITAL_SLOT_SIZE * 2}px`, height: `${ORBITAL_SLOT_SIZE * 2}px`, transform: 'translate(-50%, -50%)' }"
+            @mouseenter="hoveredSlotIndex = slotPos.index"
+            @mouseleave="hoveredSlotIndex = null"
           >
-            <!-- Zone badge -->
-            <div class="mb-1">
-              <span
-                v-if="hoveredSlot.zone === 'surface'"
-                class="text-[10px] text-neutral-500 uppercase tracking-wider"
-              >
-                {{ $t('game.slots.zone-surface') }}
-              </span>
-              <span
-                v-else
-                class="text-[10px] text-sky-400/80 uppercase tracking-wider"
-              >
-                {{ $t('game.slots.zone-orbital') }}
-              </span>
-            </div>
-
-            <template v-if="hoveredSlot.state === 'empty'">
-              <p class="text-neutral-300 font-semibold">
-                {{ $t('game.slots.empty-slot') }}
-              </p>
-              <p class="text-neutral-500 mt-0.5">
-                {{ $t('game.slots.click-to-build') }}
-              </p>
+            <button
+              type="button"
+              :data-testid="`surface-slot-${slotPos.index}`"
+              :data-state="slotPos.state"
+              class="w-full h-full rounded-full transition-all duration-200 relative border bg-neutral-950"
+              :class="[
+                placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-110 border-sky-300/80' : 'cursor-default border-sky-500/30'
+              ]"
+              @click="placeAt(slotPos.index, 'orbital')"
+            >
               <div
-                v-if="hoveredSlot.resourceNode"
-                class="mt-1 flex items-center gap-1.5 text-amber-300"
+                class="absolute inset-0 rounded-full transition-colors duration-200"
+                :class="{
+                  'bg-sky-950/80': slotPos.state === 'empty',
+                  'bg-sky-900/70': slotPos.state === 'under-construction',
+                  'bg-sky-900/50': slotPos.state === 'completed'
+                }"
+              />
+              <div
+                v-if="slotPos.state === 'empty'"
+                class="absolute inset-0 flex items-center justify-center"
               >
                 <UIcon
-                  :name="resourceNodeIcons[hoveredSlot.resourceNode]"
-                  class="w-3.5 h-3.5"
+                  name="i-lucide-plus"
+                  class="w-4 h-4"
+                  :class="placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'text-sky-200' : 'text-sky-500/50'"
                 />
-                <span>{{ $t('game.slots.resource-node', { type: resourceNodeLabels[hoveredSlot.resourceNode] }) }}</span>
               </div>
               <div
-                v-if="hoveredAdjacencyBonuses.length > 0"
-                class="mt-1 space-y-0.5"
+                v-if="(slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
               >
-                <div
-                  v-for="bonus in hoveredAdjacencyBonuses"
-                  :key="bonus.type"
-                  class="flex items-center gap-1 text-emerald-400"
-                >
-                  <UIcon
-                    name="i-lucide-sparkles"
-                    class="w-3 h-3"
-                  />
-                  <span>{{ $t('game.slots.adjacency-ore-bonus') }}</span>
-                </div>
+                <UIcon
+                  :name="getBuildingIcon(slotPos.buildingId)"
+                  class="w-5 h-5"
+                  :class="slotPos.state === 'completed' ? 'text-sky-200' : 'text-warning-300'"
+                />
+                <span
+                  v-if="slotPos.state === 'under-construction'"
+                  class="text-[8px] text-warning-200 font-semibold"
+                >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
               </div>
-            </template>
-            <template v-else-if="hoveredSlot.state === 'under-construction' && hoveredSlot.buildingId">
-              <p class="text-warning-300 font-semibold">
-                {{ getBuildingName(hoveredSlot.buildingId) }}
-              </p>
-              <p class="text-neutral-400 mt-0.5">
-                {{ $t('game.slots.under-construction') }} · {{ hoveredSlot.progress }}%
-              </p>
-            </template>
-            <template v-else-if="hoveredSlot.state === 'completed' && hoveredSlot.buildingId">
-              <p class="text-primary-200 font-semibold">
-                {{ getBuildingName(hoveredSlot.buildingId) }}
-              </p>
-              <p class="text-neutral-400 mt-0.5">
-                {{ $t('game.slots.completed') }}
-              </p>
-            </template>
+            </button>
           </div>
-        </Transition>
 
-        <!-- ═══════ BUILD MENU ═══════ -->
-        <Transition name="fade">
-          <div
-            v-if="buildMenuSlotIndex !== null"
-            class="absolute z-40 w-72 rounded-lg border bg-neutral-900 shadow-2xl overflow-hidden"
-            :class="buildMenuZone === 'orbital'
-              ? 'border-sky-500/30 shadow-sky-500/10'
-              : 'border-primary-500/30 shadow-primary-500/10'"
-            :style="{
-              left: `calc(50% + ${buildMenuPosition.x + 90}px)`,
-              top: `calc(50% + ${buildMenuPosition.y}px)`,
-              transform: 'translateY(-50%)'
-            }"
-          >
-            <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
-              <span class="text-sm font-semibold text-neutral-200">
-                {{ buildMenuZone === 'orbital'
-                  ? $t('game.slots.choose-orbital')
-                  : $t('game.slots.choose-building')
-                }}
-              </span>
-              <UButton
-                icon="i-lucide-x"
-                color="neutral"
-                variant="ghost"
-                size="xs"
-                @click="closeBuildMenu()"
-              />
-            </div>
-            <div class="max-h-64 overflow-y-auto p-2 space-y-1">
-              <button
-                v-for="building in activeBuildCatalog"
-                :key="building.id"
-                type="button"
-                :data-testid="`build-option-${building.id}`"
-                class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                :class="{ 'opacity-40 cursor-not-allowed': building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts))) }"
-                :disabled="building.locked || (!isAlreadyPaid(building.id, buildMenuSlotIndex!) && !(canAfford(building.resourceCosts) && canAffordStrategic(building.strategicCosts)))"
-                @click="handleBuild(building.id, buildMenuSlotIndex!)"
-              >
-                <div class="flex h-8 w-8 items-center justify-center rounded-md bg-neutral-800/80 shrink-0">
-                  <UIcon
-                    :name="building.icon"
-                    class="h-4 w-4 text-primary-200"
-                  />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-neutral-100 truncate">
-                    {{ building.name }}
-                  </p>
-                  <div class="flex items-center gap-2 text-[10px] text-neutral-500">
-                    <span
-                      v-if="building.resourceCosts.energy"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-zap"
-                        class="w-2.5 h-2.5 text-warning-300"
-                      />
-                      {{ building.resourceCosts.energy }}
-                    </span>
-                    <span
-                      v-if="building.resourceCosts.minerals"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-pickaxe"
-                        class="w-2.5 h-2.5 text-neutral-300"
-                      />
-                      {{ building.resourceCosts.minerals }}
-                    </span>
-                    <span
-                      v-if="building.resourceCosts.rare"
-                      class="flex items-center gap-0.5"
-                    >
-                      <UIcon
-                        name="i-lucide-atom"
-                        class="w-2.5 h-2.5 text-primary-300"
-                      />
-                      {{ building.resourceCosts.rare }}
-                    </span>
-                    <span
-                      v-for="sc in strategicCostList(building.strategicCosts)"
-                      :key="sc.key"
-                      class="flex items-center gap-0.5 text-fuchsia-300"
-                    >
-                      <UIcon
-                        :name="sc.icon"
-                        class="w-2.5 h-2.5"
-                      />
-                      {{ sc.amount }}
-                    </span>
-                    <span class="text-neutral-600">·</span>
-                    <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(building.productionCost) }) }}</span>
-                  </div>
-                  <div
-                    v-if="building.locked"
-                    class="flex items-center gap-1 mt-0.5 text-[10px] text-info-300"
-                  >
-                    <UIcon
-                      name="i-lucide-lock"
-                      class="w-2.5 h-2.5"
-                    />
-                    <span class="truncate">{{ $t('game.slots.requires-research', { tech: building.lockedByTechName ?? '?' }) }}</span>
-                  </div>
-                </div>
-                <!-- Synergy + ore-cost badge previews -->
-                <div class="flex flex-col items-end gap-1 shrink-0">
-                  <UBadge
-                    v-for="synergyKey in previewSynergies(building.id, buildMenuSlotIndex!)"
-                    :key="synergyKey"
-                    color="primary"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    <UIcon
-                      name="i-lucide-zap"
-                      class="w-3 h-3 mr-0.5"
-                    />
-                    {{ $t(synergyKey) }}
-                  </UBadge>
-                  <UBadge
-                    v-if="buildMenuZone === 'surface' && previewBonuses(building.id, buildMenuSlotIndex!).length > 0"
-                    color="success"
-                    variant="subtle"
-                    size="xs"
-                  >
-                    <UIcon
-                      name="i-lucide-sparkles"
-                      class="w-3 h-3 mr-0.5"
-                    />
-                    {{ $t('game.slots.ore-bonus-badge') }}
-                  </UBadge>
-                </div>
-              </button>
-            </div>
-          </div>
-        </Transition>
-      </div>
-
-      <!-- Stationed Units Panel -->
-      <div class="flex items-center gap-2 z-20">
-        <span class="text-[11px] text-neutral-500 uppercase tracking-wider mr-1">
-          {{ $t('game.slots.units-title') }}
-        </span>
-        <div
-          v-for="(unit, idx) in planet.stationedUnits"
-          :key="idx"
-          class="relative w-11 h-11 rounded-md border border-neutral-700/50 bg-neutral-800/60 flex flex-col items-center justify-center gap-0.5 cursor-default"
-        >
-          <UIcon
-            :name="getUnitIcon(unit.unitDefId)"
-            class="w-4 h-4 text-sky-200"
-          />
-          <span class="text-[8px] text-neutral-400 truncate max-w-10 text-center leading-tight">
-            {{ getUnitName(unit.unitDefId) }}
-          </span>
-          <span
-            v-if="unit.count > 1"
-            class="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-neutral-700 border border-neutral-600 rounded-full w-4.5 h-4.5 flex items-center justify-center text-neutral-200"
-          >
-            {{ unit.count }}
-          </span>
-        </div>
-        <span
-          v-if="planet.stationedUnits.length === 0"
-          class="text-[11px] text-neutral-600 mr-2"
-        >
-          {{ $t('game.slots.no-units') }}
-        </span>
-        <div class="relative">
-          <button
-            type="button"
-            class="w-11 h-11 rounded-md border border-dashed border-neutral-600/50 bg-neutral-800/30 flex items-center justify-center transition-colors"
-            :class="unitTrainingMenuOpen ? 'border-primary-400/60 bg-neutral-700/40' : 'hover:border-primary-400/60 hover:bg-neutral-700/40'"
-            @click="unitTrainingMenuOpen = !unitTrainingMenuOpen"
-          >
-            <UIcon
-              name="i-lucide-plus"
-              class="w-4 h-4"
-              :class="unitTrainingMenuOpen ? 'text-primary-300' : 'text-neutral-500'"
-            />
-          </button>
-          <!-- Unit Training Menu -->
+          <!-- Placement hover preview (base yield + bonuses) -->
           <Transition name="fade">
             <div
-              v-if="unitTrainingMenuOpen"
-              class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 rounded-lg border border-sky-500/30 bg-neutral-900 shadow-2xl shadow-sky-500/10 overflow-hidden z-50"
+              v-if="hoverPreview"
+              data-testid="placement-preview"
+              class="absolute left-1/2 top-0 z-30 -translate-x-1/2 px-3 py-2 rounded-lg border border-primary-500/40 bg-neutral-900 shadow-xl text-xs max-w-72 pointer-events-none"
             >
-              <div class="flex items-center justify-between px-3 py-2 border-b border-neutral-700/50">
-                <span class="text-sm font-semibold text-neutral-200">
-                  {{ $t('game.slots.choose-unit') }}
-                </span>
-                <UButton
-                  icon="i-lucide-x"
-                  color="neutral"
-                  variant="ghost"
-                  size="xs"
-                  @click="unitTrainingMenuOpen = false"
-                />
-              </div>
-              <div class="max-h-48 overflow-y-auto p-2 space-y-1">
-                <button
-                  v-for="unit in unitCatalog"
-                  :key="unit.id"
-                  type="button"
-                  class="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-neutral-800/70"
-                  :class="{ 'opacity-40 cursor-not-allowed': unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) || !canAffordStrategic(unit.strategicCosts) }"
-                  :disabled="unit.locked || !canTrainUnit(unit) || !canAfford(unit.resourceCosts) || !canAffordStrategic(unit.strategicCosts)"
-                  @click="handleTrainUnit(unit.id)"
+              <p class="font-semibold text-primary-100 mb-1">
+                {{ hoverPreview.name }}
+              </p>
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  v-for="y in hoverPreview.yields"
+                  :key="y.label"
+                  class="flex items-center gap-0.5 text-success-300"
                 >
-                  <div class="flex h-8 w-8 items-center justify-center rounded-md bg-sky-900/50 shrink-0">
-                    <UIcon
-                      :name="unit.icon"
-                      class="h-4 w-4 text-sky-200"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-neutral-100 truncate">
-                      {{ unit.name }}
-                    </p>
-                    <div class="flex items-center gap-2 text-[10px] text-neutral-500">
-                      <span
-                        v-if="unit.resourceCosts.energy"
-                        class="flex items-center gap-0.5"
-                      >
-                        <UIcon
-                          name="i-lucide-zap"
-                          class="w-2.5 h-2.5 text-warning-300"
-                        />
-                        {{ unit.resourceCosts.energy }}
-                      </span>
-                      <span
-                        v-if="unit.resourceCosts.minerals"
-                        class="flex items-center gap-0.5"
-                      >
-                        <UIcon
-                          name="i-lucide-pickaxe"
-                          class="w-2.5 h-2.5 text-neutral-300"
-                        />
-                        {{ unit.resourceCosts.minerals }}
-                      </span>
-                      <span
-                        v-if="unit.resourceCosts.rare"
-                        class="flex items-center gap-0.5"
-                      >
-                        <UIcon
-                          name="i-lucide-atom"
-                          class="w-2.5 h-2.5 text-primary-300"
-                        />
-                        {{ unit.resourceCosts.rare }}
-                      </span>
-                      <span
-                        v-for="sc in strategicCostList(unit.strategicCosts)"
-                        :key="sc.key"
-                        class="flex items-center gap-0.5 text-fuchsia-300"
-                      >
-                        <UIcon
-                          :name="sc.icon"
-                          class="w-2.5 h-2.5"
-                        />
-                        {{ sc.amount }}
-                      </span>
-                      <span class="text-neutral-600">·</span>
-                      <span>{{ $t('game.common.duration-rounds', { count: estimateRounds(unit.productionCost) }) }}</span>
-                    </div>
-                  </div>
-                  <div
-                    v-if="unit.locked"
-                    class="shrink-0"
-                  >
-                    <UBadge
-                      color="info"
-                      variant="subtle"
-                      size="xs"
-                    >
-                      <UIcon
-                        name="i-lucide-lock"
-                        class="w-3 h-3 mr-0.5"
-                      />
-                      {{ $t('game.slots.requires-research', { tech: unit.lockedByTechName ?? '?' }) }}
-                    </UBadge>
-                  </div>
-                  <div
-                    v-else-if="!canTrainUnit(unit)"
-                    class="shrink-0"
-                  >
-                    <UBadge
-                      color="error"
-                      variant="subtle"
-                      size="xs"
-                    >
-                      {{ $t('game.planet.requires-orbital-dock') }}
-                    </UBadge>
-                  </div>
-                </button>
+                  <UIcon
+                    :name="y.icon"
+                    class="w-3 h-3"
+                  />+{{ y.amount }}
+                </span>
+                <span
+                  v-if="!hoverPreview.yields.length"
+                  class="text-neutral-500"
+                >{{ $t('game.slots.no-base-yield') }}</span>
+              </div>
+              <div
+                v-if="hoverPreview.synergies.length || hoverPreview.oreBonus"
+                class="mt-1 flex flex-wrap gap-1"
+              >
+                <UBadge
+                  v-for="key in hoverPreview.synergies"
+                  :key="key"
+                  color="primary"
+                  variant="subtle"
+                  size="xs"
+                >
+                  {{ $t(key) }}
+                </UBadge>
+                <UBadge
+                  v-if="hoverPreview.oreBonus"
+                  color="success"
+                  variant="subtle"
+                  size="xs"
+                >
+                  {{ $t('game.slots.ore-bonus-badge') }}
+                </UBadge>
               </div>
             </div>
           </Transition>
         </div>
       </div>
 
-      <!-- Back button -->
-      <UButton
-        :label="$t('game.slots.back-to-system')"
-        icon="i-lucide-arrow-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        class="z-10"
-        @click="emit('close')"
-      />
+      <!-- Stationed units -->
+      <div class="flex items-center gap-2 pb-2 z-20">
+        <span class="text-[11px] text-neutral-500 uppercase tracking-wider mr-1">
+          {{ $t('game.slots.units-title') }}
+        </span>
+        <div
+          v-for="(unit, idx) in planet.stationedUnits"
+          :key="idx"
+          class="relative w-10 h-10 rounded-md border border-neutral-700/50 bg-neutral-800/60 flex flex-col items-center justify-center gap-0.5"
+        >
+          <UIcon
+            :name="getUnitIcon(unit.unitDefId)"
+            class="w-4 h-4 text-sky-200"
+          />
+          <span
+            v-if="unit.count > 1"
+            class="absolute -top-1.5 -right-1.5 text-[9px] font-bold bg-neutral-700 border border-neutral-600 rounded-full w-4.5 h-4.5 flex items-center justify-center text-neutral-200"
+          >{{ unit.count }}</span>
+        </div>
+        <span
+          v-if="planet.stationedUnits.length === 0"
+          class="text-[11px] text-neutral-600"
+        >{{ $t('game.slots.no-units') }}</span>
+      </div>
+
+      <!-- ═══════ Queue strip ═══════ -->
+      <div
+        data-testid="build-queue"
+        class="flex w-full items-center gap-2 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 overflow-x-auto"
+      >
+        <span class="text-[11px] text-neutral-500 uppercase tracking-wider shrink-0">
+          {{ $t('game.slots.queue-title') }} {{ planet.buildQueue.length }}/{{ buildQueueLimit }}
+        </span>
+        <div
+          v-if="queueItems.length === 0"
+          class="text-sm text-neutral-500"
+        >
+          {{ $t('game.slots.queue-empty') }}
+        </div>
+        <div
+          v-for="item in queueItems"
+          :key="item.index"
+          :data-testid="`queue-item-${item.index}`"
+          draggable="true"
+          class="group relative flex items-center gap-2 rounded-md border bg-neutral-900/80 px-2 py-1.5 shrink-0 cursor-grab active:cursor-grabbing"
+          :class="item.isFront ? 'border-primary-500/50' : 'border-neutral-700/50'"
+          @dragstart="onDragStart(item.index)"
+          @dragover.prevent
+          @drop="onDrop(item.index)"
+        >
+          <UIcon
+            :name="item.icon"
+            class="h-4 w-4 shrink-0"
+            :class="item.kind === 'building' ? 'text-primary-200' : 'text-sky-200'"
+          />
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-neutral-100 truncate max-w-32">
+              {{ item.name }}
+            </p>
+            <div
+              v-if="item.isFront"
+              class="flex items-center gap-1.5 mt-0.5"
+            >
+              <div class="h-1 w-20 rounded-full bg-neutral-700/60 overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-primary-500 transition-all"
+                  :style="{ width: `${item.progress}%` }"
+                />
+              </div>
+              <span class="text-[9px] text-neutral-400">{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+            </div>
+            <span
+              v-else
+              class="text-[9px] text-neutral-500"
+            >{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+          </div>
+          <button
+            type="button"
+            :data-testid="`queue-item-cancel-${item.index}`"
+            class="ml-1 text-neutral-500 hover:text-critical-300 transition"
+            @click="emit('remove-queue-item', planet.id, item.index)"
+          >
+            <UIcon
+              name="i-lucide-x"
+              class="h-3.5 w-3.5"
+            />
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.planet-slot-zoom-in {
-  animation: slotZoomIn 0.8s cubic-bezier(.1, .8, .46, 1);
-}
-
-@keyframes slotZoomIn {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.15s ease;

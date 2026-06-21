@@ -56,43 +56,61 @@ test('tours every major dialog on a seeded game', async ({ browser }) => {
   await shot(alice, '03-event-log')
   await alice.getByTestId('event-log-close').click()
 
-  // ── Planet overview → homeworld slot view → build menu ───────────────
+  // ── Planet overview → homeworld slot view → Civ-style build flow ─────
   await alice.getByTestId('planet-overview-button').click()
   await expect(alice.getByTestId('planet-overview-panel')).toBeVisible()
   await shot(alice, '04-planet-overview')
   await alice.getByTestId(`overview-planet-${ids.homeworldId}`).click()
   await expect(alice.locator('[data-testid^="surface-slot-"]').first()).toBeVisible()
+  await expect(alice.getByTestId('build-queue')).toBeVisible()
   await shot(alice, '05-planet-slot-view')
+  // Side list is the catalog; rows show name + rounds, details on hover.
+  await expect(alice.locator('[data-testid^="build-list-option-"]').first()).toBeVisible()
+  await alice.getByTestId('build-list-option-bld:solar-array').hover()
+  await expect(alice.getByTestId('build-list-option-bld:solar-array-tooltip')).toBeVisible()
+  await shot(alice, '05b-build-list-tooltip')
+  // Picking a building enters placement mode.
+  await alice.getByTestId('build-list-option-bld:solar-array').click()
+  // An empty slot is now a highlighted placement target — click it to queue.
   await alice.locator('[data-testid^="surface-slot-"][data-state="empty"]').first().click()
-  await expect(alice.locator('[data-testid^="build-option-"]').first()).toBeVisible()
-  await shot(alice, '06-build-menu')
+  await expect(alice.getByTestId('queue-item-0')).toBeVisible()
+  await shot(alice, '06-build-queue')
+  // Units queue straight from the Units tab (no placement).
+  await alice.getByTestId('build-list-tab-units').click()
+  await alice.getByTestId('build-list-option-unit:worker').click()
+  await expect(alice.getByTestId('queue-item-1')).toBeVisible()
+  await shot(alice, '06b-multi-queue')
   await alice.getByTestId('slot-view-close').click()
 
-  // ── Strategic deposit: barren world → extractor build option ─────────
+  // ── Strategic deposit: barren world → extractor placement preview ────
   if (ids.barrenId) {
     await alice.getByTestId('planet-overview-button').click()
     await alice.getByTestId(`overview-planet-${ids.barrenId}`).click()
     await expect(alice.getByTestId('surface-slot-2')).toBeVisible()
     await shot(alice, '07-barren-planet')
-    await alice.getByTestId('surface-slot-2').click() // the exotic-matter deposit slot
-    await expect(alice.getByTestId('build-option-bld:exotic-extractor')).toBeVisible()
-    await shot(alice, '08-extractor-menu')
+    // Selecting the extractor highlights its matching deposit slot; hovering previews yield.
+    await alice.getByTestId('build-list-option-bld:exotic-extractor').click()
+    await alice.getByTestId('surface-slot-2').hover() // the exotic-matter deposit slot
+    await expect(alice.getByTestId('placement-preview')).toBeVisible()
+    await shot(alice, '08-extractor-placement')
     await alice.getByTestId('slot-view-close').click()
   }
 
-  // ── Star slot view: megastructure menu + shipyard ────────────────────
+  // ── Star slot view: megastructure list + placement + shipyard ────────
   if (ids.starId) {
     await alice.getByTestId('home-button').click()
     await alice.getByTestId(`map-node-${ids.starId}`).click()
     await expect(alice.getByTestId('star-view-close')).toBeVisible()
     await shot(alice, '09-star-slot-view')
+    await expect(alice.locator('[data-testid^="star-build-list-option-"]').first()).toBeVisible()
+    await alice.getByTestId('star-build-list-option-bld:dyson-sphere').click()
     await alice.locator('[data-testid^="star-shell-"][data-state="empty"]').first().click()
-    await expect(alice.locator('[data-testid^="star-build-option-"]').first()).toBeVisible()
-    await shot(alice, '10-megastructure-menu')
-    // Stellar Shipyard was seeded → the ship-training panel is available.
-    await alice.getByTestId('star-train-unit').click()
-    await expect(alice.locator('[data-testid^="star-train-option-"]').first()).toBeVisible()
-    await shot(alice, '11-shipyard-menu')
+    await expect(alice.getByTestId('star-queue-item-0')).toBeVisible()
+    await shot(alice, '10-megastructure-queued')
+    // Stellar Shipyard was seeded → the Ships tab can queue a frigate.
+    await alice.getByTestId('star-tab-units').click()
+    await expect(alice.locator('[data-testid^="star-build-list-option-unit:"]').first()).toBeVisible()
+    await shot(alice, '11-shipyard-list')
     await alice.getByTestId('star-view-close').click()
   }
 

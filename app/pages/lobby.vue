@@ -141,8 +141,11 @@ const refreshLobbies = async () => {
 const loadMembers = async (lobbyId: string) => {
   const { data, error } = await supabase
     .from('lobby_players')
-    .select('user_id, is_host, color')
+    .select('user_id, is_host, color, joined_at')
+    // Stable join order so the roster doesn't reshuffle when a row is updated
+    // (e.g. picking a colour) — Postgres returns no implicit order otherwise.
     .eq('lobby_id', lobbyId)
+    .order('joined_at', { ascending: true })
 
   if (error) {
     displayError(error)

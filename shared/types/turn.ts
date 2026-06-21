@@ -1,23 +1,26 @@
 import type { BuildingId, PlanetId, ResearchId, SolarSystemId, UnitId } from './game'
 
-export type TurnCommandType = 'startResearch' | 'buildStructure' | 'buildUnit' | 'moveFleet'
+export type TurnCommandType = 'startResearch' | 'setProductionQueue' | 'moveFleet'
 
 export type StartResearchCommand = {
   type: 'startResearch'
   researchId: ResearchId
 }
 
-export type BuildStructureCommand = {
-  type: 'buildStructure'
-  planetId: PlanetId
-  buildingId: BuildingId
-  slotIndex: number
-}
+/** One desired entry in a planet's production queue (client-declared, server-validated). */
+export type ProductionQueueCommandItem
+  = | { kind: 'building', slotIndex: number, buildingId: BuildingId }
+    | { kind: 'unit', unitId: UnitId }
 
-export type BuildUnitCommand = {
-  type: 'buildUnit'
+/**
+ * The full, ordered production queue the client wants for one planet this turn.
+ * Declarative: add/cancel/reorder all reduce to resending the whole list, so the
+ * server just validates and sets `planet.queues.production`.
+ */
+export type SetProductionQueueCommand = {
+  type: 'setProductionQueue'
   planetId: PlanetId
-  unitId: UnitId
+  items: ProductionQueueCommandItem[]
 }
 
 export type MoveFleetCommand = {
@@ -26,7 +29,7 @@ export type MoveFleetCommand = {
   toSystemId: SolarSystemId
 }
 
-export type TurnCommand = StartResearchCommand | BuildStructureCommand | BuildUnitCommand | MoveFleetCommand
+export type TurnCommand = StartResearchCommand | SetProductionQueueCommand | MoveFleetCommand
 
 export type TurnPlan = {
   commands: TurnCommand[]

@@ -141,7 +141,7 @@ function makeSystemPlanets(
         workers: 1,
         productionPerWorker: 20,
         slots: ownedDef.slots,
-        queues: { build: [], shipyard: [] },
+        queues: { production: [] },
         progressMemory: {},
         productionCarryover: 0,
         location
@@ -176,7 +176,7 @@ function makeStar(systemKey: string, systemId: SolarSystemId, systemName: string
     workers: 1,
     productionPerWorker: 20,
     slots: createStarSlots(),
-    queues: { build: [], shipyard: [] },
+    queues: { production: [] },
     progressMemory: {},
     productionCarryover: 0,
     location: { x: 50, y: 50 }
@@ -209,7 +209,7 @@ function makeNeutralPlanet(
     workers: 1,
     productionPerWorker: 20,
     slots: makeSlots([], new Map([[2, nodeType]])),
-    queues: { build: [], shipyard: [] },
+    queues: { production: [] },
     progressMemory: {},
     productionCarryover: 0,
     location

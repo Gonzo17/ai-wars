@@ -14,10 +14,10 @@ import {
   deductStrategicCosts,
   updateResourceDeltas
 } from './resolve/resources'
-import { getBuildingDef, getUnitBuildCost, getUnitDef } from '~~/shared/defs/production'
 import type { GameSnapshot, Planet, PlayerSnapshot } from '~~/shared/types/game'
 import type { TurnPlan } from '~~/shared/types/turn'
 import { calculateResourceProduction, calculateStrategicProduction } from '~~/shared/utils/economy'
+import { queueItemCosts, reconcileProductionQueue } from '~~/shared/utils/productionQueue'
 
 type ResolveResult = {
   resolved: boolean
@@ -58,34 +58,22 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
       const player = nextSnapshot.players.find((p: PlayerSnapshot) => p.id === playerId)
       if (!player) continue
 
-      // Deduct costs for new builds before applying the plan
+      // Deduct costs for newly-queued items before applying the plan. The same
+      // reconciliation + cost helper classify "new vs resume" and apply worker
+      // escalation identically in validation, so a resumed/in-progress item is
+      // never charged twice and stacked robots cost progressively more.
       for (const command of plan.commands) {
-        if (command.type === 'buildStructure') {
-          const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
-          if (!planet) continue
-          const def = getBuildingDef(command.buildingId)
-          if (!def) continue
-          // Only charge if this is a new build (slot doesn't already have this building under construction)
-          const slot = planet.slots[command.slotIndex]
-          const isResume = slot && slot.buildingId === command.buildingId && slot.isConstructing
-          if (!isResume) {
-            deductResourceCosts(player, def.resourceCosts)
-            deductStrategicCosts(player, def.strategicCosts)
-          }
-        }
-        if (command.type === 'buildUnit') {
-          const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
-          if (!planet) continue
-          const def = getUnitDef(command.unitId)
-          if (!def) continue
-          // Only charge if this is a new build (not continuing an existing one)
-          const inShipyard = planet.queues.shipyard.some(u => u.id === command.unitId)
-          const memory = planet.progressMemory?.[command.unitId]
-          if (!inShipyard && !memory?.resourcePaid) {
-            deductResourceCosts(player, getUnitBuildCost(def, planet.workers))
-            deductStrategicCosts(player, def.strategicCosts)
-          }
-        }
+        if (command.type !== 'setProductionQueue') continue
+        const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
+        if (!planet) continue
+        const { isNew } = reconcileProductionQueue(planet, command.items)
+        const costs = queueItemCosts(planet, command.items, isNew)
+        command.items.forEach((_item, i) => {
+          if (!isNew[i]) return
+          const cost = costs[i]!
+          deductResourceCosts(player, { energy: cost.energy, minerals: cost.minerals, rare: cost.rare })
+          deductStrategicCosts(player, cost.strategic)
+        })
       }
 
       nextSnapshot = applyPlan(nextSnapshot, player, plan)

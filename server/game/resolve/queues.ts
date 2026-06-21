@@ -27,39 +27,36 @@ export function updatePlanetsControlled(snapshot: GameSnapshot) {
 
 export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId: () => string) {
   for (const planet of snapshot.planets) {
-    if (planet.queues.build.length > 0) {
-      planet.queues.build = planet.queues.build.slice(0, 1)
-      planet.queues.shipyard = []
-    } else if (planet.queues.shipyard.length > 0) {
-      planet.queues.shipyard = planet.queues.shipyard.slice(0, 1)
+    if (!planet.queues?.production) {
+      planet.queues = { production: [] }
     }
-
-    if (!planet.progressMemory) {
-      planet.progressMemory = {}
+    const queue = planet.queues.production
+    if (queue.length === 0) {
+      planet.productionCarryover = 0
+      continue
     }
 
     const available = (planet.workers * planet.productionPerWorker) + (planet.productionCarryover ?? 0)
     planet.productionCarryover = 0
 
-    // ── Building queue (slot-based) ──────────────────────────────────
-    const buildQueue = planet.queues.build
-    if (buildQueue.length > 0) {
-      const entry = buildQueue[0]!
+    // Only the front item makes progress this turn; on completion the leftover
+    // production carries to next turn (it does NOT cascade into the next item now).
+    const entry = queue[0]!
+
+    if (entry.kind === 'building') {
       const slot = planet.slots[entry.slotIndex]
       if (!slot || !slot.buildingId || !slot.isConstructing) {
-        // Invalid queue entry — clear it
-        planet.queues.build = []
+        // Stale entry (slot was cancelled/freed) — drop it.
+        planet.queues.production = queue.slice(1)
         continue
       }
       const def = getBuildingDef(slot.buildingId)
-      const remaining = Math.max(0, slot.constructionTimeLeft - available)
       const overflow = available - slot.constructionTimeLeft
-      slot.constructionTimeLeft = remaining
+      slot.constructionTimeLeft = Math.max(0, slot.constructionTimeLeft - available)
 
-      if (remaining <= 0) {
+      if (slot.constructionTimeLeft <= 0) {
         slot.isConstructing = false
         slot.constructionTimeLeft = 0
-
         if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
           addEvent(snapshot, planet.owner, {
             id: nextEventId(),
@@ -80,62 +77,54 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
             timestamp: Date.now()
           })
         }
-        planet.queues.build = buildQueue.slice(1)
-        if (overflow > 0) {
-          planet.productionCarryover = overflow
-        }
+        planet.queues.production = queue.slice(1)
+        if (overflow > 0) planet.productionCarryover = overflow
       }
       continue
     }
 
-    // ── Shipyard queue (unit-based, unchanged) ───────────────────────
-    const shipyardQueue = planet.queues.shipyard
-    if (shipyardQueue.length > 0) {
-      const current = shipyardQueue[0]!
-      const def = getUnitDef(current.id)
-      const productionCost = def?.productionCost ?? 0
-      const remaining = Math.max(0, (current.eta ?? 0) - available)
-      const overflow = available - (current.eta ?? 0)
-      current.eta = remaining
-      const spent = Math.max(0, productionCost - remaining)
-      planet.progressMemory[current.id] = { productionSpent: spent, resourcePaid: true }
-      if (remaining <= 0) {
-        if (current.id === 'unit:worker') {
-          planet.workers += 1
-        } else {
-          // Assign a unique instance id; the def id stays available via defId
-          snapshot.fleets.push({
-            ...current,
-            id: `${current.id}@${planet.id}@t${turn}` as UnitId,
-            defId: current.id,
-            eta: undefined,
-            location: planet.id
-          } as Unit)
-        }
-        planet.progressMemory = Object.fromEntries(
-          Object.entries(planet.progressMemory).filter(([key]) => key !== current.id)
-        )
-        if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
-          addEvent(snapshot, planet.owner, {
-            id: nextEventId(),
-            type: 'ship-complete',
-            severity: 'success',
-            year: turn,
-            titleKey: 'events.types.ship-complete.title',
-            titleParams: { name: unitNameKey(current.id) },
-            descriptionKey: 'events.types.ship-complete.description',
-            descriptionParams: { location: getPlanetName(snapshot, planet.id) },
-            relatedEntityId: planet.id,
-            relatedEntityType: 'planet',
-            read: false,
-            timestamp: Date.now()
-          })
-        }
-        planet.queues.shipyard = shipyardQueue.slice(1)
-        if (overflow > 0) {
-          planet.productionCarryover = overflow
-        }
+    // ── Unit item ────────────────────────────────────────────────────
+    const def = getUnitDef(entry.unitId)
+    const productionCost = def?.productionCost ?? 0
+    const remaining = Math.max(0, productionCost - entry.productionSpent)
+    const overflow = available - remaining
+
+    if (available >= remaining) {
+      if (entry.unitId === 'unit:worker') {
+        planet.workers += 1
+      } else {
+        // Assign a unique instance id; the def id stays available via defId.
+        snapshot.fleets.push({
+          id: `${entry.unitId}@${planet.id}@t${turn}` as UnitId,
+          defId: entry.unitId,
+          type: def?.unitType ?? 'battleship',
+          name: entry.unitId,
+          status: 'idle',
+          location: planet.id,
+          strength: def?.strength ?? 1,
+          ownerId: planet.owner as Unit['ownerId']
+        } as Unit)
       }
+      if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
+        addEvent(snapshot, planet.owner, {
+          id: nextEventId(),
+          type: 'ship-complete',
+          severity: 'success',
+          year: turn,
+          titleKey: 'events.types.ship-complete.title',
+          titleParams: { name: unitNameKey(entry.unitId) },
+          descriptionKey: 'events.types.ship-complete.description',
+          descriptionParams: { location: getPlanetName(snapshot, planet.id) },
+          relatedEntityId: planet.id,
+          relatedEntityType: 'planet',
+          read: false,
+          timestamp: Date.now()
+        })
+      }
+      planet.queues.production = queue.slice(1)
+      if (overflow > 0) planet.productionCarryover = overflow
+    } else {
+      entry.productionSpent += available
     }
   }
 }

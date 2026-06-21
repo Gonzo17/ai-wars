@@ -1,14 +1,15 @@
-import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
-import type { GameSnapshot, Planet, PlayerSnapshot, Unit } from '~~/shared/types/game'
+import { getBuildingDef } from '~~/shared/defs/production'
+import type { GameSnapshot, Planet, PlayerSnapshot, ProductionQueueItem, Unit } from '~~/shared/types/game'
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
 import type { TurnPlan } from '~~/shared/types/turn'
+import { reconcileProductionQueue } from '~~/shared/utils/productionQueue'
 import { findLanePath, getSystemIdForLocation } from '~~/shared/utils/starlanes'
 
 /**
- * Apply one player's plan to a fresh clone of the snapshot: queue builds/units,
- * (re)start research, and set fleet destinations. Resource costs for NEW builds
- * are deducted by the orchestrator BEFORE this runs (see resolveTurn). Resuming
- * an in-progress build keeps its progress and is not re-charged.
+ * Apply one player's plan to a fresh clone of the snapshot: set each named planet's
+ * production queue, (re)start research, and set fleet destinations. Resource costs for
+ * NEW queue items are deducted by the orchestrator BEFORE this runs (see resolveTurn);
+ * resumed/in-progress items are not re-charged.
  */
 export function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: TurnPlan): GameSnapshot {
   const next = structuredClone(snapshot)
@@ -16,22 +17,6 @@ export function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: 
   if (!targetPlayer) return next
   if (!targetPlayer.research.progressMemory) {
     targetPlayer.research.progressMemory = {}
-  }
-
-  /**
-   * Remember current shipyard queue progress before it gets replaced.
-   * Building progress lives in the slot itself, so nothing to save for buildings.
-   */
-  const rememberUnitQueueProgress = (planet: Planet) => {
-    if (!planet.progressMemory) planet.progressMemory = {}
-    const currentUnit = planet.queues.shipyard[0]
-    if (currentUnit) {
-      const def = getUnitDef(currentUnit.id)
-      const productionCost = def?.productionCost ?? 0
-      const remaining = currentUnit.eta ?? productionCost
-      const spent = Math.max(0, productionCost - remaining)
-      planet.progressMemory[currentUnit.id] = { productionSpent: spent, resourcePaid: true }
-    }
   }
 
   for (const command of plan.commands) {
@@ -52,54 +37,43 @@ export function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: 
       continue
     }
 
-    if (command.type === 'buildStructure') {
+    if (command.type === 'setProductionQueue') {
       const planet = next.planets.find((p: Planet) => p.id === command.planetId)
       if (!planet) continue
-      const def = getBuildingDef(command.buildingId)
-      if (!def) continue
-      const slot = planet.slots[command.slotIndex]
-      if (!slot) continue
+      const { queue } = reconcileProductionQueue(planet, command.items)
+      const referencedSlots = new Set(
+        queue.filter((i): i is Extract<ProductionQueueItem, { kind: 'building' }> => i.kind === 'building').map(i => i.slotIndex)
+      )
 
-      // If resuming (same building already assigned to this slot), keep progress
-      const isResume = slot.buildingId === command.buildingId && slot.isConstructing
+      // Cancel: a slot still under construction but no longer referenced by any queued
+      // building was removed by the player — free it (progress + already-paid resources
+      // are forfeited, matching "cancel loses it").
+      planet.slots.forEach((slot, idx) => {
+        if (slot.isConstructing && !referencedSlots.has(idx)) {
+          slot.buildingId = null
+          slot.buildingLevel = 0
+          slot.isConstructing = false
+          slot.constructionTimeLeft = 0
+        }
+      })
 
-      if (!isResume) {
-        const cost = adjustedProductionCost(def.productionCost, command.slotIndex, command.buildingId, planet.slots)
-        slot.buildingId = command.buildingId
-        slot.buildingLevel = 1
-        slot.isConstructing = true
-        slot.constructionTimeLeft = cost
+      // Start construction for newly-queued buildings (resumed ones keep their progress).
+      for (const item of queue) {
+        if (item.kind !== 'building') continue
+        const slot = planet.slots[item.slotIndex]
+        if (!slot) continue
+        const isResume = slot.buildingId === item.buildingId && slot.isConstructing
+        if (!isResume) {
+          const def = getBuildingDef(item.buildingId)
+          if (!def) continue
+          slot.buildingId = item.buildingId
+          slot.buildingLevel = 1
+          slot.isConstructing = true
+          slot.constructionTimeLeft = adjustedProductionCost(def.productionCost, item.slotIndex, item.buildingId, planet.slots)
+        }
       }
 
-      // Save unit progress before clearing shipyard queue
-      rememberUnitQueueProgress(planet)
-
-      planet.queues.build = [{ slotIndex: command.slotIndex }]
-      planet.queues.shipyard = []
-      continue
-    }
-
-    if (command.type === 'buildUnit') {
-      const planet = next.planets.find((p: Planet) => p.id === command.planetId)
-      if (!planet) continue
-      const def = getUnitDef(command.unitId)
-      if (!def) continue
-      rememberUnitQueueProgress(planet)
-      const stored = planet.progressMemory?.[command.unitId]
-      const storedSpent = stored?.productionSpent ?? 0
-      const remaining = Math.max(0, def.productionCost - storedSpent)
-      const unit: Unit = {
-        id: command.unitId,
-        type: def.unitType,
-        name: command.unitId,
-        status: 'idle',
-        location: planet.id,
-        eta: remaining,
-        strength: def.strength,
-        ownerId: player.id
-      }
-      planet.queues.shipyard = [unit]
-      planet.queues.build = []
+      planet.queues.production = queue
       continue
     }
 

@@ -115,8 +115,8 @@ The seed script ([scripts/seed-test-users.mjs](scripts/seed-test-users.mjs)) cre
 ## Gotchas (things that have bitten me)
 
 1. **Tech gating is live** (since June 2026): several buildings/units in `BUILDING_DEFS`/`UNIT_DEFS` carry `requirements.research`, enforced server-side in `validateTurnPlan` and surfaced in the UI via the `locked`/`lockedByTechName` catalog fields built in `game.vue`. When adding a building/unit, decide which tech gates it; `getUnlocksForTech()` drives the "Unlocks" display in the research tree.
-2. **`isResume` semantics in resolve**: building the same building in the same slot keeps existing construction progress and does NOT re-deduct resources. Switching pays again. See `applyPlan()` in [resolveTurn.ts](server/game/resolveTurn.ts).
-3. **`progressMemory`** stores per-build production progress so a cancelled or replaced build doesn't lose what was already invested. Lives on `Planet.progressMemory` (per-planet, per-buildId) and on `PlayerSnapshot.research.progressMemory` (per-tech).
+2. **Production is a shared, ordered, declarative queue** (Civ-style, since June 2026 — Phase B): each `Planet.queues.production` is one ordered list of `ProductionQueueItem` (`{kind:'building',slotIndex,buildingId}` | `{kind:'unit',unitId,productionSpent}`), buildings and units interleaved, capped at `BUILD_QUEUE_LIMIT` (6). The client owns the desired queue and sends the **whole list** as a single `setProductionQueue` command per planet (add/cancel/reorder = resend); `reconcileProductionQueue()` in [shared/utils/productionQueue.ts](shared/utils/productionQueue.ts) is the one place that classifies each item as new-vs-resume — used identically by `validateTurnPlan`, the resolveTurn deduction loop, AND `applyPlan`, so they always agree. **Resource cost is paid up-front when an item is first added** (resume = same building already constructing in that slot, or a unit matched greedily by id to an in-progress one → not re-charged). `advanceQueues` only advances the **front** item per turn; on completion it pops and rolls overflow into `productionCarryover` (next turn), no same-turn cascade. UI: side-list catalog + placement mode (`PlanetSlotView`/`StarSlotView`) emit `queue-build`/`remove-queue-item`/`reorder-queue`; `game.vue` keeps the optimistic `buildQueueOverrides` per planet. *Cost-timing is up-front, not pay-on-start; cancelling forfeits paid resources (no refund). Switching a slot's building needs a cancel one turn, re-place the next (validation checks the live server slot).*
+3. **`progressMemory`** still stores per-tech research progress on `PlayerSnapshot.research.progressMemory`. The per-planet `Planet.progressMemory` field is legacy/unused for the production queue now — unit progress lives on the queue item's `productionSpent` (so reorder is lossless), building progress on the slot's `constructionTimeLeft`.
    - **Production & research output goes through `slotOutput()` in [shared/utils/synergies.ts](shared/utils/synergies.ts)** (since June 2026), not raw `def.resourceProduction`. Three synergies make placement matter: ore-extraction (mineral building on ore node ×2 minerals), power-grid (energy building +25% per adjacent surface energy building), compute-uplink (data center +25% research per planet energy building, capped +100%). `economy.ts` sums `slotOutput` across slots; `activeSynergies()` drives the UI preview badges.
 4. **`productionCarryover`** rolls excess production from a completed build into the next turn's production pool on that planet.
 5. **Fleet movement runs on the star-lane graph** (since June 2026): `advanceFleets()` in resolveTurn moves en-route fleets one lane per turn along the BFS shortest path (`shared/utils/starlanes.ts`); validation rejects unreachable targets. Fleets get a unique instance `id` on completion — the definition lookup key is `Unit.defId`. `Galaxy.connections` is still unused. **Planned rework** (see VISION *Navigation & combat*): unify all three zoom levels into one weighted graph (intra-system + inter-galaxy edges, gateway nodes, per-edge `distance`, per-unit `speed`); this is the largest navigation change ahead.
@@ -218,12 +218,17 @@ Critical path: Phase 0 split → Phase 1 Military win → Phase 2 checkpoint →
 Captured from a hands-on playtest; slot these in around the phases above (most are
 confirmed direction, not yet scheduled). Detail lives in memory ([[feedback_playtest-2026-06]]).
 
-- **Civ-style production & placement UX** (significant redesign of planet building):
-  replace the per-slot click flow with a Civ-like side list of buildings + units and a
-  **shared build queue with multiple slots**. Picking a *unit* queues it; picking a
-  *building* lets you **place it on the map** where you want, and **hovering a free
-  slot previews base yield + bonuses**. Overlaps the Phase-3 terrain/synergy preview and
-  the Phase-2 catalog — decide the production model before/with those.
+- ✅ **Civ-style production & placement UX** (done June 2026 — Phase B): the per-slot
+  click flow is replaced by a side-list catalog (Buildings/Units tabs) + a **shared,
+  ordered, multi-slot queue** with drag-reorder and per-item cancel. Picking a *unit*
+  queues it; picking a *building* enters **placement mode** (valid slots highlight,
+  hovering previews base yield + synergy/ore bonuses), click a slot to queue. Engine:
+  unified `queues.production` + declarative `setProductionQueue` command +
+  `reconcileProductionQueue` (gotcha 2). Up-front cost, drag-reorder, planets **and**
+  stars. **Deferred follow-ups:** a possible pay-on-start cost model, per-queued-item
+  robot-cost escalation tuning, and the **resource-type discussion** David wants (which
+  new resources fit — keep energy/minerals/rare + robots-as-capacity, or add Civ-style
+  strategic tiers) — do that before any new-resource work, alongside the Phase-2 tree.
 - **Product shell & onboarding** (new workstream — make it feel like a PC game from the
   first moment, not a website): after login → a **main menu** (settings, start) → a
   **"Start game" submenu** with *Tutorial* / *Quick Play* (both greyed out for now) /

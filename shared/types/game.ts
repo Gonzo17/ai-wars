@@ -60,9 +60,15 @@ export interface PlanetSlotData {
   resourceNode: ResourceNodeType | null
 }
 
-export interface BuildQueueItem {
-  slotIndex: number
-}
+/**
+ * One entry in a planet's shared, ordered production queue. Buildings point at a
+ * slot (their construction progress lives on the slot via `constructionTimeLeft`,
+ * so reordering is lossless); units carry their own `productionSpent` so progress
+ * travels with the item across reorder/cancel.
+ */
+export type ProductionQueueItem
+  = | { kind: 'building', slotIndex: number, buildingId: BuildingId }
+    | { kind: 'unit', unitId: UnitId, productionSpent: number }
 
 export interface Planet {
   id: PlanetId
@@ -83,8 +89,8 @@ export interface Planet {
   productionPerWorker: number
   slots: PlanetSlotData[]
   queues: {
-    build: BuildQueueItem[]
-    shipyard: Unit[]
+    /** Shared ordered queue: buildings and units interleaved, processed front-first. */
+    production: ProductionQueueItem[]
   }
   progressMemory: Record<string, { productionSpent: number, resourcePaid: boolean }>
   productionCarryover: number

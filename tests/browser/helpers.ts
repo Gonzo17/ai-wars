@@ -184,8 +184,10 @@ export async function playFullTurn(page: Page, buildingId = 'bld:mining-facility
     }
 
     await needy.click()
+    // Civ-style flow: pick the building from the side list (enters placement mode),
+    // then click an empty slot to queue it.
+    await page.getByTestId(`build-list-option-${buildingId}`).click()
     await page.locator('[data-testid^="surface-slot-"][data-state="empty"]').first().click()
-    await page.getByTestId(`build-option-${buildingId}`).click()
     await page.getByTestId('slot-view-close').click()
     await expect(endTurn).toBeVisible()
   }

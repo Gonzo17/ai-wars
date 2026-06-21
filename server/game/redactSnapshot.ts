@@ -63,7 +63,7 @@ function redactEnemyPlanet(planet: Planet): Planet {
   return {
     ...planet,
     slots: [],
-    queues: { build: [], shipyard: [] },
+    queues: { production: [] },
     progressMemory: {},
     workers: 0,
     productionCarryover: 0
