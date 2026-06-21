@@ -105,7 +105,7 @@ describe('economy aggregation', () => {
     const production = calculateResourceProduction([planet], OWNER)
     expect(production.minerals).toBe(30)
     expect(production.energy).toBe(20)
-    // data-center 20 × 1.25 (one energy building) = 25, plus BASE_PLANET_SCIENCE (5) for owning the planet.
-    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(30)
+    // data-center 20 × 1.25 (one energy building) = 25, plus BASE_PLANET_SCIENCE (20) for owning the planet.
+    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(45)
   })
 })

@@ -1,5 +1,6 @@
 import type { BuildingId, Planet, PlanetId, ResourceId } from '../types/game'
 import { BASE_PLANET_PRODUCTION, BASE_PLANET_SCIENCE, getBuildingDef } from '../defs/production'
+import { DISTRICT_DEFS } from '../defs/districts'
 import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
 import { districtSlotProduction, districtSlotUpkeep, slotOutput } from './synergies'
 
@@ -81,17 +82,33 @@ export function resourceProductionBreakdown(
     }
     for (let i = 0; i < planet.slots.length; i++) {
       const slot = planet.slots[i]
-      if (!slot?.buildingId || slot.isConstructing) continue
-      const buildingId = slot.buildingId
-      const out = slotOutput(planet, i)
-      const bump = (kind: ProductionResourceKind, amount: number) => {
+      if (!slot) continue
+      const bump = (sourceId: BuildingId, kind: ProductionResourceKind, amount: number) => {
         if (!amount) return
-        perKind[kind].set(buildingId, (perKind[kind].get(buildingId) ?? 0) + amount)
+        perKind[kind].set(sourceId, (perKind[kind].get(sourceId) ?? 0) + amount)
       }
-      bump('energy', out.energy)
-      bump('minerals', out.minerals)
-      bump('rare', out.rare)
-      bump('research', out.research)
+      // District slot: attribute each completed node's (weighted) output as its own source.
+      if (slot.districtType && slot.nodes?.length) {
+        const def = DISTRICT_DEFS[slot.districtType]
+        const weight = def.weights?.[planet.type] ?? 1
+        for (const nodeId of slot.nodes) {
+          const node = def.tree.find(n => n.id === nodeId)
+          if (!node?.output) continue
+          let minerals = Math.round((node.output.matter ?? 0) * weight)
+          if (slot.districtType === 'matter' && slot.resourceNode === 'ore') minerals *= 2
+          bump(nodeId, 'energy', Math.round((node.output.energy ?? 0) * weight))
+          bump(nodeId, 'minerals', minerals)
+          bump(nodeId, 'research', Math.round((node.output.research ?? 0) * weight))
+        }
+        continue
+      }
+      // Legacy building / megastructure slot.
+      if (!slot.buildingId || slot.isConstructing) continue
+      const out = slotOutput(planet, i)
+      bump(slot.buildingId, 'energy', out.energy)
+      bump(slot.buildingId, 'minerals', out.minerals)
+      bump(slot.buildingId, 'rare', out.rare)
+      bump(slot.buildingId, 'research', out.research)
     }
     for (const kind of PRODUCTION_KINDS) {
       const map = perKind[kind]

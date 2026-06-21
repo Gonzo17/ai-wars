@@ -11,11 +11,11 @@ describe('resourceProductionBreakdown', () => {
     const breakdown = resourceProductionBreakdown(snap.planets, p1)
     const totals = calculateResourceProduction(snap.planets, p1)
 
-    // The homeworld is an energy group, and its fusion core is a source within it.
+    // The homeworld is an energy group, and its starter solar-array district node is a source.
     const homeworld = snap.planets.find(p => p.owner === p1 && p.isHomeworld)!
     const homeGroup = breakdown.energy.find(g => g.planetId === homeworld.id)
     expect(homeGroup).toBeDefined()
-    expect(homeGroup!.sources.some(s => s.buildingId === 'bld:fusion-core')).toBe(true)
+    expect(homeGroup!.sources.some(s => s.buildingId === 'bld:solar-array')).toBe(true)
     // A group's subtotal equals the sum of its sources.
     expect(homeGroup!.total).toBe(homeGroup!.sources.reduce((acc, s) => acc + s.amount, 0))
 

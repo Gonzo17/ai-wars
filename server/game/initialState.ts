@@ -47,6 +47,18 @@ function makeSlots(
   return slots
 }
 
+/** The homeworld's near-empty starting slots (one Energy district + an orbital dock). */
+function makeHomeworldSlots(): PlanetSlotData[] {
+  const slots = makeSlots([{ id: 'bld:orbital-dock' as BuildingId, level: 1 }], new Map([[2, 'ore']]))
+  // A starter Energy district on the first surface slot (solar node → +20 energy/round).
+  const energySlot = slots.find(s => s.zone === 'surface' && !s.buildingId)
+  if (energySlot) {
+    energySlot.districtType = 'energy'
+    energySlot.nodes = ['bld:solar-array' as BuildingId]
+  }
+  return slots
+}
+
 type HomeTemplate = {
   key: string
   galaxyName: string
@@ -269,15 +281,12 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
           id: template.primaryId,
           name: template.primaryName,
           isHomeworld: true,
-          slots: makeSlots(
-            [
-              { id: 'bld:fusion-core' as BuildingId, level: 2 },
-              { id: 'bld:hydroponics' as BuildingId, level: 3 },
-              { id: 'bld:orbital-dock' as BuildingId, level: 1 },
-              { id: 'bld:data-center' as BuildingId, level: 1 }
-            ],
-            new Map([[2, 'ore']])
-          )
+          // Near-empty start: a basic Energy district (the substrate that lets you
+          // afford a first consumer district) + an orbital dock for early units. Every
+          // other district is a turn-1 choice; the ore node on slot 2 awaits a Matter
+          // district. The orbital dock stays a legacy building until the 2b Shipyard
+          // district replaces it.
+          slots: makeHomeworldSlots()
         }
       }
     )

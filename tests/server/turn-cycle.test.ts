@@ -67,17 +67,17 @@ describe('initial state', () => {
       expect(owned[0]!.type).toBe('terrestrial')
       expect(owned[0]!.isHomeworld).toBe(true)
 
+      // Near-empty start: the only legacy building is the orbital dock (for early units).
       const buildings = owned
         .flatMap(p => p.slots)
         .filter(s => s.buildingId)
         .map(s => `${s.buildingId}@${s.buildingLevel}`)
         .sort()
-      expect(buildings).toEqual([
-        'bld:data-center@1',
-        'bld:fusion-core@2',
-        'bld:hydroponics@3',
-        'bld:orbital-dock@1'
-      ])
+      expect(buildings).toEqual(['bld:orbital-dock@1'])
+
+      // …plus a starter Energy district (solar-array node) — every other district is a choice.
+      const energyDistrict = owned.flatMap(p => p.slots).find(s => s.districtType === 'energy')
+      expect(energyDistrict?.nodes).toEqual(['bld:solar-array'])
     }
 
     const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
@@ -119,8 +119,8 @@ describe('initial state', () => {
     const snapshot = getSnapshot(repo, 3)
     const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
     expect(p1.resources).toEqual(p2.resources)
-    // 2 turns of fusion-core L2 (100/turn); the lone homeworld has no mineral building yet
-    expect(getResource(p1, 'res:energy')).toBe(700)
+    // 2 turns of the starter Energy district (solar-array, +20/turn); no matter district yet.
+    expect(getResource(p1, 'res:energy')).toBe(540)
     expect(getResource(p1, 'res:material')).toBe(100)
   })
 })
@@ -138,8 +138,8 @@ describe('building construction cycle', () => {
 
     const turn2 = getSnapshot(repo, 2)
     const p1 = getPlayer(turn2, U1)
-    // 500 start − 30 build cost (deducted once) + 100 production
-    expect(getResource(p1, 'res:energy')).toBe(570)
+    // 500 start − 30 build cost (deducted once) + 20 from the starter Energy district
+    expect(getResource(p1, 'res:energy')).toBe(490)
     const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[2]!
     expect(slot.buildingId).toBe('bld:mining-facility')
     expect(slot.districtType).toBe('matter')
@@ -203,13 +203,12 @@ describe('research cycle', () => {
       commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
     }
 
-    // 60 points required. Data-center L1 yields 20, +25% compute-uplink from
-    // the home fusion-core → 25, plus BASE_PLANET_SCIENCE (5) for the homeworld
-    // → 30/turn → completes in 2 turns.
+    // 60 points required. The near-empty homeworld has no Research district yet, so
+    // research is just BASE_PLANET_SCIENCE (20) → 20/turn → completes in 3 turns.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(30)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(20)
 
     for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)
