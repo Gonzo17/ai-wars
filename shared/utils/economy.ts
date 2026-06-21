@@ -1,15 +1,26 @@
 import type { BuildingId, Planet, PlanetId, ResourceId } from '../types/game'
 import { BASE_PLANET_PRODUCTION, BASE_PLANET_SCIENCE, getBuildingDef } from '../defs/production'
 import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
-import { slotOutput } from './synergies'
+import { districtSlotProduction, districtSlotUpkeep, slotOutput } from './synergies'
 
 /**
- * Build throughput a single planet generates per turn. Every owned planet has a flat
- * base (workers were removed); the Production district will add on top of this (Phase
- * 2). The single place the engine reads "how much production does this planet make".
+ * Build throughput a single planet generates per turn: a flat base (workers were
+ * removed) plus whatever its Production-district nodes add. The single place the
+ * engine reads "how much production does this planet make".
  */
-export function planetProductionPerTurn(_planet: Planet): number {
-  return BASE_PLANET_PRODUCTION
+export function planetProductionPerTurn(planet: Planet): number {
+  let bonus = 0
+  for (let i = 0; i < planet.slots.length; i++) bonus += districtSlotProduction(planet, i)
+  return BASE_PLANET_PRODUCTION + bonus
+}
+
+/** Total per-turn energy upkeep of all district nodes the player runs. */
+export function calculateEnergyUpkeep(planets: Planet[], playerId: string): number {
+  let upkeep = 0
+  forEachOwnedPlanet(planets, playerId, (planet) => {
+    for (let i = 0; i < planet.slots.length; i++) upkeep += districtSlotUpkeep(planet, i)
+  })
+  return upkeep
 }
 
 export type ResourceTotals = { energy: number, minerals: number, rare: number }
@@ -26,13 +37,17 @@ function forEachOwnedPlanet(planets: Planet[], playerId: string, fn: (planet: Pl
   }
 }
 
-/** Per-turn resource production from all completed buildings owned by the player (synergies included). */
+/**
+ * Per-turn resource production for the player (synergies included). Energy is the NET
+ * flow — gross production minus district upkeep — so the TopBar delta reflects the
+ * dual-constraint model (a build that over-draws upkeep is rejected in validation).
+ */
 export function calculateResourceProduction(planets: Planet[], playerId: string): ResourceTotals {
   const totals: ResourceTotals = { energy: 0, minerals: 0, rare: 0 }
   forEachOwnedPlanet(planets, playerId, (planet) => {
     for (let i = 0; i < planet.slots.length; i++) {
       const output = slotOutput(planet, i)
-      totals.energy += output.energy
+      totals.energy += output.energy - districtSlotUpkeep(planet, i)
       totals.minerals += output.minerals
       totals.rare += output.rare
     }

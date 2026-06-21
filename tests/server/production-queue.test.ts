@@ -59,33 +59,34 @@ describe('shared production queue', () => {
 
     const planet = homePlanet(getSnapshot(repo, 2))
     expect(planet.queues.production).toHaveLength(2)
-    // Front building progressed (57 adjusted − 20)…
+    // Front building progressed (60 cost − 20 production)…
     expect(planet.slots[2]!.isConstructing).toBe(true)
-    expect(planet.slots[2]!.constructionTimeLeft).toBeLessThan(57)
+    expect(planet.slots[2]!.constructionTimeLeft).toBe(40)
     // …the second is set up but untouched (full cost remaining).
     expect(planet.slots[3]!.isConstructing).toBe(true)
     expect(planet.slots[3]!.constructionTimeLeft).toBe(60)
   })
 
-  it('completes items in order across turns, carrying overflow to the next', async () => {
+  it('completes items in order across turns', async () => {
     const repo = seedGame()
     const plan = queueCmd(HOME, [building(2, 'bld:mining-facility'), building(3, 'bld:solar-array')])
     await playTurn(repo, 1, plan)
-    // 57 → 37 → 17 → completes (turn 3 resolve), overflow 3 carried.
+    // mining 60 at 20/turn → 60 → 40 → 20 → completes (turn 3 resolve), no overflow.
     await playTurn(repo, 2)
     await playTurn(repo, 3)
 
     const afterMining = homePlanet(getSnapshot(repo, 4))
     expect(afterMining.slots[2]!.isConstructing).toBe(false)
+    expect(afterMining.slots[2]!.nodes).toContain('bld:mining-facility')
     expect(afterMining.queues.production).toHaveLength(1)
     expect(afterMining.queues.production[0]).toMatchObject({ kind: 'building', slotIndex: 3 })
-    // Overflow (20 − 17 remaining) is held for next turn; the next item is untouched this turn.
-    expect(afterMining.productionCarryover).toBe(3)
+    // Exact completion → no overflow; the next item is untouched this turn.
+    expect(afterMining.productionCarryover).toBe(0)
     expect(afterMining.slots[3]!.constructionTimeLeft).toBe(60)
 
-    // Next turn the solar build gets 20 production + 3 carried over = 23.
+    // Next turn the solar build gets 20 production.
     await playTurn(repo, 4)
-    expect(homePlanet(getSnapshot(repo, 5)).slots[3]!.constructionTimeLeft).toBe(60 - 23)
+    expect(homePlanet(getSnapshot(repo, 5)).slots[3]!.constructionTimeLeft).toBe(60 - 20)
   })
 
   it('reordering keeps a unit\'s production progress with the item', async () => {

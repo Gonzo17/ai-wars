@@ -126,11 +126,11 @@ describe('initial state', () => {
 })
 
 describe('building construction cycle', () => {
-  it('deducts cost once, applies ore adjacency, completes, and carries over overflow', async () => {
+  it('builds a matter district node, completes it, and doubles its yield on the ore node', async () => {
     const repo = seedTwoPlayerGame()
     const plan: TurnPlan = {
-      // Slot 2 on the primary planet is empty and has an ore node →
-      // mining facility gets the −5 % adjusted production cost (60 → 57).
+      // Slot 2 on the primary planet is empty and has an ore node → a Matter
+      // district mining node (cost 30 energy, build time 3 turns at 20/turn = 60).
       commands: [buildCmd('pl:aurora', 'bld:mining-facility', 2)]
     }
 
@@ -142,24 +142,26 @@ describe('building construction cycle', () => {
     expect(getResource(p1, 'res:energy')).toBe(570)
     const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[2]!
     expect(slot.buildingId).toBe('bld:mining-facility')
+    expect(slot.districtType).toBe('matter')
     expect(slot.isConstructing).toBe(true)
-    // 57 adjusted cost − 20 production this turn
-    expect(slot.constructionTimeLeft).toBe(37)
+    // 60 cost − 20 production this turn
+    expect(slot.constructionTimeLeft).toBe(40)
 
-    // Mining facility takes 3 turns at 20 production/turn (57 → 37 → 17 → done)
+    // 60 at 20 production/turn → 60 → 40 → 20 → done (exact, no overflow).
     await playTurn(repo, 2)
     await playTurn(repo, 3)
 
     const turn4 = getSnapshot(repo, 4)
     const planet = turn4.planets.find(p => p.id === 'pl:aurora')!
     expect(planet.slots[2]!.isConstructing).toBe(false)
-    // last turn: 20 production − 17 remaining = 3 overflow carried over
-    expect(planet.productionCarryover).toBe(3)
+    // The completed node moved into the slot's cumulative node list.
+    expect(planet.slots[2]!.nodes).toContain('bld:mining-facility')
+    expect(planet.productionCarryover).toBe(0)
 
     const events = getPlayer(turn4, U1).events
     expect(events.some(e => e.type === 'building-complete')).toBe(true)
 
-    // Mine sits on the ore node → ore-extraction synergy doubles its 15 to 30
+    // Matter district on the ore node → resource-node bonus doubles its 15 to 30
     const mineralRes = getPlayer(turn4, U1).resources.find(r => r.key === 'res:material')
     expect(mineralRes?.delta).toBe(30)
   })

@@ -1,4 +1,5 @@
 import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
+import { findDistrictNode } from '~~/shared/defs/districts'
 import type { GameSnapshot, Unit, UnitId } from '~~/shared/types/game'
 import { planetProductionPerTurn } from '~~/shared/utils/economy'
 import { addEvent, buildingNameKey, getPlanetName, unitNameKey } from './events'
@@ -56,8 +57,15 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
       slot.constructionTimeLeft = Math.max(0, slot.constructionTimeLeft - available)
 
       if (slot.constructionTimeLeft <= 0) {
+        const completedId = slot.buildingId
         slot.isConstructing = false
         slot.constructionTimeLeft = 0
+        // A completed DISTRICT node joins the slot's cumulative node list and frees
+        // the slot's in-progress build for the next node; a megastructure stays put.
+        if (findDistrictNode(completedId)) {
+          slot.nodes = [...(slot.nodes ?? []), completedId]
+          slot.buildingId = null
+        }
         if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
           addEvent(snapshot, planet.owner, {
             id: nextEventId(),
@@ -65,7 +73,7 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
             severity: 'success',
             year: turn,
             titleKey: 'events.types.building-complete.title',
-            titleParams: { name: buildingNameKey(slot.buildingId) },
+            titleParams: { name: buildingNameKey(completedId) },
             descriptionKey: 'events.types.building-complete.description',
             descriptionParams: { location: getPlanetName(snapshot, planet.id) },
             details: [

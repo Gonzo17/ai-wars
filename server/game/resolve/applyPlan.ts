@@ -1,4 +1,5 @@
-import { getBuildingDef } from '~~/shared/defs/production'
+import { BASE_PLANET_PRODUCTION, getBuildingDef } from '~~/shared/defs/production'
+import { findDistrictNode } from '~~/shared/defs/districts'
 import type { GameSnapshot, Planet, PlayerSnapshot, ProductionQueueItem, Unit } from '~~/shared/types/game'
 import { adjustedProductionCost } from '~~/shared/types/planetSlots'
 import type { TurnPlan } from '~~/shared/types/turn'
@@ -46,14 +47,16 @@ export function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: 
       )
 
       // Cancel: a slot still under construction but no longer referenced by any queued
-      // building was removed by the player — free it (progress + already-paid resources
-      // are forfeited, matching "cancel loses it").
+      // building was removed by the player — free the in-progress build (progress +
+      // already-paid resources are forfeited, matching "cancel loses it"). Completed
+      // district nodes stay; a district with nothing built reverts to an empty slot.
       planet.slots.forEach((slot, idx) => {
         if (slot.isConstructing && !referencedSlots.has(idx)) {
           slot.buildingId = null
           slot.buildingLevel = 0
           slot.isConstructing = false
           slot.constructionTimeLeft = 0
+          if (slot.districtType && !slot.nodes?.length) slot.districtType = null
         }
       })
 
@@ -63,14 +66,27 @@ export function applyPlan(snapshot: GameSnapshot, player: PlayerSnapshot, plan: 
         const slot = planet.slots[item.slotIndex]
         if (!slot) continue
         const isResume = slot.buildingId === item.buildingId && slot.isConstructing
-        if (!isResume) {
-          const def = getBuildingDef(item.buildingId)
-          if (!def) continue
+        if (isResume) continue
+
+        const districtNode = findDistrictNode(item.buildingId)
+        if (districtNode) {
+          // District node: opening the district sets the slot's type; build time is
+          // buildTime turns at the planet's base production rate.
+          slot.districtType = districtNode.district.type
           slot.buildingId = item.buildingId
           slot.buildingLevel = 1
           slot.isConstructing = true
-          slot.constructionTimeLeft = adjustedProductionCost(def.productionCost, item.slotIndex, item.buildingId, planet.slots)
+          slot.constructionTimeLeft = districtNode.node.buildTime * BASE_PLANET_PRODUCTION
+          continue
         }
+
+        // Legacy building / megastructure (stars).
+        const def = getBuildingDef(item.buildingId)
+        if (!def) continue
+        slot.buildingId = item.buildingId
+        slot.buildingLevel = 1
+        slot.isConstructing = true
+        slot.constructionTimeLeft = adjustedProductionCost(def.productionCost, item.slotIndex, item.buildingId, planet.slots)
       }
 
       planet.queues.production = queue

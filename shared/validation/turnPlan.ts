@@ -2,8 +2,10 @@ import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/
 import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
 import type { StrategicCosts } from '../defs/production'
+import { findDistrictNode } from '../defs/districts'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
+import { calculateResourceProduction } from '../utils/economy'
 import { queueItemCosts, reconcileProductionQueue } from '../utils/productionQueue'
 import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
 
@@ -89,6 +91,10 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   let availableResources = getPlayerResources(player)
   const availableStrategic: Record<string, number> = {}
   for (const r of player.resources) availableStrategic[r.key] = r.current
+  // Net energy/round budget (production − upkeep). Each newly-queued district node
+  // adjusts it; a build that would push it below 0 is rejected (the flow half of the
+  // energy dual-constraint; the stockpile half is the normal affordability check).
+  let availableEnergyFlow = calculateResourceProduction(snapshot.planets, playerId).energy
 
   for (const [index, command] of plan.commands.entries()) {
     const path = `commands.${index}`
@@ -136,6 +142,78 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
           }
           seenSlots.add(item.slotIndex)
 
+          if (item.slotIndex < 0 || item.slotIndex >= planet.slots.length) {
+            errors.push({ code: 'INVALID_COMMAND', message: 'Slot index out of range', path: itemPath })
+            continue
+          }
+
+          // ── District node (planets) ──────────────────────────────────
+          const districtNode = findDistrictNode(item.buildingId)
+          if (districtNode) {
+            const slot = planet.slots[item.slotIndex]!
+            const dDef = districtNode.district
+            const nDef = districtNode.node
+            if (isStar) {
+              errors.push({ code: 'INVALID_COMMAND', message: 'Districts cannot be built on a star', path: itemPath })
+              continue
+            }
+            if (!dDef.availableOn.includes(planet.type)) {
+              errors.push({ code: 'INVALID_COMMAND', message: 'District not available on this planet type', path: itemPath })
+              continue
+            }
+            if (dDef.zone !== 'any' && slot.zone !== dDef.zone) {
+              errors.push({ code: 'INVALID_COMMAND', message: 'District not allowed in this zone', path: itemPath })
+              continue
+            }
+            if (slot.districtType && slot.districtType !== dDef.type) {
+              errors.push({ code: 'INVALID_STATE', message: 'Slot occupied by a different district', path: itemPath })
+              continue
+            }
+            if (!slot.districtType && slot.buildingId) {
+              errors.push({ code: 'INVALID_STATE', message: 'Slot already occupied', path: itemPath })
+              continue
+            }
+            if ((slot.nodes ?? []).includes(item.buildingId)) {
+              errors.push({ code: 'INVALID_STATE', message: 'District node already built', path: itemPath })
+              continue
+            }
+            const inProgress = slot.buildingId === item.buildingId && slot.isConstructing
+            if (!inProgress) {
+              const built = new Set(slot.nodes ?? [])
+              if (!nDef.prereqIds.every(p => built.has(p))) {
+                errors.push({ code: 'INVALID_STATE', message: 'District node prerequisites not met', path: itemPath })
+                continue
+              }
+              if (nDef.branchGroup) {
+                const chosen = [...(slot.nodes ?? []), ...(slot.isConstructing && slot.buildingId ? [slot.buildingId] : [])]
+                const conflict = dDef.tree.some(n => n.branchGroup === nDef.branchGroup && n.id !== item.buildingId && chosen.includes(n.id))
+                if (conflict) {
+                  errors.push({ code: 'INVALID_STATE', message: 'Another branch already chosen in this district', path: itemPath })
+                  continue
+                }
+              }
+            }
+            if (nDef.research && !hasResearchRequirement(player, [nDef.research])) {
+              errors.push({ code: 'INVALID_STATE', message: 'Research requirements not met', path: itemPath })
+            }
+            if (isNew[j]) {
+              const cost = itemCosts[j]!
+              const weight = dDef.weights?.[planet.type] ?? 1
+              const flowDelta = Math.round((nDef.output?.energy ?? 0) * weight) - (nDef.energyUpkeep ?? 0)
+              if (!canAfford(availableResources, cost) || !canAffordStrategic(availableStrategic, cost.strategic)) {
+                errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path: itemPath })
+              } else if (availableEnergyFlow + flowDelta < 0) {
+                errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough energy income to run this', path: itemPath })
+              } else {
+                availableResources = subtractCosts(availableResources, cost)
+                subtractStrategic(availableStrategic, cost.strategic)
+                availableEnergyFlow += flowDelta
+              }
+            }
+            continue
+          }
+
+          // ── Legacy building / megastructure (stars) ──────────────────
           const building = getBuildingDef(item.buildingId)
           if (!building) {
             errors.push({ code: 'NOT_FOUND', message: 'Building not found', path: itemPath })

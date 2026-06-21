@@ -1,6 +1,7 @@
 import type { BuildingId, Planet, ProductionQueueItem, UnitId } from '../types/game'
 import type { ProductionQueueCommandItem } from '../types/turn'
 import { getBuildingDef, getUnitDef } from '../defs/production'
+import { findDistrictNode } from '../defs/districts'
 
 export type ItemCost = { energy: number, minerals: number, rare: number, strategic: Record<string, number> }
 
@@ -26,6 +27,12 @@ export function queueItemCosts(_planet: Planet, items: ProductionQueueCommandIte
   return items.map((item, i) => {
     if (!isNew[i]) return ZERO_COST()
     if (item.kind === 'building') {
+      // District node: cost is on the node def (matter maps to the minerals stockpile).
+      const district = findDistrictNode(item.buildingId)
+      if (district) {
+        const c = district.node.cost
+        return { energy: c.energy ?? 0, minerals: c.matter ?? 0, rare: 0, strategic: cleanStrategic(c.strategic) }
+      }
       const def = getBuildingDef(item.buildingId)
       if (!def) return ZERO_COST()
       return { ...def.resourceCosts, strategic: cleanStrategic(def.strategicCosts) }
