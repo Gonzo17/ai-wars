@@ -1,3 +1,4 @@
+import type { DistrictType } from './districts'
 import type { GameEvent } from './events'
 import type { PlayerResearchState } from './research'
 
@@ -53,11 +54,24 @@ export type ResourceNodeType = 'ore' | 'exotic-matter' | 'antimatter'
 export interface PlanetSlotData {
   index: number
   zone: 'surface' | 'orbital'
+  /**
+   * In-progress build (a district node OR a megastructure), or a completed
+   * megastructure. For a district slot this is the node currently constructing
+   * (cleared into `nodes` on completion); null when the district is idle/empty.
+   */
   buildingId: BuildingId | null
   buildingLevel: number
   isConstructing: boolean
   constructionTimeLeft: number
   resourceNode: ResourceNodeType | null
+  /**
+   * Phase-2 districts (planet slots only; stars keep the megastructure model).
+   * The district occupying this slot, or null/absent for an empty slot or a
+   * megastructure. The branch tree itself lives in DISTRICT_DEFS.
+   */
+  districtType?: DistrictType | null
+  /** Completed district-node building ids in this slot (cumulative output). */
+  nodes?: BuildingId[]
 }
 
 /**
