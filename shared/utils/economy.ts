@@ -1,7 +1,16 @@
 import type { BuildingId, Planet, PlanetId, ResourceId } from '../types/game'
-import { getBuildingDef } from '../defs/production'
+import { BASE_PLANET_PRODUCTION, BASE_PLANET_SCIENCE, getBuildingDef } from '../defs/production'
 import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
 import { slotOutput } from './synergies'
+
+/**
+ * Build throughput a single planet generates per turn. Every owned planet has a flat
+ * base (workers were removed); the Production district will add on top of this (Phase
+ * 2). The single place the engine reads "how much production does this planet make".
+ */
+export function planetProductionPerTurn(_planet: Planet): number {
+  return BASE_PLANET_PRODUCTION
+}
 
 export type ResourceTotals = { energy: number, minerals: number, rare: number }
 
@@ -99,10 +108,15 @@ export function calculateStrategicProduction(planets: Planet[], playerId: string
   return totals
 }
 
-/** Per-turn research points from all completed buildings owned by the player (synergies included). */
+/**
+ * Per-turn research points for the player: a flat BASE_PLANET_SCIENCE from every owned
+ * (non-star) planet — so owning worlds always advances research — plus the research
+ * output of all completed buildings (synergies included).
+ */
 export function getResearchPointsPerTurn(planets: Planet[], playerId: string): number {
   let total = 0
   forEachOwnedPlanet(planets, playerId, (planet) => {
+    if (planet.kind !== 'star') total += BASE_PLANET_SCIENCE
     for (let i = 0; i < planet.slots.length; i++) {
       total += slotOutput(planet, i).research
     }

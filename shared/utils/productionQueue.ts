@@ -1,6 +1,6 @@
 import type { BuildingId, Planet, ProductionQueueItem, UnitId } from '../types/game'
 import type { ProductionQueueCommandItem } from '../types/turn'
-import { getBuildingDef, getUnitBuildCost, getUnitDef } from '../defs/production'
+import { getBuildingDef, getUnitDef } from '../defs/production'
 
 export type ItemCost = { energy: number, minerals: number, rare: number, strategic: Record<string, number> }
 
@@ -17,27 +17,22 @@ function cleanStrategic(costs?: Partial<Record<string, number>>): Record<string,
 
 /**
  * Per-item resource cost for a desired queue, aligned to `items`. Only items flagged
- * `isNew` cost anything (resumes were paid when first added). Worker escalation is
- * applied **per queued worker**: each `unit:worker` in the queue (new or resumed)
- * raises the effective worker count for every worker after it, so you can't stack
- * cheap robots in one turn. Used by validation, the resolveTurn deduction loop, and
- * the client's optimistic cost preview, so all three agree.
+ * `isNew` cost anything (resumes were paid when first added). Used by validation, the
+ * resolveTurn deduction loop, and the client's optimistic cost preview, so all three
+ * agree. `planet` is currently unused but kept for future per-planet cost modifiers
+ * (e.g. the Production/Matter district lowering build cost).
  */
-export function queueItemCosts(planet: Planet, items: ProductionQueueCommandItem[], isNew: boolean[]): ItemCost[] {
-  let workerOffset = 0
+export function queueItemCosts(_planet: Planet, items: ProductionQueueCommandItem[], isNew: boolean[]): ItemCost[] {
   return items.map((item, i) => {
+    if (!isNew[i]) return ZERO_COST()
     if (item.kind === 'building') {
-      if (!isNew[i]) return ZERO_COST()
       const def = getBuildingDef(item.buildingId)
       if (!def) return ZERO_COST()
       return { ...def.resourceCosts, strategic: cleanStrategic(def.strategicCosts) }
     }
     const def = getUnitDef(item.unitId)
-    const offset = workerOffset
-    if (item.unitId === 'unit:worker') workerOffset++
-    if (!isNew[i] || !def) return ZERO_COST()
-    const cost = getUnitBuildCost(def, planet.workers + offset)
-    return { ...cost, strategic: cleanStrategic(def.strategicCosts) }
+    if (!def) return ZERO_COST()
+    return { ...def.resourceCosts, strategic: cleanStrategic(def.strategicCosts) }
   })
 }
 

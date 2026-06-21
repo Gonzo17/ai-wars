@@ -120,8 +120,7 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
       }
 
       // Which items are newly added (and therefore must be paid for) — same
-      // classification the engine uses, so validation and resolve agree. Costs
-      // include per-queued-worker escalation.
+      // classification the engine uses, so validation and resolve agree.
       const { isNew } = reconcileProductionQueue(planet, command.items)
       const itemCosts = queueItemCosts(planet, command.items, isNew)
       const isStar = planet.kind === 'star'

@@ -167,7 +167,6 @@ export function resolveColonization(snapshot: GameSnapshot, turn: number, nextEv
     const previousOwner = target.owner
     target.owner = colonizer.ownerId
     target.queues = { production: [] }
-    if (target.workers < 1) target.workers = 1
 
     for (const player of snapshot.players) {
       player.planets = player.planets.filter(id => id !== target.id)
@@ -233,7 +232,6 @@ export function resolveStarCapture(snapshot: GameSnapshot, turn: number, nextEve
     if (!star) continue
 
     star.owner = constructor.ownerId
-    if (star.workers < 1) star.workers = 1
     consumedFleetIds.add(constructor.id)
 
     addEvent(snapshot, constructor.ownerId, {

@@ -32,8 +32,7 @@ interface PlanetOverviewItem {
   typeLabel: string
   size: string
   sizeLabel: string
-  workers: number
-  productionPerWorker: number
+  productionPerRound: number
   buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean }>
 }
 
@@ -50,7 +49,7 @@ const emit = defineEmits<{
   'open-planet': [planetId: string]
 }>()
 
-const productionPerRound = (planet: PlanetOverviewItem) => planet.workers * planet.productionPerWorker
+const productionPerRound = (planet: PlanetOverviewItem) => planet.productionPerRound
 
 const getDefinition = (kind: 'building' | 'unit', id: string) => {
   return kind === 'building'

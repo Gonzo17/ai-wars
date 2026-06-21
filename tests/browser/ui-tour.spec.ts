@@ -77,7 +77,7 @@ test('tours every major dialog on a seeded game', async ({ browser }) => {
   await shot(alice, '06-build-queue')
   // Units queue straight from the Units tab (no placement).
   await alice.getByTestId('build-list-tab-units').click()
-  await alice.getByTestId('build-list-option-unit:worker').click()
+  await alice.getByTestId('build-list-option-unit:colony-ship').click()
   await expect(alice.getByTestId('queue-item-1')).toBeVisible()
   await shot(alice, '06b-multi-queue')
   await alice.getByTestId('slot-view-close').click()

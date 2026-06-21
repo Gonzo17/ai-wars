@@ -93,21 +93,22 @@ describe('shared production queue', () => {
     const seed = getSnapshot(repo, 1)
     const p1 = getPlayer(seed, U1)
     for (const r of p1.resources) r.current = 5000
-    p1.research.completedTechIds.push('tech:probe-design') // probe needs this + the home orbital dock
+    // Both units need the home orbital dock (present) + their design tech.
+    p1.research.completedTechIds.push('tech:probe-design', 'tech:colony-ship-design')
 
-    // Queue probe (cost 60) then worker (cost 20). 20 production/turn → probe gets 20.
-    await playTurn(repo, 1, queueCmd(HOME, [unit('unit:probe'), unit('unit:worker')]))
+    // Queue probe then colony-ship. 20 production/turn → the front probe gets 20.
+    await playTurn(repo, 1, queueCmd(HOME, [unit('unit:probe'), unit('unit:colony-ship')]))
     const probeStarted = homePlanet(getSnapshot(repo, 2)).queues.production
     expect(probeStarted[0]).toMatchObject({ kind: 'unit', unitId: 'unit:probe', productionSpent: 20 })
 
-    // Reorder to [worker, probe]; the worker completes this turn (front).
-    await playTurn(repo, 2, queueCmd(HOME, [unit('unit:worker'), unit('unit:probe')]))
+    // Reorder to [colony-ship, probe]; the colony ship is now front and gets 20.
+    await playTurn(repo, 2, queueCmd(HOME, [unit('unit:colony-ship'), unit('unit:probe')]))
 
-    const after = homePlanet(getSnapshot(repo, 3))
-    expect(after.workers).toBe(2) // worker finished
-    // The probe is now the sole queued item and KEPT its 20 progress (not reset to 0).
-    expect(after.queues.production).toHaveLength(1)
-    expect(after.queues.production[0]).toMatchObject({ kind: 'unit', unitId: 'unit:probe', productionSpent: 20 })
+    const after = homePlanet(getSnapshot(repo, 3)).queues.production
+    expect(after).toHaveLength(2)
+    expect(after[0]).toMatchObject({ kind: 'unit', unitId: 'unit:colony-ship', productionSpent: 20 })
+    // The probe moved to the back but KEPT its 20 progress (not reset to 0 by the reorder).
+    expect(after[1]).toMatchObject({ kind: 'unit', unitId: 'unit:probe', productionSpent: 20 })
   })
 
   it('cancelling a queued build frees the slot and does not refund', async () => {
@@ -133,8 +134,8 @@ describe('production queue validation', () => {
     const snap = initialState([U1, U2], 1)
     const player = getPlayer(snap, U1)
     for (const r of player.resources) r.current = 100000
-    const sevenWorkers = queueCmd(HOME, Array.from({ length: 7 }, () => unit('unit:worker')))
-    const errors = validateTurnPlan(snap, toPlayerId(U1), sevenWorkers)
+    const sevenUnits = queueCmd(HOME, Array.from({ length: 7 }, () => unit('unit:probe')))
+    const errors = validateTurnPlan(snap, toPlayerId(U1), sevenUnits)
     expect(errors.some(e => e.message === 'Build queue full')).toBe(true)
   })
 
@@ -145,24 +146,6 @@ describe('production queue validation', () => {
     const dup = queueCmd(HOME, [building(3, 'bld:solar-array'), building(3, 'bld:mining-facility')])
     const errors = validateTurnPlan(snap, toPlayerId(U1), dup)
     expect(errors.some(e => e.message === 'Two builds target the same slot')).toBe(true)
-  })
-
-  it('escalates worker cost per queued robot in the same turn', () => {
-    const snap = initialState([U1, U2], 1)
-    const player = getPlayer(snap, U1)
-    // Budget = exactly 3 workers at the FLAT base cost (20e/10m each = 60e/30m).
-    // With per-queue escalation the 2nd and 3rd cost more, so 3 must NOT fit.
-    player.resources.find(r => r.key === 'res:energy')!.current = 60
-    player.resources.find(r => r.key === 'res:material')!.current = 30
-    player.resources.find(r => r.key === 'res:rare')!.current = 0
-    const homeworld = homePlanet(snap)
-    homeworld.workers = 1
-
-    const threeRobots = queueCmd(HOME, [unit('unit:worker'), unit('unit:worker'), unit('unit:worker')])
-    expect(validateTurnPlan(snap, toPlayerId(U1), threeRobots).some(e => e.code === 'INSUFFICIENT_RESOURCES')).toBe(true)
-
-    // A single robot at the flat base cost still fits.
-    expect(validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [unit('unit:worker')]))).toHaveLength(0)
   })
 
   it('checks affordability cumulatively across the queue', () => {

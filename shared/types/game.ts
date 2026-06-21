@@ -85,8 +85,6 @@ export interface Planet {
   isHomeworld?: boolean
   type: 'terrestrial' | 'gas-giant' | 'ice-giant' | 'barren' | 'oceanic' | 'desert'
   size: 'small' | 'medium' | 'large' | 'huge'
-  workers: number
-  productionPerWorker: number
   slots: PlanetSlotData[]
   queues: {
     /** Shared ordered queue: buildings and units interleaved, processed front-first. */

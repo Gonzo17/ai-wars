@@ -202,11 +202,12 @@ describe('research cycle', () => {
     }
 
     // 60 points required. Data-center L1 yields 20, +25% compute-uplink from
-    // the home fusion-core → 25/turn → completes in 3 turns.
+    // the home fusion-core → 25, plus BASE_PLANET_SCIENCE (5) for the homeworld
+    // → 30/turn → completes in 2 turns.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(25)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(30)
 
     for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)
@@ -230,18 +231,6 @@ describe('research cycle', () => {
 })
 
 describe('unit production cycle', () => {
-  it('a finished worker increases the planet worker count', async () => {
-    const repo = seedTwoPlayerGame()
-    const plan: TurnPlan = {
-      commands: [unitCmd('pl:aurora', 'unit:worker')]
-    }
-
-    await playTurn(repo, 1, { [U1]: plan })
-
-    const turn2 = getSnapshot(repo, 2)
-    expect(turn2.planets.find(p => p.id === 'pl:aurora')!.workers).toBe(2)
-  })
-
   it('a finished ship joins the global fleet list', async () => {
     const repo = seedTwoPlayerGame()
     // Probes cost 8 rare; players start with 0 → grant some up front.

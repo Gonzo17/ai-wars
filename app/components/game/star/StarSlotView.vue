@@ -52,8 +52,7 @@ interface StarData {
   name: string
   owner: string
   ownerLabel: string
-  workers: number
-  productionPerWorker: number
+  productionPerRound: number
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
   buildQueue: QueueEntry[]
   stationedUnits: Array<{ unitDefId: string, count: number }>
@@ -245,7 +244,7 @@ const costLines = (costs: BuildCosts, strategic?: Partial<Record<string, number>
 const insufficientHint = (costs: BuildCosts, strategic?: Partial<Record<string, number>>): string | null =>
   (!canAfford(costs) || !canAffordStrategic(strategic)) ? t('game.slots.tooltip-insufficient') : null
 
-const productionPerRound = computed(() => props.star.workers * props.star.productionPerWorker)
+const productionPerRound = computed(() => props.star.productionPerRound)
 const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
 
 // ── Placement ─────────────────────────────────────────────────────────

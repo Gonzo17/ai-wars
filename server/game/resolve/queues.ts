@@ -1,5 +1,6 @@
 import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
 import type { GameSnapshot, Unit, UnitId } from '~~/shared/types/game'
+import { planetProductionPerTurn } from '~~/shared/utils/economy'
 import { addEvent, buildingNameKey, getPlanetName, unitNameKey } from './events'
 
 /**
@@ -36,7 +37,7 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
       continue
     }
 
-    const available = (planet.workers * planet.productionPerWorker) + (planet.productionCarryover ?? 0)
+    const available = planetProductionPerTurn(planet) + (planet.productionCarryover ?? 0)
     planet.productionCarryover = 0
 
     // Only the front item makes progress this turn; on completion the leftover
@@ -90,21 +91,17 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
     const overflow = available - remaining
 
     if (available >= remaining) {
-      if (entry.unitId === 'unit:worker') {
-        planet.workers += 1
-      } else {
-        // Assign a unique instance id; the def id stays available via defId.
-        snapshot.fleets.push({
-          id: `${entry.unitId}@${planet.id}@t${turn}` as UnitId,
-          defId: entry.unitId,
-          type: def?.unitType ?? 'battleship',
-          name: entry.unitId,
-          status: 'idle',
-          location: planet.id,
-          strength: def?.strength ?? 1,
-          ownerId: planet.owner as Unit['ownerId']
-        } as Unit)
-      }
+      // Assign a unique instance id; the def id stays available via defId.
+      snapshot.fleets.push({
+        id: `${entry.unitId}@${planet.id}@t${turn}` as UnitId,
+        defId: entry.unitId,
+        type: def?.unitType ?? 'battleship',
+        name: entry.unitId,
+        status: 'idle',
+        location: planet.id,
+        strength: def?.strength ?? 1,
+        ownerId: planet.owner as Unit['ownerId']
+      } as Unit)
       if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
         addEvent(snapshot, planet.owner, {
           id: nextEventId(),

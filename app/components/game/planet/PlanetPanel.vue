@@ -45,8 +45,7 @@ interface PlanetData {
   sizeLabel: string
   systemId: string
   systemName: string
-  workers: number
-  productionPerWorker: number
+  productionPerRound: number
   buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean }>
   buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean }>
@@ -141,7 +140,7 @@ const activeTab = ref<TabKey>('buildings')
 const hasTrainingFacility = computed(() => (builtLevels.value.get('bld:orbital-dock') ?? 0) > 0)
 const trainingTabEnabled = computed(() => hasTrainingFacility.value || props.unitCatalog.some(unit => !unit.requiresFacility))
 
-const productionPerRound = computed(() => props.planet.workers * props.planet.productionPerWorker)
+const productionPerRound = computed(() => props.planet.productionPerRound)
 
 const estimateRounds = (productionCost: number) => {
   if (productionPerRound.value <= 0) return 0
@@ -317,15 +316,6 @@ const canBuildUnit = (unit: UnitDefinition): boolean => {
             />
             <span>
               {{ $t('game.planet.labels.system') }}: {{ planet.systemName }}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <UIcon
-              name="i-lucide-bot"
-              class="w-4 h-4 text-primary-300"
-            />
-            <span>
-              {{ $t('game.planet.labels.workers') }}: {{ props.planet.workers }}
             </span>
           </div>
           <div class="flex items-center gap-2">

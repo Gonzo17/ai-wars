@@ -39,7 +39,7 @@ describe('redactSnapshotFor', () => {
     expect(enemyPlanet.name).toBeTruthy() // still on the map
     expect(enemyPlanet.owner).toBe(toPlayerId(U2)) // ownership visible
     expect(enemyPlanet.slots).toEqual([]) // but no buildings leaked
-    expect(enemyPlanet.workers).toBe(0)
+    expect(enemyPlanet.queues.production).toEqual([])
   })
 
   it('strips enemy private state (resources, research, events)', () => {

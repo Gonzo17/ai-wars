@@ -8,7 +8,7 @@ import type { GameSnapshot, Planet, PlayerId, PlayerSnapshot } from '~~/shared/t
  *
  *  - own data is untouched (planets, resources, research, events, fleets)
  *  - unclaimed planets stay fully visible (they are expansion targets)
- *  - enemy planet *contents* (buildings, queues, workers) are hidden; only the
+ *  - enemy planet *contents* (buildings, queues) are hidden; only the
  *    map-level facts remain (id, owner, name, type, size, location)
  *  - enemy players' private state (resources, research, events) is stripped
  *  - enemy fleets are only visible in systems where the viewer owns a planet
@@ -65,7 +65,6 @@ function redactEnemyPlanet(planet: Planet): Planet {
     slots: [],
     queues: { production: [] },
     progressMemory: {},
-    workers: 0,
     productionCarryover: 0
   }
 }

@@ -340,8 +340,8 @@
     },
     "resources": {
       "energy": "Energy",
-      "material": "Minerals",
-      "rare": "Rare Elements",
+      "material": "Matter",
+      "rare": "Rare Alloys",
       "exotic-matter": "Exotic Matter",
       "antimatter": "Antimatter",
       "energy-short": "E",

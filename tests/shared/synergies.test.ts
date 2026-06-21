@@ -25,10 +25,8 @@ function makePlanet(
     owner: OWNER,
     type: 'terrestrial',
     size: 'large',
-    workers: 1,
-    productionPerWorker: 20,
     slots,
-    queues: { build: [], shipyard: [] },
+    queues: { production: [] },
     progressMemory: {},
     productionCarryover: 0,
     location: { x: 0, y: 0 }
@@ -107,6 +105,7 @@ describe('economy aggregation', () => {
     const production = calculateResourceProduction([planet], OWNER)
     expect(production.minerals).toBe(30)
     expect(production.energy).toBe(20)
-    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(25) // 20 × 1.25 (one energy building)
+    // data-center 20 × 1.25 (one energy building) = 25, plus BASE_PLANET_SCIENCE (5) for owning the planet.
+    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(30)
   })
 })

@@ -191,13 +191,13 @@
 </template>
 
 <script setup lang="ts">
-import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch, getUnitBuildCost } from '~~/shared/defs/production'
+import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
 import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
 import { STRATEGIC_RESOURCES, getStrategicResource, isStrategicResource } from '~~/shared/defs/strategicResources'
-import { getResearchPointsPerTurn, resourceProductionBreakdown } from '~~/shared/utils/economy'
+import { getResearchPointsPerTurn, planetProductionPerTurn, resourceProductionBreakdown } from '~~/shared/utils/economy'
 import type { ProductionResourceKind } from '~~/shared/utils/economy'
 import { queueItemCosts, reconcileProductionQueue } from '~~/shared/utils/productionQueue'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
@@ -229,8 +229,7 @@ interface GamePlanet {
   typeLabel: string
   size: PlanetSize
   sizeLabel: string
-  workers: number
-  productionPerWorker: number
+  productionPerRound: number
   buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
   buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
@@ -801,12 +800,6 @@ const buildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.
 const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site === 'star'))
 
 const unitCatalog = computed((): UnitDefinition[] => {
-  // Worker cost escalates with the open planet's worker count AND the robots already
-  // queued this turn (so the *next* robot's shown cost climbs as you stack them).
-  // Default to a fresh planet (1) when none is open; other units are unaffected.
-  const planet = selectedPlanetWithQueue.value
-  const queuedWorkers = planet?.buildQueue.filter(e => e.kind === 'unit' && e.id === 'unit:worker').length ?? 0
-  const planetWorkers = (planet?.workers ?? 1) + queuedWorkers
   return UNIT_DEFS.map((def) => {
     const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
     return {
@@ -814,7 +807,7 @@ const unitCatalog = computed((): UnitDefinition[] => {
       name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
       role: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
       category: def.category,
-      resourceCosts: getUnitBuildCost(def, planetWorkers),
+      resourceCosts: def.resourceCosts,
       productionCost: def.productionCost,
       icon: def.icon ?? 'i-lucide-rocket',
       requiresFacility: (def.requirements.buildings?.length ?? 0) > 0,
@@ -827,9 +820,6 @@ const unitCatalog = computed((): UnitDefinition[] => {
 
 const getStationedUnits = (planet: Planet): Array<{ unitDefId: string, count: number }> => {
   const result: Array<{ unitDefId: string, count: number }> = []
-  if (planet.workers > 0) {
-    result.push({ unitDefId: 'unit:worker', count: planet.workers })
-  }
   const fleets = snapshot.value?.fleets ?? []
   const counts = new Map<string, number>()
   for (const f of fleets) {
@@ -907,8 +897,7 @@ const toPlanetView = (planet: Planet): GamePlanet => ({
   typeLabel: getTypeLabel(planet.type),
   size: planet.size ?? 'medium',
   sizeLabel: getSizeLabel((planet.size ?? 'medium') as PlanetSize),
-  workers: planet.workers,
-  productionPerWorker: planet.productionPerWorker,
+  productionPerRound: planetProductionPerTurn(planet),
   buildings: planet.slots
     .filter(s => s.buildingId && !s.isConstructing)
     .map(s => ({ id: s.buildingId!, level: s.buildingLevel })),

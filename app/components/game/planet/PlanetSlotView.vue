@@ -69,8 +69,7 @@ interface PlanetData {
   sizeLabel: string
   systemId: string
   systemName: string
-  workers: number
-  productionPerWorker: number
+  productionPerRound: number
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
   buildQueue: QueueEntry[]
   stationedUnits: Array<{ unitDefId: string, count: number }>
@@ -235,7 +234,7 @@ const canTrainUnit = (u: UnitDefinition) => (!u.requiresFacility || hasOrbitalDo
 const canQueueUnit = (u: UnitDefinition) =>
   !u.locked && !queueFull.value && canTrainUnit(u) && canAfford(u.resourceCosts) && canAffordStrategic(u.strategicCosts)
 
-const productionPerRound = computed(() => props.planet.workers * props.planet.productionPerWorker)
+const productionPerRound = computed(() => props.planet.productionPerRound)
 const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
 
 // ── Tooltip content (costs/yields/hints live in the row's hover tooltip) ──

@@ -68,13 +68,19 @@ export type UnitDefinition = {
 // Tunable placeholder — large enough to plan ahead, small enough that the queue
 // strip stays readable and energy (paid up-front on enqueue) is the real cap.
 export const BUILD_QUEUE_LIMIT = 6
-export const PLANET_PRODUCTION_PER_TURN = 20
 
-// Production note: a planet makes PLANET_PRODUCTION_PER_TURN (20) production per
-// worker per turn. `productionCost` therefore sets build time in turns
-// (cost / 20). Buildings are deliberately multi-turn commitments (~2–6 turns)
-// so placement is a tactical choice, not a spam. `buildTime` mirrors that for
-// documentation but is not itself read by the engine.
+// Every owned planet has a flat BASE production (build throughput) and BASE science
+// (research points) even with zero districts — so an undeveloped world always does
+// *something*. Throughput above base comes from the Production district; science
+// above base from the Research district (Phase 2 district model). Workers are gone.
+export const BASE_PLANET_PRODUCTION = 20
+export const BASE_PLANET_SCIENCE = 5
+
+// Production note: a planet makes BASE_PLANET_PRODUCTION (20) production per turn.
+// `productionCost` therefore sets build time in turns (cost / 20). Buildings are
+// deliberately multi-turn commitments (~2–6 turns) so placement is a tactical
+// choice, not a spam. `buildTime` mirrors that for documentation but is not itself
+// read by the engine.
 export const BUILDING_DEFS: BuildingDefinition[] = [
   // Energy production buildings
   { id: 'bld:solar-array', category: 'energy', resourceCosts: { energy: 0, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 3, requirements: {}, resourceProduction: { energy: 20 }, maxLevel: 5, icon: 'i-lucide-sun' },
@@ -109,7 +115,6 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
 
 export const UNIT_DEFS: UnitDefinition[] = [
   // Support units
-  { id: 'unit:worker', category: 'support', resourceCosts: { energy: 20, minerals: 10, rare: 0 }, productionCost: 20, buildTime: 1, requirements: {}, unitType: 'colonizer', strength: 1, icon: 'i-lucide-bot' },
   { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 8 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:probe-design'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
   { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 10 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
   { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 30 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
@@ -121,25 +126,6 @@ export const UNIT_DEFS: UnitDefinition[] = [
 
 export const getBuildingDef = (id: BuildingId) => BUILDING_DEFS.find(def => def.id === id)
 export const getUnitDef = (id: UnitId) => UNIT_DEFS.find(def => def.id === id)
-
-/** Per-existing-worker cost growth for the `unit:worker` robot (escalating; tunable placeholder). */
-export const WORKER_COST_GROWTH = 0.5
-
-/**
- * Resource cost to build a unit on a planet. The `unit:worker` robot gets more
- * expensive the more workers a planet already has, so production can't be ramped
- * up for free; every other unit keeps its flat def cost. Strategic costs are
- * unaffected.
- */
-export function getUnitBuildCost(def: UnitDefinition, planetWorkers: number): { energy: number, minerals: number, rare: number } {
-  if (def.id !== 'unit:worker') return def.resourceCosts
-  const mult = 1 + WORKER_COST_GROWTH * Math.max(0, planetWorkers - 1)
-  return {
-    energy: Math.round(def.resourceCosts.energy * mult),
-    minerals: Math.round(def.resourceCosts.minerals * mult),
-    rare: Math.round(def.resourceCosts.rare * mult)
-  }
-}
 
 /** Everything a tech unlocks (buildings/units that list it as a research requirement). */
 export function getUnlocksForTech(techId: ResearchId): { buildings: BuildingDefinition[], units: UnitDefinition[] } {

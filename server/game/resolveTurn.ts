@@ -59,9 +59,8 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
       if (!player) continue
 
       // Deduct costs for newly-queued items before applying the plan. The same
-      // reconciliation + cost helper classify "new vs resume" and apply worker
-      // escalation identically in validation, so a resumed/in-progress item is
-      // never charged twice and stacked robots cost progressively more.
+      // reconciliation + cost helper classify "new vs resume" identically in
+      // validation, so a resumed/in-progress item is never charged twice.
       for (const command of plan.commands) {
         if (command.type !== 'setProductionQueue') continue
         const planet = nextSnapshot.planets.find((p: Planet) => p.id === command.planetId)
