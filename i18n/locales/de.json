@@ -446,7 +446,7 @@
       "synergy-ore": "×2 Mineralien",
       "synergy-power": "+25% Energie",
       "synergy-compute": "+Forschung",
-      "tab-buildings": "Gebäude",
+      "tab-buildings": "Bezirke",
       "tab-units": "Einheiten",
       "pick-building-hint": "Gebäude wählen, dann auf einem Feld platzieren.",
       "placement-hint": "Feld zum Platzieren wählen. Esc zum Abbrechen.",
@@ -460,7 +460,30 @@
       "tooltip-requires-dock": "Benötigt ein Orbitaldock",
       "none-researched": "Noch nichts verfügbar — Forschung schaltet mehr frei."
     },
+    "districts": {
+      "energy": "Energie",
+      "matter": "Materie",
+      "rare": "Seltene Legierungen",
+      "exotic": "Exotische Materie",
+      "antimatter": "Antimaterie",
+      "research": "Forschung",
+      "production": "Produktion",
+      "shipyard": "Werft",
+      "defense": "Verteidigung"
+    },
     "buildings": {
+      "power-relay": {
+        "name": "Energierelais",
+        "description": "Verteilt Netzenergie über den Bezirk. Stetige Energieausbeute."
+      },
+      "assembler": {
+        "name": "Montagewerk",
+        "description": "Automatisierte Fertigungsstraßen. Erhöht den Bauausstoß des Planeten."
+      },
+      "robotics-bay": {
+        "name": "Roboterhalle",
+        "description": "Selbstreplizierende Robotik. Großer Schub für den Bauausstoß."
+      },
       "solar-array": {
         "name": "Solaranlage",
         "description": "Gewinnt Solarenergie. Basis-Energieproduktion."

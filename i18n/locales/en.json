@@ -446,7 +446,7 @@
       "synergy-ore": "×2 Minerals",
       "synergy-power": "+25% Energy",
       "synergy-compute": "+Research",
-      "tab-buildings": "Buildings",
+      "tab-buildings": "Districts",
       "tab-units": "Units",
       "pick-building-hint": "Pick a building, then place it on a slot.",
       "placement-hint": "Choose a slot to place it. Esc to cancel.",
@@ -460,7 +460,30 @@
       "tooltip-requires-dock": "Requires an orbital dock",
       "none-researched": "Nothing available yet — research unlocks more."
     },
+    "districts": {
+      "energy": "Energy",
+      "matter": "Matter",
+      "rare": "Rare Alloys",
+      "exotic": "Exotic Matter",
+      "antimatter": "Antimatter",
+      "research": "Research",
+      "production": "Production",
+      "shipyard": "Shipyard",
+      "defense": "Defense"
+    },
     "buildings": {
+      "power-relay": {
+        "name": "Power Relay",
+        "description": "Distributes grid power across the district. Steady energy output."
+      },
+      "assembler": {
+        "name": "Assembler",
+        "description": "Automated assembly lines. Raises the planet's build throughput."
+      },
+      "robotics-bay": {
+        "name": "Robotics Bay",
+        "description": "Self-replicating robotics. A large boost to build throughput."
+      },
       "solar-array": {
         "name": "Solar Array",
         "description": "Harvests solar energy. Basic energy production."

@@ -10,6 +10,7 @@ import {
   isSurfaceBuilding
 } from '~~/shared/types/planetSlots'
 import { activeSynergies } from '~~/shared/utils/synergies'
+import { DISTRICT_ICONS } from '~~/shared/utils/districts'
 
 interface BuildCosts {
   energy: number
@@ -34,6 +35,9 @@ interface BuildingDefinition {
   strategicCosts?: Partial<Record<string, number>>
   locked?: boolean
   lockedByTechName?: string | null
+  /** District-node extras: the slots this node may target + its district type. */
+  validSlots?: number[]
+  districtType?: string
 }
 
 interface UnitDefinition {
@@ -70,7 +74,7 @@ interface PlanetData {
   systemId: string
   systemName: string
   productionPerRound: number
-  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
+  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, districtType?: string | null, nodes?: string[] }>
   buildQueue: QueueEntry[]
   stationedUnits: Array<{ unitDefId: string, count: number }>
 }
@@ -148,24 +152,44 @@ const queuedBuildingBySlot = computed(() => {
   return map
 })
 
-const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | null): PlanetSlot & { queuedBuildingId?: string, queueIndex?: number } => {
-  const serverSlot = props.planet.slots[index]
-  const base = { index, coord: SURFACE_SLOT_COORDS[index] ?? { q: 0, r: 0 }, zone, resourceNode }
+// Production progress of the in-progress build per slot (from the queue item's spend).
+const queueSpentBySlot = computed(() => {
+  const map = new Map<number, number>()
+  props.planet.buildQueue.forEach((e) => {
+    if (e.kind === 'building' && e.slotIndex !== undefined) map.set(e.slotIndex, e.productionSpent)
+  })
+  return map
+})
 
+type RenderSlot = PlanetSlot & { queuedBuildingId?: string, queueIndex?: number, districtType?: string | null, nodeCount?: number }
+
+const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | null): RenderSlot => {
+  const serverSlot = props.planet.slots[index]
+  const districtType = serverSlot?.districtType ?? null
+  const nodeCount = serverSlot?.nodes?.length ?? 0
+  const base = { index, coord: SURFACE_SLOT_COORDS[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, nodeCount }
+
+  // A node currently building (district node or megastructure).
+  if (serverSlot?.buildingId && serverSlot.isConstructing) {
+    const spent = queueSpentBySlot.value.get(index) ?? 0
+    const total = spent + serverSlot.constructionTimeLeft
+    const progress = total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0
+    return { ...base, state: 'under-construction', buildingId: serverSlot.buildingId as BuildingId, progress }
+  }
+  // An established district sitting idle (has built nodes, nothing in progress).
+  if (districtType && nodeCount > 0) {
+    return { ...base, state: 'completed', buildingId: null, progress: 100 }
+  }
+  // A completed legacy building / megastructure (seeded worlds, stars).
   if (serverSlot?.buildingId && !serverSlot.isConstructing) {
     return { ...base, state: 'completed', buildingId: serverSlot.buildingId as BuildingId, progress: 100 }
   }
-  if (serverSlot?.buildingId && serverSlot.isConstructing) {
-    const def = props.buildingCatalog.find(b => b.id === serverSlot.buildingId)
-    const cost = def?.productionCost ?? 1
-    const spent = Math.max(0, cost - serverSlot.constructionTimeLeft)
-    return { ...base, state: 'under-construction', buildingId: serverSlot.buildingId as BuildingId, progress: Math.min(100, Math.round((spent / cost) * 100)) }
-  }
+  // A node placed this turn onto an empty slot (queued, not yet started).
   const queued = queuedBuildingBySlot.value.get(index)
   if (queued) {
     return { ...base, state: 'under-construction', buildingId: queued.buildingId as BuildingId, progress: 0, queuedBuildingId: queued.buildingId, queueIndex: queued.queueIndex }
   }
-  return { ...base, state: 'empty', buildingId: null, progress: 0 }
+  return { ...base, state: 'empty', buildingId: null, progress: 0, districtType: null, nodeCount: 0 }
 }
 
 const surfaceSlots = computed(() =>
@@ -274,10 +298,13 @@ const unitHint = (u: UnitDefinition): string | null => {
 // ── Placement ─────────────────────────────────────────────────────────
 const placementDef = computed(() => props.buildingCatalog.find(b => b.id === placementBuildingId.value) ?? null)
 
+// District nodes carry the exact slots they may target (computed engine-side); fall
+// back to the legacy zone/strategic rules for non-district builds (megastructures).
 const validPlacementSlots = computed(() => {
-  const set = new Set<number>()
   const def = placementDef.value
-  if (!def) return set
+  if (!def) return new Set<number>()
+  if (def.validSlots) return new Set(def.validSlots)
+  const set = new Set<number>()
   for (const slot of allSlots.value) {
     if (slot.state !== 'empty') continue
     if (!isBuildingAllowedInZone(def.id as BuildingId, slot.zone)) continue
@@ -376,6 +403,11 @@ const onDrop = (toIndex: number) => {
 const getBuildingName = (id: string) => props.buildingCatalog.find(b => b.id === id)?.name ?? id
 const getBuildingIcon = (id: string) => props.buildingCatalog.find(b => b.id === id)?.icon ?? 'i-lucide-hammer'
 const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.icon ?? 'i-lucide-rocket'
+const getDistrictIcon = (type: string) => (DISTRICT_ICONS as Record<string, string>)[type] ?? 'i-lucide-layout-grid'
+const getDistrictName = (type: string) => {
+  const key = `game.districts.${type}`
+  return t(key) === key ? type : t(key)
+}
 
 const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
 const planetImageSrc = computed(() =>
@@ -593,22 +625,21 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 />
               </div>
               <div
-                v-if="(slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId"
+                v-if="slotPos.districtType || ((slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId)"
                 class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
               >
                 <UIcon
-                  :name="getBuildingIcon(slotPos.buildingId)"
+                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : getBuildingIcon(slotPos.buildingId!)"
                   class="w-5 h-5"
                   :class="slotPos.state === 'completed' ? 'text-primary-200' : 'text-warning-300'"
                 />
                 <span
-                  v-if="slotPos.state === 'under-construction'"
-                  class="text-[9px] text-warning-200 font-semibold"
-                >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
-                <span
-                  v-else
                   class="text-[9px] text-neutral-200 text-center leading-tight px-1 max-w-full truncate"
-                >{{ getBuildingName(slotPos.buildingId) }}</span>
+                >{{ slotPos.districtType ? `${getDistrictName(slotPos.districtType)}${slotPos.nodeCount ? ' ' + slotPos.nodeCount : ''}` : getBuildingName(slotPos.buildingId!) }}</span>
+                <span
+                  v-if="slotPos.state === 'under-construction'"
+                  class="text-[8px] text-warning-200 font-semibold"
+                >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
               </div>
             </button>
           </div>
@@ -651,11 +682,11 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 />
               </div>
               <div
-                v-if="(slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId"
+                v-if="slotPos.districtType || ((slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId)"
                 class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
               >
                 <UIcon
-                  :name="getBuildingIcon(slotPos.buildingId)"
+                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : getBuildingIcon(slotPos.buildingId!)"
                   class="w-5 h-5"
                   :class="slotPos.state === 'completed' ? 'text-sky-200' : 'text-warning-300'"
                 />
@@ -663,6 +694,10 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                   v-if="slotPos.state === 'under-construction'"
                   class="text-[8px] text-warning-200 font-semibold"
                 >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
+                <span
+                  v-else-if="slotPos.districtType"
+                  class="text-[8px] text-sky-100 font-semibold"
+                >{{ slotPos.nodeCount }}</span>
               </div>
             </button>
           </div>

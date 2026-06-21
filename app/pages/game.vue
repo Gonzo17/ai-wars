@@ -62,7 +62,7 @@
         <GamePlanetSlotView
           v-if="viewMode === 'planet' && selectedPlanetWithQueue"
           :planet="selectedPlanetWithQueue"
-          :building-catalog="buildingCatalog"
+          :building-catalog="planetBuildCatalog"
           :unit-catalog="unitCatalog"
           :build-queue-limit="buildQueueLimit"
           :player-resources="playerResources"
@@ -191,7 +191,9 @@
 </template>
 
 <script setup lang="ts">
-import { BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
+import { BASE_PLANET_PRODUCTION, BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
+import { findDistrictNode } from '~~/shared/defs/districts'
+import { DISTRICT_ICONS, buildableDistrictNodes } from '~~/shared/utils/districts'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -231,7 +233,7 @@ interface GamePlanet {
   sizeLabel: string
   productionPerRound: number
   buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
-  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null }>
+  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, districtType?: string | null, nodes?: string[] }>
   buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
   shipyardQueue: Array<{ id: string }>
   stationedUnits: Array<{ unitDefId: string, count: number }>
@@ -263,6 +265,9 @@ interface BuildingDefinition {
   strategicCosts?: Partial<Record<string, number>>
   locked: boolean
   lockedByTechName: string | null
+  /** District-node catalog extras: the slots this node may target + its district. */
+  validSlots?: number[]
+  districtType?: string
 }
 
 interface UnitDefinition {
@@ -799,6 +804,36 @@ const allBuildingCatalog = computed((): BuildingDefinition[] => BUILDING_DEFS.ma
 const buildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site !== 'star'))
 const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCatalog.value.filter(b => b.site === 'star'))
 
+// Districts: the buildable nodes for the OPEN planet, each carrying the slots it may
+// target. Mirrors the engine's district rules so the catalog and server agree.
+const selectedRawPlanet = computed(() => planets.value.find(p => p.id === selectedId.value) ?? null)
+const planetBuildCatalog = computed((): BuildingDefinition[] => {
+  const planet = selectedRawPlanet.value
+  if (!planet || planet.kind === 'star') return []
+  return buildableDistrictNodes(planet, completedTechIds.value).map((n) => {
+    const nameKey = buildingNameKey(n.nodeId)
+    const descKey = buildingDescriptionKey(n.nodeId)
+    return {
+      id: n.nodeId,
+      name: te(nameKey) ? t(nameKey) : n.nodeId,
+      description: te(descKey) ? t(descKey) : '',
+      category: 'infrastructure' as BuildingCategory,
+      maxLevel: 1,
+      resourceCosts: { energy: n.cost.energy ?? 0, minerals: n.cost.matter ?? 0, rare: 0 },
+      productionCost: n.buildTime * BASE_PLANET_PRODUCTION,
+      icon: getBuildingDef(n.nodeId)?.icon ?? DISTRICT_ICONS[n.districtType],
+      site: 'planet' as const,
+      resourceProduction: { energy: n.output.energy, minerals: n.output.matter },
+      researchPoints: n.output.research,
+      strategicCosts: n.cost.strategic,
+      locked: n.locked,
+      lockedByTechName: null,
+      validSlots: n.validSlots,
+      districtType: n.districtType
+    }
+  })
+})
+
 const unitCatalog = computed((): UnitDefinition[] => {
   return UNIT_DEFS.map((def) => {
     const missingResearch = getMissingResearch(def.requirements, completedTechIds.value)
@@ -907,14 +942,18 @@ const toPlanetView = (planet: Planet): GamePlanet => ({
     isConstructing: s.isConstructing,
     constructionTimeLeft: s.constructionTimeLeft,
     zone: s.zone,
-    resourceNode: s.resourceNode
+    resourceNode: s.resourceNode,
+    districtType: s.districtType ?? null,
+    nodes: s.nodes ?? []
   })),
   buildQueue: (planet.queues.production ?? []).map((entry) => {
     if (entry.kind === 'building') {
       const slot = planet.slots[entry.slotIndex]
       if (!slot?.buildingId) return null
-      const def = getBuildingDef(slot.buildingId)
-      const productionCost = def?.productionCost ?? 0
+      const districtNode = findDistrictNode(slot.buildingId)
+      const productionCost = districtNode
+        ? districtNode.node.buildTime * BASE_PLANET_PRODUCTION
+        : (getBuildingDef(slot.buildingId)?.productionCost ?? 0)
       const spent = Math.max(0, productionCost - slot.constructionTimeLeft)
       return {
         id: slot.buildingId,
