@@ -207,11 +207,19 @@ the loop, then deepen.* (No effort estimates — David doesn't want them.)
   decisions, abilities, pinning). Plus the **planet-cracker** (siege tool + brutal win +
   disruptor of peaceful wins). **Planet terrain types** fold in here (tied to Phase-2
   specialization).
-- **Phase 4 — Balance & polish**, once the loop is end-to-end playable (~80–120 turns).
-  Megastructure values are placeholders; also a Star Fortress siege mechanic (currently
-  an absolute block).
+- **Phase 3.5 — Opponent intelligence & visibility** (its OWN phase right after Phase 3,
+  not merged into combat — David's call June 2026). Graded fog of war: extend
+  `redactSnapshot` from binary to **band → exact**, keyed off a per-opponent intel tier
+  that **probes/espionage** raise; AoE2-style civilisation-tier badge per opponent;
+  player-bar pimp (own colour outline + opponent chips). Resource bands are *relative to
+  your own values* (`horrible/weak/even/good/strong`), so this depends on the Phase-2
+  resource model + tier ladder. Builds on the existing fog (gotcha 7) + `IntelLevel`.
+- **Phase 4 — Balance & product feel**, once the loop is end-to-end playable (~80–120
+  turns): balance pass (megastructure values are placeholders; Star Fortress siege
+  instead of the current absolute block) + animations, event sequences, end-game stats.
 
-Critical path: Phase 0 split → Phase 1 Military win → Phase 2 checkpoint → Phase 3.
+Critical path: Phase 0 split → Phase 1 Military win → **Phase 2 checkpoint (next)** →
+Phase 3 (combat/nav) → Phase 3.5 (opponent intel) → Phase 4.
 
 ### Playtest feedback & backlog (June 2026, from David)
 
