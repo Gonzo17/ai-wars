@@ -50,45 +50,25 @@ describe('district economy', () => {
     planet.slots[0]!.districtType = 'energy'
     planet.slots[0]!.nodes = ['bld:solar-array' as never, 'bld:fusion-core' as never]
 
-    // terrestrial energy weight = 1 → 20 (solar) + 50 (fusion) = 70, no upkeep.
+    // terrestrial energy weight = 1 → 20 (solar) + 50 (fusion) = 70.
     expect(calculateResourceProduction(snap.planets, toPlayerId(U1)).energy).toBe(70)
   })
 
-  it('nets DEEPER-node upkeep out of the energy flow (base nodes are free)', () => {
+  it('reports gross energy (costs are one-time, no running upkeep)', () => {
     const snap = initialState([U1, U2], 1)
     clearHomeBuildings(snap)
     const planet = homePlanet(snap)
     planet.slots[0]!.districtType = 'energy'
     planet.slots[0]!.nodes = ['bld:solar-array' as never] // +20 energy
     planet.slots[1]!.districtType = 'matter'
-    // mining base = free; refinery (deeper) draws 8 upkeep.
+    // The refinery produces matter, not energy, and draws no upkeep → energy is just solar.
     planet.slots[1]!.nodes = ['bld:mining-facility' as never, 'bld:refinery-node' as never]
 
-    expect(calculateResourceProduction(snap.planets, toPlayerId(U1)).energy).toBe(12)
+    expect(calculateResourceProduction(snap.planets, toPlayerId(U1)).energy).toBe(20)
   })
 })
 
 describe('district validation', () => {
-  it('rejects a deeper node when energy flow would go negative (base nodes never do)', () => {
-    const snap = initialState([U1, U2], 1)
-    clearHomeBuildings(snap) // no energy income at all
-    establishResearch(snap)
-    setRich(getPlayer(snap, U1))
-    getPlayer(snap, U1).research.completedTechIds.push('tech:basic-industrial-robotics')
-    // A Matter district with its (free) base built; the slot index 2 has the ore node.
-    const planet = homePlanet(snap)
-    planet.slots[2]!.districtType = 'matter'
-    planet.slots[2]!.nodes = ['bld:mining-facility' as never]
-
-    // The refinery (deeper, −8 upkeep) with zero energy income → net 0 − 8 < 0 → rejected.
-    const errs = validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [building(2, 'bld:refinery-node')]))
-    expect(errs.some(e => e.code === 'INSUFFICIENT_RESOURCES')).toBe(true)
-
-    // A base node (solar Energy) has no upkeep, so it's allowed even with no energy income.
-    const ok = validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [building(3, 'bld:solar-array')]))
-    expect(ok).toHaveLength(0)
-  })
-
   it('enforces exclusive branch groups within a district', () => {
     const snap = initialState([U1, U2], 1)
     clearHomeBuildings(snap)

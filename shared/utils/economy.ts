@@ -2,26 +2,20 @@ import type { BuildingId, Planet, PlanetId, ResourceId } from '../types/game'
 import { BASE_PLANET_PRODUCTION, BASE_PLANET_SCIENCE, getBuildingDef } from '../defs/production'
 import { DISTRICT_DEFS } from '../defs/districts'
 import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
-import { districtSlotProduction, districtSlotUpkeep, slotOutput } from './synergies'
+import { districtSlotProduction, slotOutput } from './synergies'
 
 /**
- * Build throughput a single planet generates per turn: a flat base (workers were
- * removed) plus whatever its Production-district nodes add. The single place the
+ * Build throughput a single planet generates per turn: the sum of whatever its district
+ * nodes add (the data center carries the base production, so it's visible rather than a
+ * hidden flat bonus). A fresh planet with no operational district yet still gets a
+ * BASE_PLANET_PRODUCTION bootstrap so it can raise its first, mandatory build (the data
+ * center); once any district produces, the real sum takes over. The single place the
  * engine reads "how much production does this planet make".
  */
 export function planetProductionPerTurn(planet: Planet): number {
-  let bonus = 0
-  for (let i = 0; i < planet.slots.length; i++) bonus += districtSlotProduction(planet, i)
-  return BASE_PLANET_PRODUCTION + bonus
-}
-
-/** Total per-turn energy upkeep of all (deeper) district nodes the player runs. */
-export function calculateEnergyUpkeep(planets: Planet[], playerId: string): number {
-  let upkeep = 0
-  forEachOwnedPlanet(planets, playerId, (planet) => {
-    for (let i = 0; i < planet.slots.length; i++) upkeep += districtSlotUpkeep(planet, i)
-  })
-  return upkeep
+  let sum = 0
+  for (let i = 0; i < planet.slots.length; i++) sum += districtSlotProduction(planet, i)
+  return sum > 0 ? sum : BASE_PLANET_PRODUCTION
 }
 
 export type ResourceTotals = { energy: number, minerals: number, rare: number }
@@ -39,16 +33,15 @@ function forEachOwnedPlanet(planets: Planet[], playerId: string, fn: (planet: Pl
 }
 
 /**
- * Per-turn resource production for the player (districts + synergies included). Energy
- * is NET: gross production minus the upkeep that deeper district nodes draw. Base nodes
- * are free, so an empty/early planet never goes negative.
+ * Per-turn resource production for the player (districts + synergies included). All
+ * costs are one-time, so production is gross — there is no running upkeep to net out.
  */
 export function calculateResourceProduction(planets: Planet[], playerId: string): ResourceTotals {
   const totals: ResourceTotals = { energy: 0, minerals: 0, rare: 0 }
   forEachOwnedPlanet(planets, playerId, (planet) => {
     for (let i = 0; i < planet.slots.length; i++) {
       const output = slotOutput(planet, i)
-      totals.energy += output.energy - districtSlotUpkeep(planet, i)
+      totals.energy += output.energy
       totals.minerals += output.minerals
       totals.rare += output.rare
     }

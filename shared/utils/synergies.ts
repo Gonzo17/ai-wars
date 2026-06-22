@@ -2,6 +2,7 @@ import { getBuildingDef } from '../defs/production'
 import { DISTRICT_DEFS } from '../defs/districts'
 import { terrainModifier } from '../defs/terrain'
 import type { BuildingId, Planet } from '../types/game'
+import type { DistrictType } from '../types/districts'
 import { getAdjacentSlotIndices } from '../types/planetSlots'
 
 /**
@@ -119,6 +120,30 @@ function districtSlotOutput(planet: Planet, slotIndex: number): SlotOutput {
   }
 }
 
+/**
+ * Effective per-turn yield a district node WOULD produce if founded/built in `slotIndex`,
+ * including planet-type weight, terrain and synergies — so a placement preview shows the
+ * real number (the buffed value), not the raw def output. Computed by reusing the live
+ * economy math on a hypothetical planet, so it can never drift from what the engine pays.
+ */
+export function previewDistrictNodeOutput(
+  planet: Planet,
+  slotIndex: number,
+  districtType: DistrictType,
+  nodeId: BuildingId
+): SlotOutput & { production: number } {
+  const target = planet.slots[slotIndex]
+  if (!target) return { ...ZERO, production: 0 }
+  const hypothetical: Planet = {
+    ...planet,
+    slots: planet.slots.map((s, i) =>
+      i === slotIndex
+        ? { ...s, districtType, nodes: [...(s.nodes ?? []), nodeId], buildingId: null, isConstructing: false }
+        : s)
+  }
+  return { ...slotOutput(hypothetical, slotIndex), production: districtSlotProduction(hypothetical, slotIndex) }
+}
+
 /** Per-turn build throughput a district slot adds (Production district nodes). */
 export function districtSlotProduction(planet: Planet, slotIndex: number): number {
   const slot = planet.slots[slotIndex]
@@ -129,18 +154,6 @@ export function districtSlotProduction(planet: Planet, slotIndex: number): numbe
     production += def.tree.find(n => n.id === nodeId)?.output?.production ?? 0
   }
   return Math.round(production * terrainModifier(slot.terrain, slot.districtType))
-}
-
-/** Per-turn energy upkeep a district slot draws (sum of its nodes' energyUpkeep; base nodes are free). */
-export function districtSlotUpkeep(planet: Planet, slotIndex: number): number {
-  const slot = planet.slots[slotIndex]
-  if (!slot?.districtType || !slot.nodes?.length) return 0
-  const def = DISTRICT_DEFS[slot.districtType]
-  let upkeep = 0
-  for (const nodeId of slot.nodes) {
-    upkeep += def.tree.find(n => n.id === nodeId)?.energyUpkeep ?? 0
-  }
-  return upkeep
 }
 
 /** Effective per-turn output of `slotIndex`: a district's cumulative nodes, else a completed building. */

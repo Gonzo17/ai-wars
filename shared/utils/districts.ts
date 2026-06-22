@@ -14,7 +14,6 @@ export interface BuildableNode {
   districtType: DistrictType
   cost: NodeCost
   buildTime: number
-  energyUpkeep: number
   output: NodeOutput
   /** Slot indices this node may be placed into (empty slots for a base, the district's slot for deeper nodes). */
   validSlots: number[]
@@ -101,7 +100,6 @@ export function buildableDistrictNodes(
         districtType: def.type,
         cost: node.cost,
         buildTime: node.buildTime,
-        energyUpkeep: node.energyUpkeep ?? 0,
         output: node.output ?? {},
         validSlots,
         locked: Boolean(node.research && !completed.has(node.research)),
@@ -130,7 +128,6 @@ export interface CatalogNode {
   state: DistrictNodeState
   cost: NodeCost
   buildTime: number
-  energyUpkeep: number
   output: NodeOutput
   research?: ResearchId
   /** District slot to build into (deeper nodes / founded base); null until founded. */
@@ -200,7 +197,6 @@ export function planetDistrictCatalog(
         state,
         cost: node.cost,
         buildTime: node.buildTime,
-        energyUpkeep: node.energyUpkeep ?? 0,
         output: node.output ?? {},
         research: node.research,
         slotIndex: founded ? existingIndex : null,

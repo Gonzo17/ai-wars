@@ -8,7 +8,6 @@ import { hasResearchDistrict } from '../utils/districts'
 import { terrainAllows } from '../defs/terrain'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
-import { calculateResourceProduction } from '../utils/economy'
 import { queueItemCosts, reconcileProductionQueue } from '../utils/productionQueue'
 import { findLanePath, getSystemIdForLocation } from '../utils/starlanes'
 
@@ -102,9 +101,6 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   let availableResources = getPlayerResources(player)
   const availableStrategic: Record<string, number> = {}
   for (const r of player.resources) availableStrategic[r.key] = r.current
-  // Net energy/round budget. Deeper district nodes draw upkeep; queuing one that would
-  // push the net below 0 is rejected (base nodes are free, so they never can).
-  let availableEnergyFlow = calculateResourceProduction(snapshot.planets, playerId).energy
   // The data center (Research district) must come first — gates every other district.
   const researchEstablished = hasResearchDistrict(snapshot.planets.filter(p => p.owner === playerId))
 
@@ -218,16 +214,11 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
             }
             if (isNew[j]) {
               const cost = itemCosts[j]!
-              const weight = dDef.weights?.[planet.type] ?? 1
-              const flowDelta = Math.round((nDef.output?.energy ?? 0) * weight) - (nDef.energyUpkeep ?? 0)
               if (!canAfford(availableResources, cost) || !canAffordStrategic(availableStrategic, cost.strategic)) {
                 errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough resources', path: itemPath })
-              } else if (availableEnergyFlow + flowDelta < 0) {
-                errors.push({ code: 'INSUFFICIENT_RESOURCES', message: 'Not enough energy income to run this', path: itemPath })
               } else {
                 availableResources = subtractCosts(availableResources, cost)
                 subtractStrategic(availableStrategic, cost.strategic)
-                availableEnergyFlow += flowDelta
               }
             }
             continue

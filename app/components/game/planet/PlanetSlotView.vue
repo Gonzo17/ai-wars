@@ -5,7 +5,7 @@ import {
   computeAdjacencyBonuses,
   surfaceHexCoords
 } from '~~/shared/types/planetSlots'
-import { activeSynergies } from '~~/shared/utils/synergies'
+import { activeSynergies, previewDistrictNodeOutput } from '~~/shared/utils/synergies'
 import { DISTRICT_ICONS } from '~~/shared/utils/districts'
 import { DISTRICT_DEFS, findDistrictNode } from '~~/shared/defs/districts'
 import { getProjectDef } from '~~/shared/defs/projects'
@@ -167,6 +167,23 @@ const toggleMinimize = (type: string) => {
 }
 /** A minimised district flags an exclamation mark when it has anything buildable. */
 const groupHasBuildable = (group: DistrictGroup) => group.nodes.some(n => n.state === 'available')
+
+// ── Catalog filters (top of the rail) — let the player declutter the list ──────
+const filters = ref({ built: true, units: true, projects: true })
+const toggleFilter = (k: 'built' | 'units' | 'projects') => {
+  filters.value[k] = !filters.value[k]
+}
+const visibleNodes = (group: DistrictGroup) => group.nodes.filter((n) => {
+  if (!filters.value.built && n.state === 'built') return false
+  if (!filters.value.units && n.kind === 'unit') return false
+  if (!filters.value.projects && n.kind === 'project') return false
+  return true
+})
+const FILTER_CHIPS: Array<{ key: 'built' | 'units' | 'projects', icon: string }> = [
+  { key: 'built', icon: 'i-lucide-check' },
+  { key: 'units', icon: 'i-lucide-rocket' },
+  { key: 'projects', icon: 'i-lucide-sparkles' }
+]
 
 // ── Flat node lookup (queue + slot rendering need names/icons) ────────
 const allNodes = computed(() => props.districtCatalog.flatMap(g => g.nodes))
@@ -365,9 +382,12 @@ const synergyLabelKeys: Record<string, string> = {
   'compute-uplink': 'game.slots.synergy-compute'
 }
 
+// The view-model planet cast to the engine shape (type + slots) for the shared economy
+// helpers — enough for weights, terrain and synergies, which is all they read.
+const enginePlanet = computed(() => ({ type: props.planet.type, slots: props.planet.slots }) as unknown as Planet)
+
 const previewSynergies = (buildingId: string, slotIndex: number): string[] => {
-  const planet = { slots: props.planet.slots } as unknown as Planet
-  return activeSynergies(planet, slotIndex, buildingId as BuildingId)
+  return activeSynergies(enginePlanet.value, slotIndex, buildingId as BuildingId)
     .map(type => synergyLabelKeys[type])
     .filter((key): key is string => Boolean(key))
 }
@@ -387,7 +407,16 @@ const districtTypeOfNode = (nodeId: string): DistrictType | null =>
 /** Signed percentage label for a terrain multiplier (e.g. +30% / −30%), or '' for ×1. */
 const terrainModLabel = (mod: number) => (mod === 1 ? '' : `${mod > 1 ? '+' : '−'}${Math.round(Math.abs(mod - 1) * 100)}%`)
 
-// Base-yield + bonus preview shown while hovering a valid placement target.
+// Map an effective output (after weight/terrain/synergy) to display rows.
+const PREVIEW_YIELD_ICONS = { energy: 'i-lucide-zap', minerals: 'i-lucide-pickaxe', research: 'i-lucide-flask-conical', production: 'i-lucide-hammer' } as const
+const effectiveYields = (out: { energy: number, minerals: number, research: number, production: number }) =>
+  (['energy', 'minerals', 'research', 'production'] as const)
+    .filter(k => out[k] > 0)
+    .map(k => ({ icon: PREVIEW_YIELD_ICONS[k], amount: out[k] }))
+
+// Effective-yield + bonus preview shown while hovering a valid placement target. The
+// numbers are the REAL buffed values for this slot (planet weight + terrain + synergies),
+// not the raw def output, so what you see is what the planet will actually produce.
 const hoverPreview = computed(() => {
   const node = placementNode.value
   const index = hoveredSlotIndex.value
@@ -396,9 +425,12 @@ const hoverPreview = computed(() => {
   const dType = districtTypeOfNode(node.id)
   const terrain = (slot?.zone === 'surface' ? slot?.terrain : null) ?? null
   const mod = (terrain && dType) ? terrainModifier(terrain, dType) : 1
+  const yields = dType
+    ? effectiveYields(previewDistrictNodeOutput(enginePlanet.value, index, dType, node.id as BuildingId))
+    : node.yields
   return {
     name: node.name,
-    yields: node.yields,
+    yields,
     synergies: slot?.zone === 'surface' ? previewSynergies(node.id, index) : [],
     oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(node.id, index) : false,
     terrain: terrain ? { name: terrainName(terrain), label: terrainModLabel(mod), good: mod > 1 } : null
@@ -435,7 +467,6 @@ const slotTooltip = computed(() => {
     const weight = dDef?.weights?.[props.planet.type as keyof typeof dDef.weights] ?? 1
     const tMod = terrainModifier(slot.terrain as TerrainType | null, districtType as DistrictType)
     const totals = { energy: 0, matter: 0, research: 0, production: 0 }
-    let upkeep = 0
     const nodes = built.map((id) => {
       const found = findDistrictNode(id as BuildingId)
       const out = found?.node.output ?? {}
@@ -443,22 +474,21 @@ const slotTooltip = computed(() => {
       totals.matter += Math.round((out.matter ?? 0) * weight * tMod)
       totals.research += Math.round((out.research ?? 0) * weight * tMod)
       totals.production += Math.round((out.production ?? 0) * tMod)
-      upkeep += found?.node.energyUpkeep ?? 0
       return { name: nodeName(id), building: false }
     })
     if (constructing) nodes.push({ name: nodeName(constructing), building: true })
     const outputs = (['energy', 'matter', 'research', 'production'] as const)
       .filter(k => totals[k] > 0)
       .map(k => ({ icon: OUTPUT_ICONS[k], amount: totals[k] }))
-    return { title: getDistrictName(districtType), terrain, nodes, outputs, upkeep }
+    return { title: getDistrictName(districtType), terrain, nodes, outputs }
   }
 
   if (slot.buildingId && !slot.isConstructing) {
-    return { title: nodeName(slot.buildingId), terrain, nodes: [], outputs: [], upkeep: 0 }
+    return { title: nodeName(slot.buildingId), terrain, nodes: [], outputs: [] }
   }
   // Empty surface slot — still show its terrain so the player can plan placement.
   if (terrain) {
-    return { title: terrain, terrain: '', nodes: [], outputs: [], upkeep: 0 }
+    return { title: terrain, terrain: '', nodes: [], outputs: [] }
   }
   return null
 })
@@ -540,6 +570,27 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
         {{ placementNodeId ? $t('game.slots.placement-hint') : $t('game.slots.pick-district-hint') }}
       </p>
 
+      <!-- Filters: toggle whole categories off to declutter (e.g. hide built buildings) -->
+      <div class="flex items-center gap-1.5 px-2.5 pb-1.5">
+        <span class="text-[10px] uppercase tracking-wider text-neutral-600 mr-0.5">{{ $t('game.slots.filter-label') }}</span>
+        <button
+          v-for="chip in FILTER_CHIPS"
+          :key="chip.key"
+          type="button"
+          :data-testid="`build-filter-${chip.key}`"
+          class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition"
+          :class="filters[chip.key]
+            ? 'border-primary-600/40 bg-primary-900/30 text-primary-200'
+            : 'border-neutral-800 bg-neutral-900/40 text-neutral-500 line-through'"
+          @click="toggleFilter(chip.key)"
+        >
+          <UIcon
+            :name="chip.icon"
+            class="h-3 w-3"
+          />{{ $t(`game.slots.filter-${chip.key}`) }}
+        </button>
+      </div>
+
       <div class="flex-1 overflow-y-auto p-2 space-y-2">
         <div
           v-for="group in districtCatalog"
@@ -596,7 +647,7 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
             class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1"
           >
             <GameBuildListRow
-              v-for="n in group.nodes"
+              v-for="n in visibleNodes(group)"
               :key="n.id"
               :testid="`build-list-option-${n.id}`"
               :name="n.name"
@@ -626,39 +677,91 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
 
     <!-- ═══════ Main column: header + canvas + queue strip ═══════ -->
     <div class="relative z-10 flex flex-1 flex-col items-center overflow-hidden">
-      <!-- Header -->
-      <div class="flex items-center gap-4 pt-4 z-20">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-primary-500/40"
-            :style="{ backgroundImage: `url('${planetImageSrc}')` }"
-          />
-          <div>
-            <h2 class="text-lg font-bold text-neutral-100">
-              {{ planet.name }}
-            </h2>
-            <p class="text-xs text-neutral-400">
-              {{ planet.typeLabel }} · {{ planet.sizeLabel }} ·
-              <span :class="canBuild ? '' : 'text-amber-300/80'">{{ planet.ownerLabel }}</span>
-            </p>
-          </div>
+      <!-- Header (slim: name + classification; production is shown on the data center) -->
+      <div class="flex items-center gap-3 pt-3 z-20">
+        <div>
+          <h2 class="text-base font-bold text-neutral-100 leading-tight">
+            {{ planet.name }}
+          </h2>
+          <p class="text-[11px] text-neutral-400">
+            {{ planet.typeLabel }} · {{ planet.sizeLabel }} ·
+            <span :class="canBuild ? '' : 'text-amber-300/80'">{{ planet.ownerLabel }}</span>
+          </p>
         </div>
-        <span class="flex items-center gap-1 ml-2 text-xs text-neutral-400">
-          <UIcon
-            name="i-lucide-hammer"
-            class="w-3.5 h-3.5 text-primary-300"
-          />
-          {{ productionPerRound }}/{{ $t('game.slots.round-short') }}
-        </span>
         <UButton
           icon="i-lucide-x"
           color="neutral"
           variant="ghost"
           size="sm"
-          class="ml-2"
           data-testid="slot-view-close"
           @click="emit('close')"
         />
+      </div>
+
+      <!-- ═══════ Queue strip (owner only) — at the top, above the canvas ═══════ -->
+      <div
+        v-if="canBuild"
+        data-testid="build-queue"
+        class="mt-2 flex w-full items-center gap-2 border-y border-neutral-800 bg-neutral-950/95 px-4 py-2.5 overflow-x-auto"
+      >
+        <span class="text-[11px] text-neutral-500 uppercase tracking-wider shrink-0">
+          {{ $t('game.slots.queue-title') }} {{ planet.buildQueue.length }}/{{ buildQueueLimit }}
+        </span>
+        <div
+          v-if="queueItems.length === 0"
+          class="text-sm text-neutral-500"
+        >
+          {{ $t('game.slots.queue-empty') }}
+        </div>
+        <div
+          v-for="item in queueItems"
+          :key="item.index"
+          :data-testid="`queue-item-${item.index}`"
+          draggable="true"
+          class="group relative flex items-center gap-2 rounded-md border bg-neutral-900/80 px-2 py-1.5 shrink-0 cursor-grab active:cursor-grabbing"
+          :class="item.isFront ? 'border-primary-500/50' : 'border-neutral-700/50'"
+          @dragstart="onDragStart(item.index)"
+          @dragover.prevent
+          @drop="onDrop(item.index)"
+        >
+          <UIcon
+            :name="item.icon"
+            class="h-4 w-4 shrink-0"
+            :class="item.kind === 'building' ? 'text-primary-200' : 'text-sky-200'"
+          />
+          <div class="min-w-0">
+            <p class="text-xs font-medium text-neutral-100 truncate max-w-32">
+              {{ item.name }}
+            </p>
+            <div
+              v-if="item.isFront"
+              class="flex items-center gap-1.5 mt-0.5"
+            >
+              <div class="h-1 w-20 rounded-full bg-neutral-700/60 overflow-hidden">
+                <div
+                  class="h-full rounded-full bg-primary-500 transition-all"
+                  :style="{ width: `${item.progress}%` }"
+                />
+              </div>
+              <span class="text-[9px] text-neutral-400">{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+            </div>
+            <span
+              v-else
+              class="text-[9px] text-neutral-500"
+            >{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+          </div>
+          <button
+            type="button"
+            :data-testid="`queue-item-cancel-${item.index}`"
+            class="ml-1 text-neutral-500 hover:text-critical-300 transition"
+            @click="emit('remove-queue-item', planet.id, item.index)"
+          >
+            <UIcon
+              name="i-lucide-x"
+              class="h-3.5 w-3.5"
+            />
+          </button>
+        </div>
       </div>
 
       <!-- Planet canvas -->
@@ -953,15 +1056,6 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
                     class="w-3 h-3"
                   />+{{ o.amount }}
                 </span>
-                <span
-                  v-if="slotTooltip.upkeep > 0"
-                  class="flex items-center gap-0.5 text-critical-300"
-                >
-                  <UIcon
-                    name="i-lucide-zap"
-                    class="w-3 h-3"
-                  />−{{ slotTooltip.upkeep }}/{{ $t('game.slots.round-short') }}
-                </span>
               </div>
             </div>
           </Transition>
@@ -1003,72 +1097,6 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
           class="w-4 h-4"
         />
         {{ $t('game.slots.read-only-hint') }}
-      </div>
-
-      <!-- ═══════ Queue strip (owner only) ═══════ -->
-      <div
-        v-if="canBuild"
-        data-testid="build-queue"
-        class="flex w-full items-center gap-2 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 overflow-x-auto"
-      >
-        <span class="text-[11px] text-neutral-500 uppercase tracking-wider shrink-0">
-          {{ $t('game.slots.queue-title') }} {{ planet.buildQueue.length }}/{{ buildQueueLimit }}
-        </span>
-        <div
-          v-if="queueItems.length === 0"
-          class="text-sm text-neutral-500"
-        >
-          {{ $t('game.slots.queue-empty') }}
-        </div>
-        <div
-          v-for="item in queueItems"
-          :key="item.index"
-          :data-testid="`queue-item-${item.index}`"
-          draggable="true"
-          class="group relative flex items-center gap-2 rounded-md border bg-neutral-900/80 px-2 py-1.5 shrink-0 cursor-grab active:cursor-grabbing"
-          :class="item.isFront ? 'border-primary-500/50' : 'border-neutral-700/50'"
-          @dragstart="onDragStart(item.index)"
-          @dragover.prevent
-          @drop="onDrop(item.index)"
-        >
-          <UIcon
-            :name="item.icon"
-            class="h-4 w-4 shrink-0"
-            :class="item.kind === 'building' ? 'text-primary-200' : 'text-sky-200'"
-          />
-          <div class="min-w-0">
-            <p class="text-xs font-medium text-neutral-100 truncate max-w-32">
-              {{ item.name }}
-            </p>
-            <div
-              v-if="item.isFront"
-              class="flex items-center gap-1.5 mt-0.5"
-            >
-              <div class="h-1 w-20 rounded-full bg-neutral-700/60 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-primary-500 transition-all"
-                  :style="{ width: `${item.progress}%` }"
-                />
-              </div>
-              <span class="text-[9px] text-neutral-400">{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
-            </div>
-            <span
-              v-else
-              class="text-[9px] text-neutral-500"
-            >{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
-          </div>
-          <button
-            type="button"
-            :data-testid="`queue-item-cancel-${item.index}`"
-            class="ml-1 text-neutral-500 hover:text-critical-300 transition"
-            @click="emit('remove-queue-item', planet.id, item.index)"
-          >
-            <UIcon
-              name="i-lucide-x"
-              class="h-3.5 w-3.5"
-            />
-          </button>
-        </div>
       </div>
     </div>
   </div>

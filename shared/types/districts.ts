@@ -27,7 +27,7 @@ export interface NodeOutput {
   energy?: number
   matter?: number
   research?: number
-  /** Build throughput added on top of the planet's BASE_PLANET_PRODUCTION. */
+  /** Build throughput this node adds (the data center carries the planet's base). */
   production?: number
   strategic?: Partial<Record<ResourceId, number>>
 }
@@ -54,8 +54,6 @@ export interface DistrictNodeDef {
   research?: ResearchId
   cost: NodeCost
   buildTime: number
-  /** Per-round energy drained to keep this node running (the flow constraint). */
-  energyUpkeep?: number
   output?: NodeOutput
 }
 
@@ -79,7 +77,6 @@ export interface MegastructureDef {
   research?: ResearchId
   cost: NodeCost
   buildTime: number
-  energyUpkeep?: number
   output?: NodeOutput
   /** Staged wonders (e.g. Dyson) build up levels in place. */
   maxLevel?: number

@@ -467,7 +467,12 @@
       "needs-prereq": "Erst die Voraussetzung bauen.",
       "requires-tech": "Benötigt {tech}",
       "completed-last-turn": "Letzte Runde fertiggestellt",
-      "district-output": "Ertrag"
+      "district-output": "Ertrag",
+      "built-tag": "Gebaut",
+      "filter-label": "Zeige",
+      "filter-built": "Gebaut",
+      "filter-units": "Einheiten",
+      "filter-projects": "Projekte"
     },
     "districts": {
       "label": "Bezirk",

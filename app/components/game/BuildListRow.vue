@@ -65,9 +65,10 @@ const closeTip = () => {
     :data-testid="testid"
     class="group relative flex w-full items-center gap-3 rounded-md border px-2 py-2 text-left transition"
     :class="[
-      selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
-      disabled && !done ? 'opacity-40 cursor-not-allowed' : '',
-      done ? 'cursor-default' : ''
+      done
+        ? 'cursor-default border-success-700/30 bg-success-950/20'
+        : selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
+      disabled && !done ? 'opacity-40 cursor-not-allowed' : ''
     ]"
     :disabled="disabled"
     @click="emit('select')"
@@ -92,12 +93,25 @@ const closeTip = () => {
         :title="$t('game.slots.completed-last-turn')"
       />
     </div>
-    <span class="flex-1 min-w-0 truncate text-sm font-medium text-neutral-100">
+    <span
+      class="flex-1 min-w-0 truncate text-sm font-medium"
+      :class="done ? 'text-success-200/90' : 'text-neutral-100'"
+    >
       {{ name }}
     </span>
-    <!-- Built one-off buildings have no round count (not re-buildable); repeatable items keep it. -->
+    <!-- Built: a clear "done" chip (not a round count, so it never reads as buildable). -->
     <span
-      v-if="!done"
+      v-if="done"
+      class="flex shrink-0 items-center gap-1 rounded-full border border-success-700/40 bg-success-900/30 px-1.5 py-0.5 text-[10px] font-medium text-success-300"
+    >
+      <UIcon
+        name="i-lucide-check"
+        class="h-3 w-3"
+      />{{ $t('game.slots.built-tag') }}
+    </span>
+    <!-- Repeatable / unbuilt items keep their round count. -->
+    <span
+      v-else
       class="shrink-0 text-[11px] text-neutral-400"
     >
       {{ $t('game.common.duration-rounds', { count: rounds }) }}

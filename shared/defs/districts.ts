@@ -6,10 +6,7 @@ import type { DistrictDef, DistrictType } from '../types/districts'
  * "first choice"). Demonstrates the agreed model:
  *  - cumulative output: a district's yield is the SUM of every node built in it;
  *  - branching: `branchGroup` siblings are mutually exclusive (pick one path);
- *  - energy: a district's BASE node is free infrastructure (no upkeep, basic yield);
- *    DEEPER nodes draw `energyUpkeep` per round (improving a district has a running
- *    cost). Energy is gross production minus upkeep; a build that would push net
- *    energy/round below zero is rejected.
+ *  - costs are one-time only (no running upkeep) — keep it simple.
  * Numbers are a first pass, kept near today's building values; the full tree content
  * (branches, the other 5 districts, megastructures) is fleshed out with the Phase-2
  * tech tree (2b). Node ids reuse existing building ids where one already fits.
@@ -18,8 +15,8 @@ import type { DistrictDef, DistrictType } from '../types/districts'
 const b = (id: string): BuildingId => id as BuildingId
 
 export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
-  // ⚡ ENERGY — the substrate. Nodes PRODUCE energy/round (no upkeep); everything
-  // else's upkeep is paid out of this. Strong on desert (solar) and gas-giant.
+  // ⚡ ENERGY — the substrate. Nodes PRODUCE energy/round. Strong on desert (solar)
+  // and gas-giant.
   energy: {
     type: 'energy',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant'],
@@ -34,7 +31,7 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     ]
   },
 
-  // ⛏ MATTER — construction substrate. Consumer (light upkeep). Strong on barren/ice.
+  // ⛏ MATTER — construction substrate. Strong on barren/ice.
   matter: {
     type: 'matter',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'barren'],
@@ -42,34 +39,36 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     weights: { 'barren': 1.3, 'ice-giant': 1.2, 'oceanic': 0.9 },
     tree: [
       { id: b('bld:mining-facility'), prereqIds: [], cost: { energy: 30 }, buildTime: 3, output: { matter: 15 } },
-      // Deep-core line — raw yield, but draws energy/round to run.
-      { id: b('bld:refinery-node'), prereqIds: [b('bld:mining-facility')], branchGroup: 'extract', research: 'tech:basic-industrial-robotics', cost: { energy: 55, matter: 85 }, buildTime: 4, energyUpkeep: 8, output: { matter: 25 } }
+      // Deep-core line — raw yield.
+      { id: b('bld:refinery-node'), prereqIds: [b('bld:mining-facility')], branchGroup: 'extract', research: 'tech:basic-industrial-robotics', cost: { energy: 55, matter: 85 }, buildTime: 4, output: { matter: 25 } }
     ]
   },
 
-  // 🔬 RESEARCH — the only source of science (no per-planet base). The data center
-  // houses the AI core, so it is the MANDATORY first build on a fresh planet (every
-  // other district needs it to run). Cheap, energy-only, ONE round — surface, since a
-  // research centre in orbit makes little sense. Base node is research-free to bootstrap.
+  // 🔬 RESEARCH — the source of science. The data center houses the AI core, so it is
+  // the MANDATORY first build on a fresh planet (every other district needs it). Cheap,
+  // energy-only, ONE round — surface, since a research centre in orbit makes little
+  // sense. It also produces a little PRODUCTION (the planet's base build throughput,
+  // surfaced here instead of being a hidden flat bonus), so a fresh planet can build
+  // without being forced to open a Production district first.
   research: {
     type: 'research',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant'],
     zone: 'surface',
     weights: { terrestrial: 1.2, oceanic: 1.2 },
     tree: [
-      { id: b('bld:data-center'), prereqIds: [], cost: { energy: 50 }, buildTime: 1, output: { research: 20 } }
+      { id: b('bld:data-center'), prereqIds: [], cost: { energy: 50 }, buildTime: 1, output: { research: 20, production: 20 } }
     ]
   },
 
-  // 🏭 PRODUCTION — build throughput above BASE_PLANET_PRODUCTION (replaces workers).
+  // 🏭 PRODUCTION — build throughput on top of the data center's base.
   production: {
     type: 'production',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'barren', 'gas-giant'],
     zone: 'surface',
     tree: [
       { id: b('bld:assembler'), prereqIds: [], cost: { energy: 30, matter: 40 }, buildTime: 3, output: { production: 15 } },
-      // Deeper automation boosts throughput but draws energy/round to run.
-      { id: b('bld:robotics-bay'), prereqIds: [b('bld:assembler')], research: 'tech:basic-industrial-robotics', cost: { energy: 60, matter: 90 }, buildTime: 5, energyUpkeep: 12, output: { production: 30 } }
+      // Deeper automation boosts throughput.
+      { id: b('bld:robotics-bay'), prereqIds: [b('bld:assembler')], research: 'tech:basic-industrial-robotics', cost: { energy: 60, matter: 90 }, buildTime: 5, output: { production: 30 } }
     ]
   },
 

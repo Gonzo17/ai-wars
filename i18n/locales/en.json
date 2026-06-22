@@ -467,7 +467,12 @@
       "needs-prereq": "Build its prerequisite first.",
       "requires-tech": "Requires {tech}",
       "completed-last-turn": "Completed last turn",
-      "district-output": "Output"
+      "district-output": "Output",
+      "built-tag": "Built",
+      "filter-label": "Show",
+      "filter-built": "Built",
+      "filter-units": "Units",
+      "filter-projects": "Projects"
     },
     "districts": {
       "label": "District",

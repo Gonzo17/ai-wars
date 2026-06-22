@@ -69,18 +69,18 @@ export type UnitDefinition = {
 // strip stays readable and energy (paid up-front on enqueue) is the real cap.
 export const BUILD_QUEUE_LIMIT = 6
 
-// A planet's robots provide a flat BASE production (build throughput) even on an empty
-// world — that's how the first district gets built. Resources and science, by contrast,
-// come ONLY from districts (an empty planet makes no energy/matter/science per round):
-// districts are the infrastructure the robots work with. Workers-as-units are gone.
+// Production (build throughput) comes from districts — the data center carries the base
+// amount, so it's visible rather than a hidden flat bonus. BASE_PLANET_PRODUCTION is the
+// BOOTSTRAP a fresh planet falls back to until a district produces (so its first,
+// mandatory build — the data center — can be raised), AND the conversion factor between
+// a node's `buildTime` (turns) and its production cost: productionCost = buildTime × 20.
+// Resources and science likewise come ONLY from districts. Workers-as-units are gone.
 export const BASE_PLANET_PRODUCTION = 20
 export const BASE_PLANET_SCIENCE = 0
 
-// Production note: a planet makes BASE_PLANET_PRODUCTION (20) production per turn.
-// `productionCost` therefore sets build time in turns (cost / 20). Buildings are
-// deliberately multi-turn commitments (~2–6 turns) so placement is a tactical
-// choice, not a spam. `buildTime` mirrors that for documentation but is not itself
-// read by the engine.
+// `productionCost` sets build time in turns (cost / 20). Buildings are deliberately
+// multi-turn commitments (~2–6 turns) so placement is a tactical choice, not a spam.
+// `buildTime` mirrors that for documentation but is not itself read by the engine.
 export const BUILDING_DEFS: BuildingDefinition[] = [
   // Energy production buildings
   { id: 'bld:solar-array', category: 'energy', resourceCosts: { energy: 0, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 3, requirements: {}, resourceProduction: { energy: 20 }, maxLevel: 5, icon: 'i-lucide-sun' },
