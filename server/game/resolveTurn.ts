@@ -90,7 +90,7 @@ export async function resolveTurn(repo: GameRepository, gameId: string, turn: nu
 
     // Step 4: Add resource production from existing buildings (before completing new ones)
     for (const player of nextSnapshot.players) {
-      const production = calculateResourceProduction(nextSnapshot.planets, player.id)
+      const production = calculateResourceProduction(nextSnapshot.planets, player.id, player.research.completedTechIds)
       applyResourceProduction(player, production)
       applyStrategicProduction(player, calculateStrategicProduction(nextSnapshot.planets, player.id))
     }

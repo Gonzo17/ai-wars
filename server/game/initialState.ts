@@ -375,7 +375,7 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
 
   // Initial resource deltas based on each player's starting buildings
   for (const player of players) {
-    const production = calculateResourceProduction(planets, player.id)
+    const production = calculateResourceProduction(planets, player.id, player.research.completedTechIds)
     const energyRes = player.resources.find(r => r.key === 'res:energy')
     const mineralRes = player.resources.find(r => r.key === 'res:material')
     const rareRes = player.resources.find(r => r.key === 'res:rare')

@@ -51,7 +51,8 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
       continue
     }
 
-    const available = planetProductionPerTurn(planet) + (planet.productionCarryover ?? 0)
+    const owner = snapshot.players.find(p => p.id === planet.owner)
+    const available = planetProductionPerTurn(planet, owner?.research.completedTechIds ?? []) + (planet.productionCarryover ?? 0)
     planet.productionCarryover = 0
 
     // Only the front item makes progress this turn; on completion the leftover

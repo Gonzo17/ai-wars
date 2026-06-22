@@ -44,7 +44,7 @@ export function applyStrategicProduction(player: PlayerSnapshot, production: Rec
 
 export function updateResourceDeltas(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
-    const production = calculateResourceProduction(snapshot.planets, player.id)
+    const production = calculateResourceProduction(snapshot.planets, player.id, player.research.completedTechIds)
     const energyRes = getPlayerResource(player, 'res:energy')
     const mineralRes = getPlayerResource(player, 'res:material')
     const rareRes = getPlayerResource(player, 'res:rare')

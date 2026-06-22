@@ -64,6 +64,9 @@ export interface DistrictDef {
   zone: SlotZonePlacement
   /** Output multiplier by planet type (◎ strong = >1, weak = <1). Default 1. */
   weights?: Partial<Record<PlanetType, number>>
+  /** Tech that must be completed before this district can be founded (unlocks-first:
+   *  opening a new district is itself a research reward). Omit = available from the start. */
+  research?: ResearchId
   /** The branch tree; nodes with empty `prereqIds` are the openable base(s). */
   tree: DistrictNodeDef[]
 }

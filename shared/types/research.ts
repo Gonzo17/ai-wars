@@ -9,6 +9,16 @@ export type ResearchCategory
 
 export type TechStatus = 'completed' | 'researching' | 'available' | 'locked'
 
+/**
+ * What a tech grants BESIDES the buildings/units it unlocks (those are expressed on the
+ * defs via `requirements.research`, derived for display). Effects carry the things that
+ * aren't a def: gameplay abilities/visibilities (`ability`) and output buffs that ride
+ * alongside an unlock (`resourceMult`). Unlocks-first: a tech should never be ONLY a buff.
+ */
+export type TechEffect
+  = { kind: 'ability', flag: string }
+    | { kind: 'resourceMult', resource: 'energy' | 'minerals' | 'research' | 'production', mult: number }
+
 export interface TechDef {
   id: string
   name: string
@@ -17,6 +27,10 @@ export interface TechDef {
   tier: AscensionTier
   prerequisites: string[]
   researchPoints?: number
+  /** Mutually-exclusive doctrine group: completing one tech here locks its siblings. */
+  doctrineGroup?: string
+  /** Abilities/visibilities + output buffs this tech grants (unlocks live on the defs). */
+  effects?: TechEffect[]
   requires?: {
     ascension?: AscensionTier
     compute?: number

@@ -3,19 +3,21 @@ import { BASE_PLANET_PRODUCTION, BASE_PLANET_SCIENCE, getBuildingDef } from '../
 import { DISTRICT_DEFS } from '../defs/districts'
 import { STRATEGIC_RESOURCE_IDS } from '../defs/strategicResources'
 import { districtSlotProduction, slotOutput } from './synergies'
+import { techBuffs } from './techBuffs'
 
 /**
  * Build throughput a single planet generates per turn: the sum of whatever its district
  * nodes add (the data center carries the base production, so it's visible rather than a
- * hidden flat bonus). A fresh planet with no operational district yet still gets a
- * BASE_PLANET_PRODUCTION bootstrap so it can raise its first, mandatory build (the data
- * center); once any district produces, the real sum takes over. The single place the
- * engine reads "how much production does this planet make".
+ * hidden flat bonus), scaled by the owner's production tech buffs. A fresh planet with no
+ * operational district yet still gets a BASE_PLANET_PRODUCTION bootstrap so it can raise
+ * its first, mandatory build (the data center); once any district produces, the real sum
+ * takes over. The single place the engine reads "how much production does this planet make".
  */
-export function planetProductionPerTurn(planet: Planet): number {
+export function planetProductionPerTurn(planet: Planet, completedTechIds: string[] = []): number {
   let sum = 0
   for (let i = 0; i < planet.slots.length; i++) sum += districtSlotProduction(planet, i)
-  return sum > 0 ? sum : BASE_PLANET_PRODUCTION
+  const buffed = Math.round(sum * techBuffs(completedTechIds).resourceMult.production)
+  return buffed > 0 ? buffed : BASE_PLANET_PRODUCTION
 }
 
 export type ResourceTotals = { energy: number, minerals: number, rare: number }
@@ -36,7 +38,7 @@ function forEachOwnedPlanet(planets: Planet[], playerId: string, fn: (planet: Pl
  * Per-turn resource production for the player (districts + synergies included). All
  * costs are one-time, so production is gross — there is no running upkeep to net out.
  */
-export function calculateResourceProduction(planets: Planet[], playerId: string): ResourceTotals {
+export function calculateResourceProduction(planets: Planet[], playerId: string, completedTechIds: string[] = []): ResourceTotals {
   const totals: ResourceTotals = { energy: 0, minerals: 0, rare: 0 }
   forEachOwnedPlanet(planets, playerId, (planet) => {
     for (let i = 0; i < planet.slots.length; i++) {
@@ -46,6 +48,9 @@ export function calculateResourceProduction(planets: Planet[], playerId: string)
       totals.rare += output.rare
     }
   })
+  const mult = techBuffs(completedTechIds).resourceMult
+  totals.energy = Math.round(totals.energy * mult.energy)
+  totals.minerals = Math.round(totals.minerals * mult.minerals)
   return totals
 }
 
@@ -138,7 +143,7 @@ export function calculateStrategicProduction(planets: Planet[], playerId: string
  * (non-star) planet — so owning worlds always advances research — plus the research
  * output of all completed buildings (synergies included).
  */
-export function getResearchPointsPerTurn(planets: Planet[], playerId: string): number {
+export function getResearchPointsPerTurn(planets: Planet[], playerId: string, completedTechIds: string[] = []): number {
   let total = 0
   forEachOwnedPlanet(planets, playerId, (planet) => {
     if (planet.kind !== 'star') total += BASE_PLANET_SCIENCE
@@ -146,5 +151,5 @@ export function getResearchPointsPerTurn(planets: Planet[], playerId: string): n
       total += slotOutput(planet, i).research
     }
   })
-  return total
+  return Math.round(total * techBuffs(completedTechIds).resourceMult.research)
 }

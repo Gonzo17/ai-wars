@@ -165,6 +165,8 @@ export function planetDistrictCatalog(
     const inProgress = slot?.isConstructing && slot.buildingId ? slot.buildingId : null
     const chosen = new Set<string>([...built, ...(inProgress ? [inProgress] : [])])
     const available = def.type === 'research' || researchEstablished
+    // The district itself can be tech-gated (unlocks-first: research opens the district).
+    const districtTechOk = !def.research || completed.has(def.research)
     const foundSlots = founded ? [] : emptySlotsForZone(planet, def.zone, def.type)
 
     const nodes: CatalogNode[] = def.tree.map((node) => {
@@ -178,7 +180,7 @@ export function planetDistrictCatalog(
         const prereqOk = node.prereqIds.every(p => chosen.has(p))
         const branchConflict = Boolean(node.branchGroup)
           && def.tree.some(n => n.branchGroup === node.branchGroup && n.id !== node.id && chosen.has(n.id))
-        const techOk = !node.research || completed.has(node.research)
+        const techOk = (!node.research || completed.has(node.research)) && (isBase ? districtTechOk : true)
         if (isBase) {
           if (!available || foundSlots.length === 0) state = 'blocked'
           else if (!techOk) state = 'locked'

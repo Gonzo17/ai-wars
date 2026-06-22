@@ -169,6 +169,10 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
               errors.push({ code: 'INVALID_COMMAND', message: 'District not available on this planet type', path: itemPath })
               continue
             }
+            if (dDef.research && !hasResearchRequirement(player, [dDef.research])) {
+              errors.push({ code: 'INVALID_STATE', message: 'District not yet researched', path: itemPath })
+              continue
+            }
             if (dDef.type !== 'research' && !researchEstablished) {
               errors.push({ code: 'INVALID_STATE', message: 'Build a Research district (data center) first', path: itemPath })
               continue
