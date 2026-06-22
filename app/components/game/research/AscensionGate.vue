@@ -147,7 +147,10 @@ const totalTechCount = computed(() =>
         </div>
 
         <!-- Compute Requirement -->
-        <div class="space-y-2">
+        <div
+          v-if="gateStatus.computeRequired > 0"
+          class="space-y-2"
+        >
           <div class="flex items-center gap-1 text-xs text-neutral-400">
             <UIcon
               name="i-lucide-cpu"

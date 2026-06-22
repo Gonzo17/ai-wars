@@ -71,8 +71,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k0.8',
     prerequisites: ['tech:basic-industrial-robotics', 'tech:data-center-i'],
-    researchPoints: 300,
-    requires: { compute: 2 }
+    researchPoints: 300
   },
   {
     id: 'tech:deep-system-scan',
@@ -117,8 +116,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k0.8',
     prerequisites: ['tech:data-center-i'],
-    researchPoints: 400,
-    requires: { compute: 3 }
+    researchPoints: 400
   },
   {
     id: 'tech:efficient-thrusters',
@@ -140,8 +138,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.0',
     prerequisites: ['tech:autonomous-resource-allocation'],
-    researchPoints: 400,
-    requires: { compute: 4 }
+    researchPoints: 400
   },
   {
     id: 'tech:orbital-shipyard',
@@ -159,8 +156,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'military_defense',
     tier: 'k1.0',
     prerequisites: ['tech:data-center-ii'],
-    researchPoints: 300,
-    requires: { compute: 5 }
+    researchPoints: 300
   },
   {
     id: 'tech:fleet-coordination',
@@ -201,8 +197,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'economy_industry',
     tier: 'k1.5',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:efficient-thrusters'],
-    researchPoints: 400,
-    requires: { compute: 6 }
+    researchPoints: 400
   },
   {
     id: 'tech:orbital-fabricators',
@@ -221,7 +216,7 @@ export const TECH_DEFS: TechDef[] = [
     tier: 'k1.5',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:data-center-ii'],
     researchPoints: 500,
-    requires: { compute: 8, empire: { planetsControlled: 3 } }
+    requires: { empire: { planetsControlled: 3 } }
   },
   {
     id: 'tech:data-center-iii',
@@ -230,8 +225,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k1.5',
     prerequisites: ['tech:ai-governor-systems'],
-    researchPoints: 500,
-    requires: { compute: 8 }
+    researchPoints: 500
   },
   {
     id: 'tech:system-defense-network',
@@ -255,7 +249,7 @@ export const TECH_DEFS: TechDef[] = [
     tier: 'k2.0',
     prerequisites: ['tech:orbital-fabricators', 'tech:data-center-iii'],
     researchPoints: 600,
-    requires: { compute: 10, empire: { homeSystemMajority: true } }
+    requires: { empire: { homeSystemMajority: true } }
   },
   {
     id: 'tech:dyson-swarm',
@@ -273,8 +267,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k2.0',
     prerequisites: ['tech:dyson-swarm'],
-    researchPoints: 600,
-    requires: { compute: 12 }
+    researchPoints: 600
   },
   {
     id: 'tech:antimatter-containment',
@@ -283,8 +276,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k2.0',
     prerequisites: ['tech:stellar-energy-capture'],
-    researchPoints: 700,
-    requires: { compute: 12 }
+    researchPoints: 700
   },
   {
     id: 'tech:system-wide-shields',
@@ -307,8 +299,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'exploration_navigation',
     tier: 'k2.3',
     prerequisites: ['tech:stellar-energy-capture', 'tech:orbital-fabricators'],
-    researchPoints: 800,
-    requires: { compute: 14 }
+    researchPoints: 800
   },
   {
     id: 'tech:generation-ship',
@@ -331,8 +322,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k3.0',
     prerequisites: ['tech:generation-ship', 'tech:stellar-computation'],
-    researchPoints: 2000,
-    requires: { compute: 20 }
+    researchPoints: 2000
   }
 ]
 
@@ -344,7 +334,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:first-shipyard',
       'tech:probe-design'
     ],
-    requiresCompute: 2
+    requiresCompute: 0
   },
   {
     toTier: 'k1.0',
@@ -353,7 +343,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:colony-ship-design',
       'tech:autonomous-resource-allocation'
     ],
-    requiresCompute: 4,
+    requiresCompute: 0,
     requiresEmpire: {
       planetsControlled: 2
     }
@@ -365,7 +355,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:orbital-shipyard',
       'tech:fleet-coordination'
     ],
-    requiresCompute: 6,
+    requiresCompute: 0,
     requiresEmpire: {
       planetsControlled: 4,
       homeSystemMajority: true
@@ -378,7 +368,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:data-center-iii',
       'tech:orbital-fabricators'
     ],
-    requiresCompute: 10,
+    requiresCompute: 0,
     // K2.0 Stellar Mastery: capturing a star and closing a Dyson sphere around
     // it is THE gate — stellar progression, not planet count (see VISION).
     requiresEmpire: {
@@ -392,7 +382,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:stellar-computation',
       'tech:dyson-swarm'
     ],
-    requiresCompute: 14,
+    requiresCompute: 0,
     requiresEmpire: {
       planetsControlled: 12
     }
@@ -403,7 +393,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:generation-ship',
       'tech:stellar-computation'
     ],
-    requiresCompute: 20
+    requiresCompute: 0
   }
 ]
 

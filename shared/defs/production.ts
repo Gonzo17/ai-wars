@@ -114,12 +114,12 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
 ]
 
 export const UNIT_DEFS: UnitDefinition[] = [
-  // Support units
-  { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 8 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:probe-design'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
-  { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 10 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
-  { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 30 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
+  // Support units — the first ships cost only the basic materials (energy + matter).
+  { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:probe-design'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
+  { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 0 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
+  { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 0 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
   // Combat units
-  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 20 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' },
+  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 0 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' },
   // Antimatter capital ship — needs mined antimatter on top of the base cost.
   { id: 'unit:dreadnought', category: 'combat', resourceCosts: { energy: 300, minerals: 400, rare: 60 }, strategicCosts: { 'res:antimatter': 30 }, productionCost: 300, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:antimatter-containment'] }, unitType: 'battleship', strength: 12, icon: 'i-lucide-rocket' }
 ]

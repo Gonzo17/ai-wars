@@ -44,6 +44,7 @@ interface DistrictGroup {
   founded: boolean
   operational: boolean
   available: boolean
+  yields: Array<{ icon: string, amount: number }>
   nodes: DistrictNode[]
 }
 
@@ -535,6 +536,22 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
               :class="group.founded ? 'text-primary-300' : 'text-neutral-400'"
             />
             <span class="text-sm font-semibold text-neutral-100">{{ group.name }}</span>
+            <!-- Total output this district contributes (planet overview at a glance) -->
+            <span
+              v-if="group.yields.length"
+              class="flex items-center gap-1.5 ml-2 text-[11px] text-success-300"
+            >
+              <span
+                v-for="(y, i) in group.yields"
+                :key="i"
+                class="flex items-center gap-0.5"
+              >
+                <UIcon
+                  :name="y.icon"
+                  class="w-3 h-3"
+                />{{ y.amount }}
+              </span>
+            </span>
             <!-- Minimised + something buildable → exclamation -->
             <UIcon
               v-if="isMinimized(group.type) && groupHasBuildable(group)"
@@ -563,6 +580,7 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
               :disabled="!canQueueNode(n)"
               :selected="placementNodeId === n.id"
               :just-completed="n.justCompleted"
+              :done="n.state === 'built'"
               :accent="n.kind === 'unit' ? 'sky' : n.kind === 'project' ? 'amber' : 'primary'"
               :description="n.description"
               :yields="n.yields"

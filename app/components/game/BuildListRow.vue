@@ -65,10 +65,9 @@ const closeTip = () => {
     :data-testid="testid"
     class="group relative flex w-full items-center gap-3 rounded-md border px-2 py-2 text-left transition"
     :class="[
-      justCompleted ? 'border-success-500/50 bg-success-950/20'
-      : done ? 'border-primary-700/40 bg-primary-950/30 cursor-default'
-        : selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
-      disabled && !done && !justCompleted ? 'opacity-40 cursor-not-allowed' : ''
+      selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
+      disabled && !done ? 'opacity-40 cursor-not-allowed' : '',
+      done ? 'cursor-default' : ''
     ]"
     :disabled="disabled"
     @click="emit('select')"
@@ -78,7 +77,7 @@ const closeTip = () => {
     @blur="closeTip"
   >
     <div
-      class="flex h-7 w-7 items-center justify-center rounded-md shrink-0"
+      class="relative flex h-7 w-7 items-center justify-center rounded-md shrink-0"
       :class="iconBg"
     >
       <UIcon
@@ -86,22 +85,19 @@ const closeTip = () => {
         class="h-4 w-4"
         :class="iconText"
       />
+      <!-- Subtle "just completed last turn" marker, on the icon so it never hides the rounds. -->
+      <span
+        v-if="justCompleted"
+        class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-success-400 ring-2 ring-neutral-950"
+        :title="$t('game.slots.completed-last-turn')"
+      />
     </div>
     <span class="flex-1 min-w-0 truncate text-sm font-medium text-neutral-100">
       {{ name }}
     </span>
-    <UIcon
-      v-if="justCompleted"
-      name="i-lucide-circle-check-big"
-      class="h-4 w-4 shrink-0 text-success-300"
-    />
-    <UIcon
-      v-else-if="done"
-      name="i-lucide-check"
-      class="h-4 w-4 shrink-0 text-primary-300"
-    />
+    <!-- Built one-off buildings have no round count (not re-buildable); repeatable items keep it. -->
     <span
-      v-else
+      v-if="!done"
       class="shrink-0 text-[11px] text-neutral-400"
     >
       {{ $t('game.common.duration-rounds', { count: rounds }) }}

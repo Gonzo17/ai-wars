@@ -674,6 +674,7 @@ onMounted(() => {
                       </span>
                     </div>
                     <div
+                      v-if="gatePos.gate.requiresCompute > 0"
                       class="flex items-center gap-1.5 px-2 py-1 rounded-md"
                       :class="getGateStatus(gatePos.gate).computeMet ? 'bg-success-500/20' : 'bg-neutral-800/50'"
                     >
@@ -745,7 +746,10 @@ onMounted(() => {
                   <!-- Other Requirements -->
                   <div class="flex items-center gap-4 pt-2 border-t border-neutral-800">
                     <!-- Compute -->
-                    <div class="flex items-center gap-2">
+                    <div
+                      v-if="gatePos.gate.requiresCompute > 0"
+                      class="flex items-center gap-2"
+                    >
                       <UIcon
                         name="i-lucide-cpu"
                         class="w-4 h-4"

@@ -465,7 +465,9 @@
       "found-district": "Found district",
       "needs-district": "Found this district first.",
       "needs-prereq": "Build its prerequisite first.",
-      "requires-tech": "Requires {tech}"
+      "requires-tech": "Requires {tech}",
+      "completed-last-turn": "Completed last turn",
+      "district-output": "Output"
     },
     "districts": {
       "label": "District",

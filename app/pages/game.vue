@@ -202,6 +202,7 @@ import { toPlayerId } from '~~/shared/utils/playerId'
 import { UNCLAIMED_COLOR } from '~~/shared/defs/playerColors'
 import { STRATEGIC_RESOURCES, getStrategicResource, isStrategicResource } from '~~/shared/defs/strategicResources'
 import { getResearchPointsPerTurn, planetProductionPerTurn, resourceProductionBreakdown } from '~~/shared/utils/economy'
+import { slotOutput, districtSlotProduction } from '~~/shared/utils/synergies'
 import type { ProductionResourceKind } from '~~/shared/utils/economy'
 import { queueItemCosts, reconcileProductionQueue } from '~~/shared/utils/productionQueue'
 import { getLaneEta, getSystemIdForLocation } from '~~/shared/utils/starlanes'
@@ -314,6 +315,7 @@ interface DistrictGroup {
   founded: boolean
   operational: boolean
   available: boolean
+  yields: Array<{ icon: string, amount: number }>
   nodes: DistrictNode[]
 }
 
@@ -968,6 +970,18 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
       .filter(n => VISIBLE_NODE_STATES.has(n.state)) // hide research-locked / not-yet-unlocked
       .map(n => ({ ...n, justCompleted: completions.has(n.id) }))
 
+    // Total output this district contributes (shown in the header for a planet overview).
+    let yields: Array<{ icon: string, amount: number }> = []
+    if (group.slotIndex !== null) {
+      const out = slotOutput(planet, group.slotIndex)
+      yields = nodeYields({
+        energy: out.energy,
+        matter: out.minerals,
+        research: out.research,
+        production: districtSlotProduction(planet, group.slotIndex)
+      })
+    }
+
     return {
       type: group.type,
       name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
@@ -975,6 +989,7 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
       founded: group.founded,
       operational: group.operational,
       available: group.available,
+      yields,
       nodes
     }
   }).filter(group => group.nodes.length > 0) // drop districts with nothing to show

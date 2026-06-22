@@ -465,7 +465,9 @@
       "found-district": "Bezirk gründen",
       "needs-district": "Erst diesen Bezirk gründen.",
       "needs-prereq": "Erst die Voraussetzung bauen.",
-      "requires-tech": "Benötigt {tech}"
+      "requires-tech": "Benötigt {tech}",
+      "completed-last-turn": "Letzte Runde fertiggestellt",
+      "district-output": "Ertrag"
     },
     "districts": {
       "label": "Bezirk",
