@@ -11,7 +11,7 @@ function makePlanet(
   oreNodes: number[] = []
 ): Planet {
   const nodes = new Map<number, ResourceNodeType>(oreNodes.map(i => [i, 'ore']))
-  const slots = createPlanetSlots(nodes)
+  const slots = createPlanetSlots(7, 5, nodes)
   for (const b of buildings) {
     const slot = slots[b.slotIndex]!
     slot.buildingId = b.id
@@ -105,7 +105,7 @@ describe('economy aggregation', () => {
     const production = calculateResourceProduction([planet], OWNER)
     expect(production.minerals).toBe(30)
     expect(production.energy).toBe(20)
-    // data-center 20 × 1.25 (one energy building) = 25, plus BASE_PLANET_SCIENCE (20) for owning the planet.
-    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(45)
+    // data-center 20 × 1.25 (one energy building) = 25; base planet science is 0.
+    expect(getResearchPointsPerTurn([planet], OWNER)).toBe(25)
   })
 })

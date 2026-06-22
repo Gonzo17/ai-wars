@@ -126,7 +126,7 @@ export function districtSlotProduction(planet: Planet, slotIndex: number): numbe
   return production
 }
 
-/** Per-turn energy upkeep a district slot drains (sum of its nodes' energyUpkeep). */
+/** Per-turn energy upkeep a district slot draws (sum of its nodes' energyUpkeep; base nodes are free). */
 export function districtSlotUpkeep(planet: Planet, slotIndex: number): number {
   const slot = planet.slots[slotIndex]
   if (!slot?.districtType || !slot.nodes?.length) return 0

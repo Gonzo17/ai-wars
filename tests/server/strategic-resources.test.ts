@@ -134,6 +134,10 @@ describe('strategic resources', () => {
     setResource(state, U1, 'res:material', 5000)
     setResource(state, U1, 'res:rare', 5000)
     state.players.find(p => p.id === toPlayerId(U1))!.research.completedTechIds.push('tech:antimatter-containment')
+    // The dreadnought needs an orbital dock; the empty start has none, so seed one.
+    const dock = homeworld.slots.find(s => s.zone === 'orbital')!
+    dock.buildingId = 'bld:orbital-dock'
+    dock.buildingLevel = 1
 
     const dreadnought: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: homeworld.id, items: [{ kind: 'unit', unitId: 'unit:dreadnought' as UnitId }] }] }
     expect(validateTurnPlan(state, toPlayerId(U1), dreadnought).length).toBeGreaterThan(0)

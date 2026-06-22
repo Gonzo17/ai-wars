@@ -62,6 +62,41 @@ export const SURFACE_SLOT_COUNT = SURFACE_SLOT_COORDS.length
 export const ORBITAL_SLOT_COUNT = 5
 export const TOTAL_SLOT_COUNT = SURFACE_SLOT_COUNT + ORBITAL_SLOT_COUNT
 
+// Planet size → slot counts (surface hexes + orbital ring). Three sizes; medium (7+5)
+// is the basic world. createPlanetSlots / PlanetSlotView read these so geometry scales.
+export type PlanetSizeKey = 'small' | 'medium' | 'large' | 'huge'
+export const SIZE_SLOTS: Record<PlanetSizeKey, { surface: number, orbit: number }> = {
+  small: { surface: 4, orbit: 3 },
+  medium: { surface: 7, orbit: 5 },
+  large: { surface: 11, orbit: 5 },
+  huge: { surface: 11, orbit: 5 } // planets don't use 'huge'; kept for the size union
+}
+
+const HEX_DIRS: ReadonlyArray<readonly [number, number]> = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]]
+
+/**
+ * The first `count` axial hex coordinates spiralling out from the centre (centre, then
+ * ring 1, then ring 2…). Gives a balanced honeycomb for any slot count; for count 7 it
+ * is the classic centre+6 hexagon. Render-only — the server stores slots by index.
+ */
+export function generateHexCoords(count: number): HexCoord[] {
+  const out: HexCoord[] = [{ q: 0, r: 0 }]
+  let radius = 1
+  while (out.length < count) {
+    let q = HEX_DIRS[4]![0] * radius
+    let r = HEX_DIRS[4]![1] * radius
+    for (let side = 0; side < 6 && out.length < count; side++) {
+      for (let step = 0; step < radius && out.length < count; step++) {
+        out.push({ q, r })
+        q += HEX_DIRS[side]![0]
+        r += HEX_DIRS[side]![1]
+      }
+    }
+    radius++
+  }
+  return out
+}
+
 /** Building IDs that belong in the orbital ring (military + research) */
 export const ORBITAL_BUILDING_IDS: BuildingId[] = [
   'bld:orbital-dock' as BuildingId,
@@ -95,12 +130,13 @@ export const HEX_SLOT_COORDS = SURFACE_SLOT_COORDS
  * `resourceNodes` is a map of surface-slot-index → node type.
  */
 export function createPlanetSlots(
+  surfaceCount: number = SURFACE_SLOT_COUNT,
+  orbitCount: number = ORBITAL_SLOT_COUNT,
   resourceNodes: Map<number, ResourceNodeType> = new Map()
 ): PlanetSlotData[] {
   const slots: PlanetSlotData[] = []
 
-  // Surface slots
-  for (let i = 0; i < SURFACE_SLOT_COUNT; i++) {
+  for (let i = 0; i < surfaceCount; i++) {
     slots.push({
       index: i,
       zone: 'surface',
@@ -112,10 +148,9 @@ export function createPlanetSlots(
     })
   }
 
-  // Orbital slots
-  for (let i = 0; i < ORBITAL_SLOT_COUNT; i++) {
+  for (let i = 0; i < orbitCount; i++) {
     slots.push({
-      index: SURFACE_SLOT_COUNT + i,
+      index: surfaceCount + i,
       zone: 'orbital',
       buildingId: null,
       buildingLevel: 0,

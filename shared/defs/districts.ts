@@ -6,8 +6,10 @@ import type { DistrictDef, DistrictType } from '../types/districts'
  * "first choice"). Demonstrates the agreed model:
  *  - cumulative output: a district's yield is the SUM of every node built in it;
  *  - branching: `branchGroup` siblings are mutually exclusive (pick one path);
- *  - energy dual-constraint: producer nodes (Energy) add energy/round; consumer nodes
- *    carry `energyUpkeep` that drains it — you can't build past net-zero energy/round.
+ *  - energy: a district's BASE node is free infrastructure (no upkeep, basic yield);
+ *    DEEPER nodes draw `energyUpkeep` per round (improving a district has a running
+ *    cost). Energy is gross production minus upkeep; a build that would push net
+ *    energy/round below zero is rejected.
  * Numbers are a first pass, kept near today's building values; the full tree content
  * (branches, the other 5 districts, megastructures) is fleshed out with the Phase-2
  * tech tree (2b). Node ids reuse existing building ids where one already fits.
@@ -39,20 +41,21 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     zone: 'surface',
     weights: { 'barren': 1.3, 'ice-giant': 1.2, 'oceanic': 0.9 },
     tree: [
-      { id: b('bld:mining-facility'), prereqIds: [], cost: { energy: 30 }, buildTime: 3, energyUpkeep: 5, output: { matter: 15 } },
-      // Deep-core line — raw yield.
+      { id: b('bld:mining-facility'), prereqIds: [], cost: { energy: 30 }, buildTime: 3, output: { matter: 15 } },
+      // Deep-core line — raw yield, but draws energy/round to run.
       { id: b('bld:refinery-node'), prereqIds: [b('bld:mining-facility')], branchGroup: 'extract', research: 'tech:basic-industrial-robotics', cost: { energy: 55, matter: 85 }, buildTime: 4, energyUpkeep: 8, output: { matter: 25 } }
     ]
   },
 
-  // 🔬 RESEARCH — science above the per-planet base. Consumer (higher upkeep).
+  // 🔬 RESEARCH — the only source of science (no per-planet base). Base node is
+  // research-free so an empty planet can bootstrap science by building one.
   research: {
     type: 'research',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant'],
     zone: 'orbital',
     weights: { terrestrial: 1.2, oceanic: 1.2 },
     tree: [
-      { id: b('bld:data-center'), prereqIds: [], research: 'tech:data-center-i', cost: { energy: 80, matter: 60 }, buildTime: 6, energyUpkeep: 10, output: { research: 20 } }
+      { id: b('bld:data-center'), prereqIds: [], cost: { energy: 80, matter: 60 }, buildTime: 6, output: { research: 20 } }
     ]
   },
 
@@ -62,7 +65,8 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'barren', 'gas-giant'],
     zone: 'surface',
     tree: [
-      { id: b('bld:assembler'), prereqIds: [], cost: { energy: 30, matter: 40 }, buildTime: 3, energyUpkeep: 6, output: { production: 15 } },
+      { id: b('bld:assembler'), prereqIds: [], cost: { energy: 30, matter: 40 }, buildTime: 3, output: { production: 15 } },
+      // Deeper automation boosts throughput but draws energy/round to run.
       { id: b('bld:robotics-bay'), prereqIds: [b('bld:assembler')], research: 'tech:basic-industrial-robotics', cost: { energy: 60, matter: 90 }, buildTime: 5, energyUpkeep: 12, output: { production: 30 } }
     ]
   },

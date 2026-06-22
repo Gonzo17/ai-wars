@@ -5,7 +5,7 @@ import {
 import { calculateResourceProduction } from '~~/shared/utils/economy'
 import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType } from '~~/shared/types/game'
 import type { PlayerResearchState } from '~~/shared/types/research'
-import { createPlanetSlots, createStarSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
+import { SIZE_SLOTS, createPlanetSlots, createStarSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
 import { STRATEGIC_RESOURCES } from '~~/shared/defs/strategicResources'
 
 /**
@@ -38,23 +38,13 @@ function placeBuilding(slots: PlanetSlotData[], id: BuildingId, level: number): 
 
 function makeSlots(
   buildings: Array<{ id: BuildingId, level: number }>,
-  resourceNodes: Map<number, ResourceNodeType> = new Map()
+  resourceNodes: Map<number, ResourceNodeType> = new Map(),
+  size: Planet['size'] = 'medium'
 ): PlanetSlotData[] {
-  const slots = createPlanetSlots(resourceNodes)
+  const { surface, orbit } = SIZE_SLOTS[size]
+  const slots = createPlanetSlots(surface, orbit, resourceNodes)
   for (const { id, level } of buildings) {
     placeBuilding(slots, id, level)
-  }
-  return slots
-}
-
-/** The homeworld's near-empty starting slots (one Energy district + an orbital dock). */
-function makeHomeworldSlots(): PlanetSlotData[] {
-  const slots = makeSlots([{ id: 'bld:orbital-dock' as BuildingId, level: 1 }], new Map([[2, 'ore']]))
-  // A starter Energy district on the first surface slot (solar node → +20 energy/round).
-  const energySlot = slots.find(s => s.zone === 'surface' && !s.buildingId)
-  if (energySlot) {
-    energySlot.districtType = 'energy'
-    energySlot.nodes = ['bld:solar-array' as BuildingId]
   }
   return slots
 }
@@ -103,12 +93,14 @@ function galaxyLocation(index: number, total: number): { x: number, y: number } 
 
 /** Every planet type, in a fixed ring order so each system reads consistently. */
 const ALL_TYPES: Planet['type'][] = ['terrestrial', 'oceanic', 'ice-giant', 'gas-giant', 'desert', 'barren']
+// Three sizes (small 4+3 / medium 7+5 / large 11+5). Homeworld type (terrestrial) is the
+// basic medium; gas giants are large; desert/barren are small.
 const TYPE_SIZE: Record<Planet['type'], Planet['size']> = {
-  'terrestrial': 'large',
-  'oceanic': 'large',
+  'terrestrial': 'medium',
+  'oceanic': 'medium',
   'ice-giant': 'medium',
-  'gas-giant': 'huge',
-  'desert': 'medium',
+  'gas-giant': 'large',
+  'desert': 'small',
   'barren': 'small'
 }
 
@@ -214,7 +206,7 @@ function makeNeutralPlanet(
     owner: 'unclaimed',
     type,
     size,
-    slots: makeSlots([], new Map([[2, nodeType]])),
+    slots: makeSlots([], new Map([[2, nodeType]]), size),
     queues: { production: [] },
     progressMemory: {},
     productionCarryover: 0,
@@ -281,12 +273,10 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
           id: template.primaryId,
           name: template.primaryName,
           isHomeworld: true,
-          // Near-empty start: a basic Energy district (the substrate that lets you
-          // afford a first consumer district) + an orbital dock for early units. Every
-          // other district is a turn-1 choice; the ore node on slot 2 awaits a Matter
-          // district. The orbital dock stays a legacy building until the 2b Shipyard
-          // district replaces it.
-          slots: makeHomeworldSlots()
+          // Empty start: nothing pre-built. The robots arrive and build the first
+          // district; every slot is a turn-1 choice. The ore node on slot 2 rewards a
+          // Matter district. (Units wait on the 2b Shipyard district.)
+          slots: makeSlots([], new Map([[2, 'ore']]), TYPE_SIZE.terrestrial)
         }
       }
     )

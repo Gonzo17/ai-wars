@@ -94,7 +94,10 @@ describe('shared production queue', () => {
     const seed = getSnapshot(repo, 1)
     const p1 = getPlayer(seed, U1)
     for (const r of p1.resources) r.current = 5000
-    // Both units need the home orbital dock (present) + their design tech.
+    // Both units need an orbital dock (the empty start has none) + their design tech.
+    const dock = homePlanet(seed).slots.find(s => s.zone === 'orbital')!
+    dock.buildingId = 'bld:orbital-dock' as never
+    dock.buildingLevel = 1
     p1.research.completedTechIds.push('tech:probe-design', 'tech:colony-ship-design')
 
     // Queue probe then colony-ship. 20 production/turn → the front probe gets 20.

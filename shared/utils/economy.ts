@@ -15,7 +15,7 @@ export function planetProductionPerTurn(planet: Planet): number {
   return BASE_PLANET_PRODUCTION + bonus
 }
 
-/** Total per-turn energy upkeep of all district nodes the player runs. */
+/** Total per-turn energy upkeep of all (deeper) district nodes the player runs. */
 export function calculateEnergyUpkeep(planets: Planet[], playerId: string): number {
   let upkeep = 0
   forEachOwnedPlanet(planets, playerId, (planet) => {
@@ -39,9 +39,9 @@ function forEachOwnedPlanet(planets: Planet[], playerId: string, fn: (planet: Pl
 }
 
 /**
- * Per-turn resource production for the player (synergies included). Energy is the NET
- * flow — gross production minus district upkeep — so the TopBar delta reflects the
- * dual-constraint model (a build that over-draws upkeep is rejected in validation).
+ * Per-turn resource production for the player (districts + synergies included). Energy
+ * is NET: gross production minus the upkeep that deeper district nodes draw. Base nodes
+ * are free, so an empty/early planet never goes negative.
  */
 export function calculateResourceProduction(planets: Planet[], playerId: string): ResourceTotals {
   const totals: ResourceTotals = { energy: 0, minerals: 0, rare: 0 }

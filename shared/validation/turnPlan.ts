@@ -91,9 +91,8 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   let availableResources = getPlayerResources(player)
   const availableStrategic: Record<string, number> = {}
   for (const r of player.resources) availableStrategic[r.key] = r.current
-  // Net energy/round budget (production − upkeep). Each newly-queued district node
-  // adjusts it; a build that would push it below 0 is rejected (the flow half of the
-  // energy dual-constraint; the stockpile half is the normal affordability check).
+  // Net energy/round budget. Deeper district nodes draw upkeep; queuing one that would
+  // push the net below 0 is rejected (base nodes are free, so they never can).
   let availableEnergyFlow = calculateResourceProduction(snapshot.planets, playerId).energy
 
   for (const [index, command] of plan.commands.entries()) {

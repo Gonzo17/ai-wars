@@ -7,12 +7,15 @@ describe('resourceProductionBreakdown', () => {
   it('groups energy by planet then building and sums to the headline total', () => {
     const snap = initialState(['u1', 'u2'], 1)
     const p1 = toPlayerId('u1')
+    // Empty start makes no energy; seed an Energy district so there's something to group.
+    const homeworld = snap.planets.find(p => p.owner === p1 && p.isHomeworld)!
+    homeworld.slots[0]!.districtType = 'energy'
+    homeworld.slots[0]!.nodes = ['bld:solar-array' as never]
 
     const breakdown = resourceProductionBreakdown(snap.planets, p1)
     const totals = calculateResourceProduction(snap.planets, p1)
 
-    // The homeworld is an energy group, and its starter solar-array district node is a source.
-    const homeworld = snap.planets.find(p => p.owner === p1 && p.isHomeworld)!
+    // The homeworld is an energy group, and its solar-array district node is a source.
     const homeGroup = breakdown.energy.find(g => g.planetId === homeworld.id)
     expect(homeGroup).toBeDefined()
     expect(homeGroup!.sources.some(s => s.buildingId === 'bld:solar-array')).toBe(true)

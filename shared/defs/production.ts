@@ -69,14 +69,12 @@ export type UnitDefinition = {
 // strip stays readable and energy (paid up-front on enqueue) is the real cap.
 export const BUILD_QUEUE_LIMIT = 6
 
-// Every owned planet has a flat BASE production (build throughput) and BASE science
-// (research points) even with zero districts — so an undeveloped world always does
-// *something*. Throughput above base comes from the Production district; science
-// above base from the Research district (Phase 2 district model). Workers are gone.
+// A planet's robots provide a flat BASE production (build throughput) even on an empty
+// world — that's how the first district gets built. Resources and science, by contrast,
+// come ONLY from districts (an empty planet makes no energy/matter/science per round):
+// districts are the infrastructure the robots work with. Workers-as-units are gone.
 export const BASE_PLANET_PRODUCTION = 20
-// Tuned so a fresh single-planet start researches the cheap first tech in ~3 turns
-// (David's "early probe via the first research"); a Research district adds on top.
-export const BASE_PLANET_SCIENCE = 20
+export const BASE_PLANET_SCIENCE = 0
 
 // Production note: a planet makes BASE_PLANET_PRODUCTION (20) production per turn.
 // `productionCost` therefore sets build time in turns (cost / 20). Buildings are

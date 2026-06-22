@@ -67,17 +67,12 @@ describe('initial state', () => {
       expect(owned[0]!.type).toBe('terrestrial')
       expect(owned[0]!.isHomeworld).toBe(true)
 
-      // Near-empty start: the only legacy building is the orbital dock (for early units).
-      const buildings = owned
-        .flatMap(p => p.slots)
-        .filter(s => s.buildingId)
-        .map(s => `${s.buildingId}@${s.buildingLevel}`)
-        .sort()
-      expect(buildings).toEqual(['bld:orbital-dock@1'])
-
-      // …plus a starter Energy district (solar-array node) — every other district is a choice.
-      const energyDistrict = owned.flatMap(p => p.slots).find(s => s.districtType === 'energy')
-      expect(energyDistrict?.nodes).toEqual(['bld:solar-array'])
+      // Empty start: nothing pre-built — every slot is a turn-1 choice.
+      const builtSlots = owned.flatMap(p => p.slots).filter(s => s.buildingId || s.districtType)
+      expect(builtSlots).toEqual([])
+      // …but the homeworld has its full set of (empty) slots, with an ore node to settle.
+      expect(owned[0]!.slots.length).toBeGreaterThan(0)
+      expect(owned[0]!.slots.some(s => s.resourceNode === 'ore')).toBe(true)
     }
 
     const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
@@ -119,8 +114,8 @@ describe('initial state', () => {
     const snapshot = getSnapshot(repo, 3)
     const [p1, p2] = [getPlayer(snapshot, U1), getPlayer(snapshot, U2)]
     expect(p1.resources).toEqual(p2.resources)
-    // 2 turns of the starter Energy district (solar-array, +20/turn); no matter district yet.
-    expect(getResource(p1, 'res:energy')).toBe(540)
+    // Empty start: no districts yet → no energy income, stockpile unchanged.
+    expect(getResource(p1, 'res:energy')).toBe(500)
     expect(getResource(p1, 'res:material')).toBe(100)
   })
 })
@@ -138,8 +133,8 @@ describe('building construction cycle', () => {
 
     const turn2 = getSnapshot(repo, 2)
     const p1 = getPlayer(turn2, U1)
-    // 500 start − 30 build cost (deducted once) + 20 from the starter Energy district
-    expect(getResource(p1, 'res:energy')).toBe(490)
+    // 500 start − 30 build cost (deducted once); no energy district → no income.
+    expect(getResource(p1, 'res:energy')).toBe(470)
     const slot = turn2.planets.find(p => p.id === 'pl:aurora')!.slots[2]!
     expect(slot.buildingId).toBe('bld:mining-facility')
     expect(slot.districtType).toBe('matter')
@@ -199,16 +194,21 @@ describe('building construction cycle', () => {
 describe('research cycle', () => {
   it('progresses by research points per turn and completes', async () => {
     const repo = seedTwoPlayerGame()
+    // Empty start makes no science; seed a Research district so research can progress.
+    const seed = getSnapshot(repo, 1)
+    const homeSlot = seed.planets.find(p => p.id === 'pl:aurora')!.slots.find(s => s.zone === 'orbital')!
+    homeSlot.districtType = 'research'
+    homeSlot.nodes = ['bld:data-center']
     const plan: TurnPlan = {
       commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
     }
 
-    // 60 points required. The near-empty homeworld has no Research district yet, so
-    // research is just BASE_PLANET_SCIENCE (20) → 20/turn → completes in 3 turns.
+    // 60 points required. data-center 20 × 1.2 (terrestrial research weight) = 24/turn
+    // → completes in 3 turns.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(20)
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(24)
 
     for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)
@@ -239,6 +239,10 @@ describe('unit production cycle', () => {
     const seedState = getSnapshot(repo, 1)
     getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
     getPlayer(seedState, U1).research.completedTechIds.push('tech:probe-design')
+    // Probes need an orbital dock; the empty start has none, so seed one.
+    const dock = seedState.planets.find(p => p.id === 'pl:aurora')!.slots.find(s => s.zone === 'orbital')!
+    dock.buildingId = 'bld:orbital-dock'
+    dock.buildingLevel = 1
 
     const plan: TurnPlan = {
       commands: [unitCmd('pl:aurora', 'unit:probe')]

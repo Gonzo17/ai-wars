@@ -3,9 +3,8 @@ import type { BuildingId, Planet, ResourceNodeType } from '~~/shared/types/game'
 import type { PlanetSlot, SlotZone } from '~~/shared/types/planetSlots'
 import {
   ORBITAL_BUILDING_IDS,
-  ORBITAL_SLOT_COUNT,
-  SURFACE_SLOT_COORDS,
   computeAdjacencyBonuses,
+  generateHexCoords,
   isBuildingAllowedInZone,
   isSurfaceBuilding
 } from '~~/shared/types/planetSlots'
@@ -139,6 +138,12 @@ onMounted(() => window.addEventListener('keydown', onKeydown, true))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
 
 // ── Slots: server state → render state ────────────────────────────────
+// Slot counts come from the planet's actual slots (they scale with planet size);
+// surface hex positions are generated to match.
+const surfaceCount = computed(() => props.planet.slots.filter(s => s.zone === 'surface').length)
+const orbitalCount = computed(() => props.planet.slots.filter(s => s.zone === 'orbital').length)
+const surfaceCoords = computed(() => generateHexCoords(surfaceCount.value))
+
 // A slot still empty on the server but referenced by a queued building is shown
 // as "pending" (placed this turn, not yet building).
 const queuedBuildingBySlot = computed(() => {
@@ -167,7 +172,7 @@ const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | 
   const serverSlot = props.planet.slots[index]
   const districtType = serverSlot?.districtType ?? null
   const nodeCount = serverSlot?.nodes?.length ?? 0
-  const base = { index, coord: SURFACE_SLOT_COORDS[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, nodeCount }
+  const base = { index, coord: surfaceCoords.value[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, nodeCount }
 
   // A node currently building (district node or megastructure).
   if (serverSlot?.buildingId && serverSlot.isConstructing) {
@@ -193,10 +198,10 @@ const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | 
 }
 
 const surfaceSlots = computed(() =>
-  SURFACE_SLOT_COORDS.map((_, index) => toSlot(index, 'surface', (props.planet.slots[index]?.resourceNode as ResourceNodeType) ?? null)))
+  surfaceCoords.value.map((_, index) => toSlot(index, 'surface', (props.planet.slots[index]?.resourceNode as ResourceNodeType) ?? null)))
 
 const orbitalSlots = computed(() =>
-  Array.from({ length: ORBITAL_SLOT_COUNT }, (_, i) => toSlot(SURFACE_SLOT_COORDS.length + i, 'orbital', null)))
+  Array.from({ length: orbitalCount.value }, (_, i) => toSlot(surfaceCount.value + i, 'orbital', null)))
 
 const allSlots = computed(() => [...surfaceSlots.value, ...orbitalSlots.value])
 
@@ -213,7 +218,7 @@ const surfacePositions = computed(() =>
 
 const orbitalPositions = computed(() =>
   orbitalSlots.value.map((slot, i) => {
-    const angle = (2 * Math.PI * i) / ORBITAL_SLOT_COUNT - Math.PI / 2
+    const angle = (2 * Math.PI * i) / Math.max(1, orbitalCount.value) - Math.PI / 2
     return { ...slot, px: Math.cos(angle) * ORBITAL_RING_RADIUS, py: Math.sin(angle) * ORBITAL_RING_RADIUS }
   }))
 
@@ -562,10 +567,12 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
             class="absolute rounded-full overflow-hidden pointer-events-none planet-glow"
             :style="{ width: `${PLANET_RADIUS * 2}px`, height: `${PLANET_RADIUS * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           >
+            <!-- scale-110: overfill the circle so the planet meets the ring with no gap,
+                 cropping a few px of the edge (we favour the surface over the rim). -->
             <img
               :src="planetImageSrc"
               alt=""
-              class="w-full h-full object-cover opacity-70"
+              class="w-full h-full object-cover opacity-70 scale-110"
             >
             <div class="absolute inset-0 rounded-full bg-linear-to-b from-transparent via-transparent to-primary-950/60" />
           </div>
