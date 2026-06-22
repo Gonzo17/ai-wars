@@ -9,6 +9,7 @@ import {
   MILITARY_HOLD_TURNS,
   RESEARCH_HOLD_TURNS,
   RESEARCH_VICTORY_TECH,
+  galaxyStarFraction,
   playerMeetsExpansion
 } from '../../shared/utils/victory'
 import type { GameSnapshot } from '../../shared/types/game'
@@ -154,6 +155,35 @@ describe('expansion victory', () => {
     const final = snapshotAt(repo, 2 + EXPANSION_HOLD_TURNS)
     expect(final.victory?.winnerId).toBe(toPlayerId(U1))
     expect(final.victory?.winningCondition).toBe('expansion')
+  })
+})
+
+describe('empire-state ascension gates', () => {
+  it('galaxyStarFraction reflects home-galaxy star ownership', () => {
+    const snap = initialState([U1, U2], 1)
+    const p1 = toPlayerId(U1)
+    expect(galaxyStarFraction(snap, p1)).toBe(0) // owns no stars at start
+
+    const homeworld = snap.planets.find(p => p.isHomeworld && p.owner === p1)!
+    const galaxy = snap.galaxies.find(g => g.solarSystems.includes(homeworld.systemId))!
+    const galaxyStars = snap.planets.filter(p => p.kind === 'star' && galaxy.solarSystems.includes(p.systemId))
+    for (const s of galaxyStars) s.owner = p1
+    expect(galaxyStarFraction(snap, p1)).toBe(1)
+  })
+
+  it('resolve writes galaxyStarFraction + homeSystemMajority into empireState', async () => {
+    const snap = initialState([U1, U2], 1)
+    const p1 = toPlayerId(U1)
+    const homeworld = snap.planets.find(p => p.isHomeworld && p.owner === p1)!
+    // U1 holds every star and every non-star planet in its home system.
+    for (const star of snap.planets.filter(p => p.kind === 'star')) star.owner = p1
+    for (const p of snap.planets.filter(p => p.systemId === homeworld.systemId && p.kind !== 'star')) p.owner = p1
+
+    const repo = makeRepo(snap)
+    await playTurn(repo, 1)
+    const es = snapshotAt(repo, 2).players.find(p => p.id === p1)!.research.empireState
+    expect(es.galaxyStarFraction).toBeGreaterThan(0)
+    expect(es.homeSystemMajority).toBe(true)
   })
 })
 

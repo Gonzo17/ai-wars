@@ -267,7 +267,8 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
         homeSystemMajority: true,
         intelLevel: 'low',
         starsControlled: 0,
-        dysonStages: 0
+        dysonStages: 0,
+        galaxyStarFraction: 0
       },
       completedTechIds: [...startingTechIds],
       activeResearch: undefined,

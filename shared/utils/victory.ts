@@ -36,20 +36,29 @@ export const EXPANSION_HOLD_TURNS = 8
 export const EXPANSION_STAR_FRACTION = 0.9
 
 /**
- * Expansion trigger (wide / Kardashev III): hold a supermajority of the stars in
- * the player's **own home galaxy** (the galaxy containing their homeworld) — not
- * of all stars in the universe. Reads star ownership directly off the snapshot.
+ * Share (0..1) of the stars in the player's **own home galaxy** (the galaxy containing
+ * their homeworld) that they currently hold. The single source for both the expansion
+ * win and the `galaxyStarFraction` ascension gates. 0 if they have no homeworld/galaxy
+ * or the galaxy has no stars.
  */
-export function playerMeetsExpansion(snapshot: GameSnapshot, playerId: PlayerId): boolean {
+export function galaxyStarFraction(snapshot: GameSnapshot, playerId: PlayerId): number {
   const homeworld = snapshot.planets.find(p => p.isHomeworld && p.owner === playerId)
-  if (!homeworld) return false
+  if (!homeworld) return 0
   const galaxy = snapshot.galaxies.find(g => g.solarSystems.includes(homeworld.systemId))
-  if (!galaxy) return false
+  if (!galaxy) return 0
 
   const galaxyStars = snapshot.planets.filter(p => p.kind === 'star' && galaxy.solarSystems.includes(p.systemId))
-  if (galaxyStars.length === 0) return false
+  if (galaxyStars.length === 0) return 0
   const owned = galaxyStars.filter(p => p.owner === playerId).length
-  return owned / galaxyStars.length >= EXPANSION_STAR_FRACTION
+  return owned / galaxyStars.length
+}
+
+/**
+ * Expansion trigger (wide / Kardashev III): hold a supermajority of the stars in the
+ * player's own home galaxy — not of all stars in the universe.
+ */
+export function playerMeetsExpansion(snapshot: GameSnapshot, playerId: PlayerId): boolean {
+  return galaxyStarFraction(snapshot, playerId) >= EXPANSION_STAR_FRACTION
 }
 
 export const RESEARCH_HOLD_TURNS = 6

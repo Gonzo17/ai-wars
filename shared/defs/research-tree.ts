@@ -215,8 +215,7 @@ export const TECH_DEFS: TechDef[] = [
     category: 'energy_compute',
     tier: 'k1.5',
     prerequisites: ['tech:planetwide-infrastructure', 'tech:data-center-ii'],
-    researchPoints: 500,
-    requires: { empire: { planetsControlled: 3 } }
+    researchPoints: 500
   },
   {
     id: 'tech:data-center-iii',
@@ -344,6 +343,7 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:autonomous-resource-allocation'
     ],
     requiresCompute: 0,
+    // Minimal "you've colonized once" floor — the only gate that still reads a planet count.
     requiresEmpire: {
       planetsControlled: 2
     }
@@ -356,8 +356,8 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:fleet-coordination'
     ],
     requiresCompute: 0,
+    // Hold your whole home system before expanding outward.
     requiresEmpire: {
-      planetsControlled: 4,
       homeSystemMajority: true
     }
   },
@@ -369,11 +369,11 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:orbital-fabricators'
     ],
     requiresCompute: 0,
-    // K2.0 Stellar Mastery: capturing a star and closing a Dyson sphere around
-    // it is THE gate — stellar progression, not planet count (see VISION).
+    // K2.0 = HOLD A STAR. The universal milestone: only on a captured star do the stellar
+    // structures & units unlock. The star-constructor unlocks at k1.5, so the capture
+    // itself is the gate (no Dyson needed yet — that's a k2.0 activity).
     requiresEmpire: {
-      starsControlled: 1,
-      dysonStages: 1
+      starsControlled: 1
     }
   },
   {
@@ -383,8 +383,10 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:dyson-swarm'
     ],
     requiresCompute: 0,
+    // Post-star expansion: still holding a star and grown to half your home galaxy.
     requiresEmpire: {
-      planetsControlled: 12
+      starsControlled: 1,
+      galaxyStarFraction: 0.5
     }
   },
   {
@@ -393,7 +395,12 @@ export const ASCENSION_GATES: AscensionGateDef[] = [
       'tech:generation-ship',
       'tech:stellar-computation'
     ],
-    requiresCompute: 0
+    requiresCompute: 0,
+    // K3.0 = HOLD THE GALAXY. This threshold IS the expansion win (see resolve/victory.ts);
+    // reaching k3.0 means the game is over. Not a research tier.
+    requiresEmpire: {
+      galaxyStarFraction: 0.9
+    }
   }
 ]
 

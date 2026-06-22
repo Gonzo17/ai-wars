@@ -192,7 +192,8 @@
           "home-system": "Home system majority",
           "intel": "{level} intel",
           "stars": "1 star captured | {count} stars captured",
-          "dyson": "Dyson sphere stage {count}"
+          "dyson": "Dyson sphere stage {count}",
+          "galaxy-stars": "{percent}% of your galaxy's stars"
         }
       },
       "locked": {
@@ -204,7 +205,8 @@
         "requires-home-system": "Requires home system majority",
         "requires-intel": "Requires {level} intel level",
         "requires-stars": "Requires 1 star captured | Requires {count} stars captured",
-        "requires-dyson": "Requires Dyson sphere stage {count}"
+        "requires-dyson": "Requires Dyson sphere stage {count}",
+        "requires-galaxy-stars": "Requires {percent}% of your galaxy's stars"
       },
       "techs": {
         "bootstrapped-ai-core": {

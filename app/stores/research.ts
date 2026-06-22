@@ -34,7 +34,8 @@ export const useResearchStore = defineStore('research', () => {
     homeSystemMajority: true,
     intelLevel: 'low' as 'low' | 'medium' | 'high',
     starsControlled: 0,
-    dysonStages: 0
+    dysonStages: 0,
+    galaxyStarFraction: 0
   })
 
   // Initialzustand: keine Forschung abgeschlossen und keine aktive Forschung
@@ -183,6 +184,14 @@ export const useResearchStore = defineStore('research', () => {
           required: req.dysonStages
         })
       }
+      if (req.galaxyStarFraction && empireState.value.galaxyStarFraction < req.galaxyStarFraction) {
+        reasons.push({
+          type: 'empire',
+          message: t('game.research.locked.requires-galaxy-stars', { percent: Math.round(req.galaxyStarFraction * 100) }),
+          value: `${Math.round(empireState.value.galaxyStarFraction * 100)}%`,
+          required: `${Math.round(req.galaxyStarFraction * 100)}%`
+        })
+      }
     }
 
     return reasons
@@ -258,6 +267,9 @@ export const useResearchStore = defineStore('research', () => {
       if (req.dysonStages && empireState.value.dysonStages < req.dysonStages) {
         return false
       }
+      if (req.galaxyStarFraction && empireState.value.galaxyStarFraction < req.galaxyStarFraction) {
+        return false
+      }
     }
 
     return true
@@ -318,6 +330,14 @@ export const useResearchStore = defineStore('research', () => {
         empireMet = empireMet && met
         empireDetails.push({
           requirement: t('game.research.gate.requirements.dyson', { count: req.dysonStages }),
+          met
+        })
+      }
+      if (req.galaxyStarFraction) {
+        const met = empireState.value.galaxyStarFraction >= req.galaxyStarFraction
+        empireMet = empireMet && met
+        empireDetails.push({
+          requirement: t('game.research.gate.requirements.galaxy-stars', { percent: Math.round(req.galaxyStarFraction * 100) }),
           met
         })
       }

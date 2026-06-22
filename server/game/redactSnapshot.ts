@@ -51,7 +51,7 @@ function redactEnemyPlayer(player: PlayerSnapshot): PlayerSnapshot {
     research: {
       ascensionTierReached: 'k0.6',
       computeLevel: 0,
-      empireState: { planetsControlled: player.planets.length, homeSystemMajority: false, intelLevel: 'low', starsControlled: 0, dysonStages: 0 },
+      empireState: { planetsControlled: player.planets.length, homeSystemMajority: false, intelLevel: 'low', starsControlled: 0, dysonStages: 0, galaxyStarFraction: 0 },
       completedTechIds: [],
       activeResearch: undefined,
       progressMemory: {}

@@ -3,12 +3,13 @@ import { findDistrictNode } from '~~/shared/defs/districts'
 import { getProjectDef } from '~~/shared/defs/projects'
 import type { GameSnapshot, Unit, UnitId } from '~~/shared/types/game'
 import { planetProductionPerTurn } from '~~/shared/utils/economy'
+import { galaxyStarFraction } from '~~/shared/utils/victory'
 import { addEvent, buildingNameKey, getPlanetName, projectNameKey, unitNameKey } from './events'
 
 /**
- * Keep each player's empireState in sync with ownership: planets controlled,
- * stars controlled, and the highest Dyson-sphere stage built on any owned star.
- * These drive the stellar ascension gates (K2.0 onward).
+ * Keep each player's empireState in sync with ownership: planets/stars controlled, the
+ * highest Dyson stage, whether they hold their whole home system, and their home-galaxy
+ * star share. These drive the ascension gates (home-system → hold a star → hold the galaxy).
  */
 export function updatePlanetsControlled(snapshot: GameSnapshot) {
   for (const player of snapshot.players) {
@@ -22,9 +23,20 @@ export function updatePlanetsControlled(snapshot: GameSnapshot) {
         }
       }
     }
+
+    // Home-system control: own every non-star planet in the system holding your homeworld.
+    const homeworld = owned.find(p => p.isHomeworld)
+    let homeSystemMajority = false
+    if (homeworld) {
+      const systemPlanets = snapshot.planets.filter(p => p.systemId === homeworld.systemId && p.kind !== 'star')
+      homeSystemMajority = systemPlanets.length > 0 && systemPlanets.every(p => p.owner === player.id)
+    }
+
     player.research.empireState.planetsControlled = owned.filter(p => p.kind !== 'star').length
     player.research.empireState.starsControlled = ownedStars.length
     player.research.empireState.dysonStages = dysonStages
+    player.research.empireState.homeSystemMajority = homeSystemMajority
+    player.research.empireState.galaxyStarFraction = galaxyStarFraction(snapshot, player.id)
   }
 }
 

@@ -192,7 +192,8 @@
           "home-system": "Heimsystem-Mehrheit",
           "intel": "{level}-Intel",
           "stars": "1 Stern erobert | {count} Sterne erobert",
-          "dyson": "Dyson-Sphäre Stufe {count}"
+          "dyson": "Dyson-Sphäre Stufe {count}",
+          "galaxy-stars": "{percent}% der Sterne deiner Galaxie"
         }
       },
       "locked": {
@@ -204,7 +205,8 @@
         "requires-home-system": "Benötigt Heimsystem-Mehrheit",
         "requires-intel": "Benötigt Intel-Stufe {level}",
         "requires-stars": "Benötigt 1 eroberten Stern | Benötigt {count} eroberte Sterne",
-        "requires-dyson": "Benötigt Dyson-Sphäre Stufe {count}"
+        "requires-dyson": "Benötigt Dyson-Sphäre Stufe {count}",
+        "requires-galaxy-stars": "Benötigt {percent}% der Sterne deiner Galaxie"
       },
       "techs": {
         "bootstrapped-ai-core": {

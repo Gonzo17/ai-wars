@@ -25,6 +25,8 @@ export interface TechDef {
 }
 
 export interface EmpireRequirement {
+  /** Minimal early "you've colonized once" floor — kept ONLY for the first gate. The
+   *  bigger mid/late territory gates use `galaxyStarFraction` instead. */
   planetsControlled?: number
   homeSystemMajority?: boolean
   intelLevel?: 'low' | 'medium' | 'high'
@@ -32,6 +34,8 @@ export interface EmpireRequirement {
   starsControlled?: number
   /** Highest Dyson-sphere stage built on any owned star. */
   dysonStages?: number
+  /** Share (0..1) of the player's OWN home-galaxy stars they must hold (expansion gate). */
+  galaxyStarFraction?: number
 }
 
 export interface AscensionGateDef {
@@ -56,6 +60,8 @@ export interface PlayerResearchState {
     intelLevel: 'low' | 'medium' | 'high'
     starsControlled: number
     dysonStages: number
+    /** Share (0..1) of the player's home-galaxy stars currently held. */
+    galaxyStarFraction: number
   }
   completedTechIds: string[]
   activeResearch?: ActiveResearch
