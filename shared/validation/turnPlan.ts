@@ -5,6 +5,7 @@ import { getProjectDef } from '../defs/projects'
 import type { StrategicCosts } from '../defs/production'
 import { findDistrictNode } from '../defs/districts'
 import { hasResearchDistrict } from '../utils/districts'
+import { terrainAllows } from '../defs/terrain'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
 import { calculateResourceProduction } from '../utils/economy'
@@ -178,6 +179,10 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
             }
             if (dDef.zone !== 'any' && slot.zone !== dDef.zone) {
               errors.push({ code: 'INVALID_COMMAND', message: 'District not allowed in this zone', path: itemPath })
+              continue
+            }
+            if (slot.zone === 'surface' && !terrainAllows(slot.terrain, dDef.type)) {
+              errors.push({ code: 'INVALID_COMMAND', message: 'District not allowed on this terrain', path: itemPath })
               continue
             }
             if (slot.districtType && slot.districtType !== dDef.type) {

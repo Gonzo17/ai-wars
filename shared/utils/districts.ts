@@ -1,6 +1,7 @@
 import type { BuildingId, Planet, ResearchId } from '../types/game'
 import type { DistrictType, NodeCost, NodeOutput, SlotZonePlacement } from '../types/districts'
 import { DISTRICT_DEFS, districtsForPlanetType } from '../defs/districts'
+import { terrainAllows } from '../defs/terrain'
 
 /**
  * A district node the player could queue right now on a planet, with the slot(s) it
@@ -34,11 +35,14 @@ export function hasResearchDistrict(planets: Planet[]): boolean {
     && p.slots.some(s => s.districtType === 'research' && (s.nodes?.length ?? 0) > 0))
 }
 
-function emptySlotsForZone(planet: Planet, zone: SlotZonePlacement): number[] {
+/** Empty slots of the right zone where `type` is allowed (terrain doesn't forbid it). */
+function emptySlotsForZone(planet: Planet, zone: SlotZonePlacement, type: DistrictType): number[] {
   const out: number[] = []
   planet.slots.forEach((slot, i) => {
     const empty = !slot.buildingId && !slot.districtType && !(slot.nodes?.length)
-    if (empty && (zone === 'any' || slot.zone === zone)) out.push(i)
+    const zoneOk = zone === 'any' || slot.zone === zone
+    const terrainOk = slot.zone !== 'surface' || terrainAllows(slot.terrain, type)
+    if (empty && zoneOk && terrainOk) out.push(i)
   })
   return out
 }
@@ -79,7 +83,7 @@ export function buildableDistrictNodes(
       if (existingIndex < 0) {
         // No district of this type yet — only the base node can open one.
         if (!isBase) continue
-        validSlots = emptySlotsForZone(planet, def.zone)
+        validSlots = emptySlotsForZone(planet, def.zone, def.type)
       } else {
         const built = chosenNodes(planet, existingIndex)
         if (built.includes(node.id)) continue // already built / in progress
@@ -164,7 +168,7 @@ export function planetDistrictCatalog(
     const inProgress = slot?.isConstructing && slot.buildingId ? slot.buildingId : null
     const chosen = new Set<string>([...built, ...(inProgress ? [inProgress] : [])])
     const available = def.type === 'research' || researchEstablished
-    const foundSlots = founded ? [] : emptySlotsForZone(planet, def.zone)
+    const foundSlots = founded ? [] : emptySlotsForZone(planet, def.zone, def.type)
 
     const nodes: CatalogNode[] = def.tree.map((node) => {
       const isBase = node.prereqIds.length === 0

@@ -1,4 +1,4 @@
-import type { BuildingId, PlanetSlotData, ResourceNodeType } from './game'
+import type { BuildingId, PlanetSlotData, ResourceNodeType, TerrainType } from './game'
 
 /** Hex-grid axial coordinates (cube coords where s = -q - r) */
 export interface HexCoord {
@@ -163,7 +163,8 @@ export const HEX_SLOT_COORDS = SURFACE_SLOT_COORDS
 export function createPlanetSlots(
   surfaceCount: number = SURFACE_SLOT_COUNT,
   orbitCount: number = ORBITAL_SLOT_COUNT,
-  resourceNodes: Map<number, ResourceNodeType> = new Map()
+  resourceNodes: Map<number, ResourceNodeType> = new Map(),
+  terrains: Map<number, TerrainType> = new Map()
 ): PlanetSlotData[] {
   const slots: PlanetSlotData[] = []
 
@@ -171,6 +172,7 @@ export function createPlanetSlots(
     slots.push({
       index: i,
       zone: 'surface',
+      terrain: terrains.get(i) ?? 'plains',
       buildingId: null,
       buildingLevel: 0,
       isConstructing: false,

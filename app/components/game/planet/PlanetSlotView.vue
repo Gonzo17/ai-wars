@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { BuildingId, Planet, ResourceNodeType } from '~~/shared/types/game'
+import type { BuildingId, Planet, ResourceNodeType, TerrainType } from '~~/shared/types/game'
 import type { PlanetSlot, SlotZone, PlanetSizeKey } from '~~/shared/types/planetSlots'
 import {
   computeAdjacencyBonuses,
@@ -9,6 +9,7 @@ import { activeSynergies } from '~~/shared/utils/synergies'
 import { DISTRICT_ICONS } from '~~/shared/utils/districts'
 import { DISTRICT_DEFS, findDistrictNode } from '~~/shared/defs/districts'
 import { getProjectDef } from '~~/shared/defs/projects'
+import { TERRAIN_ICONS, terrainModifier } from '~~/shared/defs/terrain'
 import type { DistrictType } from '~~/shared/types/districts'
 
 interface BuildCosts {
@@ -82,7 +83,7 @@ interface PlanetData {
   systemId: string
   systemName: string
   productionPerRound: number
-  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, districtType?: string | null, nodes?: string[] }>
+  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, terrain?: string | null, districtType?: string | null, nodes?: string[] }>
   buildQueue: QueueEntry[]
   stationedUnits: Array<{ unitDefId: string, count: number }>
 }
@@ -209,13 +210,15 @@ type RenderSlot = PlanetSlot & {
   queueIndex?: number
   districtType?: string | null
   builtNodes?: string[]
+  terrain?: TerrainType | null
 }
 
 const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | null): RenderSlot => {
   const serverSlot = props.planet.slots[index]
   const districtType = serverSlot?.districtType ?? null
   const builtNodes = serverSlot?.nodes ?? []
-  const base = { index, coord: surfaceCoords.value[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, builtNodes }
+  const terrain = (serverSlot?.terrain ?? null) as TerrainType | null
+  const base = { index, coord: surfaceCoords.value[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, builtNodes, terrain }
 
   // A node currently building (district node or megastructure).
   if (serverSlot?.buildingId && serverSlot.isConstructing) {
@@ -372,17 +375,33 @@ const previewSynergies = (buildingId: string, slotIndex: number): string[] => {
 const previewHasOreBonus = (buildingId: string, slotIndex: number): boolean =>
   computeAdjacencyBonuses(slotIndex, buildingId as BuildingId, surfaceSlots.value).length > 0
 
+// ── Terrain helpers ───────────────────────────────────────────────────
+const terrainName = (terrain?: TerrainType | null) => {
+  if (!terrain) return ''
+  const key = `game.terrain.${terrain}`
+  return t(key) === key ? terrain : t(key)
+}
+const getTerrainIcon = (terrain?: TerrainType | null) => (terrain ? TERRAIN_ICONS[terrain] : '')
+const districtTypeOfNode = (nodeId: string): DistrictType | null =>
+  findDistrictNode(nodeId as BuildingId)?.district.type ?? null
+/** Signed percentage label for a terrain multiplier (e.g. +30% / −30%), or '' for ×1. */
+const terrainModLabel = (mod: number) => (mod === 1 ? '' : `${mod > 1 ? '+' : '−'}${Math.round(Math.abs(mod - 1) * 100)}%`)
+
 // Base-yield + bonus preview shown while hovering a valid placement target.
 const hoverPreview = computed(() => {
   const node = placementNode.value
   const index = hoveredSlotIndex.value
   if (!node || index === null || !validPlacementSlots.value.has(index)) return null
   const slot = allSlots.value.find(s => s.index === index)
+  const dType = districtTypeOfNode(node.id)
+  const terrain = (slot?.zone === 'surface' ? slot?.terrain : null) ?? null
+  const mod = (terrain && dType) ? terrainModifier(terrain, dType) : 1
   return {
     name: node.name,
     yields: node.yields,
     synergies: slot?.zone === 'surface' ? previewSynergies(node.id, index) : [],
-    oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(node.id, index) : false
+    oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(node.id, index) : false,
+    terrain: terrain ? { name: terrainName(terrain), label: terrainModLabel(mod), good: mod > 1 } : null
   }
 })
 
@@ -409,19 +428,21 @@ const slotTooltip = computed(() => {
   const districtType = slot.districtType ?? null
   const built = slot.nodes ?? []
   const constructing = slot.isConstructing && slot.buildingId ? slot.buildingId : null
+  const terrain = slot.zone === 'surface' ? terrainName(slot.terrain as TerrainType | null) : ''
 
   if (districtType && (built.length || constructing)) {
     const dDef = DISTRICT_DEFS[districtType as DistrictType]
     const weight = dDef?.weights?.[props.planet.type as keyof typeof dDef.weights] ?? 1
+    const tMod = terrainModifier(slot.terrain as TerrainType | null, districtType as DistrictType)
     const totals = { energy: 0, matter: 0, research: 0, production: 0 }
     let upkeep = 0
     const nodes = built.map((id) => {
       const found = findDistrictNode(id as BuildingId)
       const out = found?.node.output ?? {}
-      totals.energy += Math.round((out.energy ?? 0) * weight)
-      totals.matter += Math.round((out.matter ?? 0) * weight)
-      totals.research += Math.round((out.research ?? 0) * weight)
-      totals.production += out.production ?? 0
+      totals.energy += Math.round((out.energy ?? 0) * weight * tMod)
+      totals.matter += Math.round((out.matter ?? 0) * weight * tMod)
+      totals.research += Math.round((out.research ?? 0) * weight * tMod)
+      totals.production += Math.round((out.production ?? 0) * tMod)
       upkeep += found?.node.energyUpkeep ?? 0
       return { name: nodeName(id), building: false }
     })
@@ -429,11 +450,15 @@ const slotTooltip = computed(() => {
     const outputs = (['energy', 'matter', 'research', 'production'] as const)
       .filter(k => totals[k] > 0)
       .map(k => ({ icon: OUTPUT_ICONS[k], amount: totals[k] }))
-    return { title: getDistrictName(districtType), nodes, outputs, upkeep }
+    return { title: getDistrictName(districtType), terrain, nodes, outputs, upkeep }
   }
 
   if (slot.buildingId && !slot.isConstructing) {
-    return { title: nodeName(slot.buildingId), nodes: [], outputs: [], upkeep: 0 }
+    return { title: nodeName(slot.buildingId), terrain, nodes: [], outputs: [], upkeep: 0 }
+  }
+  // Empty surface slot — still show its terrain so the player can plan placement.
+  if (terrain) {
+    return { title: terrain, terrain: '', nodes: [], outputs: [], upkeep: 0 }
   }
   return null
 })
@@ -714,6 +739,16 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
                   class="w-4 h-4 text-amber-400/80"
                 />
               </div>
+              <!-- Terrain marker (empty surface slots) -->
+              <div
+                v-if="slotPos.state === 'empty' && slotPos.terrain"
+                class="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none"
+              >
+                <UIcon
+                  :name="getTerrainIcon(slotPos.terrain)"
+                  class="w-3.5 h-3.5 text-neutral-400/70"
+                />
+              </div>
               <!-- Built / building district: icon + the buildings inside it -->
               <div
                 v-if="slotPos.districtType || ((slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId)"
@@ -853,6 +888,21 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
                   {{ $t('game.slots.ore-bonus-badge') }}
                 </UBadge>
               </div>
+              <!-- Terrain effect for this district on this slot -->
+              <div
+                v-if="hoverPreview.terrain"
+                class="mt-1 flex items-center gap-1 text-[11px]"
+              >
+                <UIcon
+                  name="i-lucide-globe"
+                  class="w-3 h-3 text-neutral-400"
+                />
+                <span class="text-neutral-300">{{ hoverPreview.terrain.name }}</span>
+                <span
+                  v-if="hoverPreview.terrain.label"
+                  :class="hoverPreview.terrain.good ? 'text-success-300' : 'text-critical-300'"
+                >{{ hoverPreview.terrain.label }}</span>
+              </div>
             </div>
           </Transition>
 
@@ -865,6 +915,15 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
             >
               <p class="font-semibold text-neutral-100 mb-1">
                 {{ slotTooltip.title }}
+              </p>
+              <p
+                v-if="slotTooltip.terrain"
+                class="flex items-center gap-1 text-[11px] text-neutral-400 mb-1"
+              >
+                <UIcon
+                  name="i-lucide-globe"
+                  class="w-3 h-3"
+                />{{ slotTooltip.terrain }}
               </p>
               <ul
                 v-if="slotTooltip.nodes.length"

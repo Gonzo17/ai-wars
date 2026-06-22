@@ -113,4 +113,30 @@ describe('district validation', () => {
     const errs = validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [building(2, 'bld:mining-facility')]))
     expect(errs.some(e => e.message === 'District not available on this planet type')).toBe(true)
   })
+
+  it('terrain forbids a research district on mountains but allows it on plains', () => {
+    const snap = initialState([U1, U2], 1)
+    clearHomeBuildings(snap)
+    setRich(getPlayer(snap, U1))
+    const planet = homePlanet(snap)
+    planet.slots[3]!.terrain = 'mountains'
+    planet.slots[4]!.terrain = 'plains'
+
+    const onMountain = validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [building(3, 'bld:data-center')]))
+    expect(onMountain.some(e => e.message === 'District not allowed on this terrain')).toBe(true)
+
+    expect(validateTurnPlan(snap, toPlayerId(U1), queueCmd(HOME, [building(4, 'bld:data-center')]))).toHaveLength(0)
+  })
+
+  it('scales a district output by its terrain (energy on volcanic ×1.4)', () => {
+    const snap = initialState([U1, U2], 1)
+    clearHomeBuildings(snap)
+    const planet = homePlanet(snap)
+    planet.slots[0]!.terrain = 'volcanic'
+    planet.slots[0]!.districtType = 'energy'
+    planet.slots[0]!.nodes = ['bld:solar-array' as never]
+
+    // solar 20 × volcanic energy 1.4 = 28
+    expect(calculateResourceProduction(snap.planets, toPlayerId(U1)).energy).toBe(28)
+  })
 })

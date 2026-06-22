@@ -3,7 +3,7 @@ import {
   TECH_DEFS
 } from '~~/shared/defs/research-tree'
 import { calculateResourceProduction } from '~~/shared/utils/economy'
-import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType } from '~~/shared/types/game'
+import type { BuildingId, GameSnapshot, Galaxy, Planet, PlanetId, PlanetSlotData, PlayerSnapshot, ResearchId, Resource, SolarSystem, SolarSystemId, ResourceNodeType, TerrainType } from '~~/shared/types/game'
 import type { PlayerResearchState } from '~~/shared/types/research'
 import { SIZE_SLOTS, createPlanetSlots, createStarSlots, ORBITAL_BUILDING_IDS } from '~~/shared/types/planetSlots'
 import { STRATEGIC_RESOURCES } from '~~/shared/defs/strategicResources'
@@ -36,13 +36,40 @@ function placeBuilding(slots: PlanetSlotData[], id: BuildingId, level: number): 
   }
 }
 
+/** Stable per-string hash so a given planet always gets the same terrain layout. */
+function hashStr(s: string): number {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0
+  return h
+}
+
+const TERRAIN_POOL: TerrainType[] = ['plains', 'mountains', 'volcanic', 'tundra']
+
+/**
+ * Terrain per surface slot, varied by planet (hash of its id). Slot 0 and resource-node
+ * slots are kept as plains so the mandatory data center and extractors always have a legal
+ * home — terrain forbids some districts, and we never want a soft-lock.
+ */
+function assignTerrains(planetId: string, surfaceCount: number, resourceNodes: Map<number, ResourceNodeType>): Map<number, TerrainType> {
+  const map = new Map<number, TerrainType>()
+  for (let i = 0; i < surfaceCount; i++) {
+    if (i === 0 || resourceNodes.has(i)) {
+      map.set(i, 'plains')
+      continue
+    }
+    map.set(i, TERRAIN_POOL[hashStr(`${planetId}:${i}`) % TERRAIN_POOL.length]!)
+  }
+  return map
+}
+
 function makeSlots(
+  planetId: string,
   buildings: Array<{ id: BuildingId, level: number }>,
   resourceNodes: Map<number, ResourceNodeType> = new Map(),
   size: Planet['size'] = 'medium'
 ): PlanetSlotData[] {
   const { surface, orbit } = SIZE_SLOTS[size]
-  const slots = createPlanetSlots(surface, orbit, resourceNodes)
+  const slots = createPlanetSlots(surface, orbit, resourceNodes, assignTerrains(planetId, surface, resourceNodes))
   for (const { id, level } of buildings) {
     placeBuilding(slots, id, level)
   }
@@ -206,7 +233,7 @@ function makeNeutralPlanet(
     owner: 'unclaimed',
     type,
     size,
-    slots: makeSlots([], new Map([[2, nodeType]]), size),
+    slots: makeSlots(id, [], new Map([[2, nodeType]]), size),
     queues: { production: [] },
     progressMemory: {},
     productionCarryover: 0,
@@ -282,8 +309,8 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
           isHomeworld: true,
           // Empty start: nothing pre-built. The robots arrive and build the first
           // district; every slot is a turn-1 choice. The ore node on slot 2 rewards a
-          // Matter district. (Units wait on the 2b Shipyard district.)
-          slots: makeSlots([], new Map([[2, 'ore']]), TYPE_SIZE.terrestrial)
+          // Matter district. (Units wait on the Shipyard district.)
+          slots: makeSlots(template.primaryId, [], new Map([[2, 'ore']]), TYPE_SIZE.terrestrial)
         }
       }
     )

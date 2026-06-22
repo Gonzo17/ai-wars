@@ -1,5 +1,6 @@
 import { getBuildingDef } from '../defs/production'
 import { DISTRICT_DEFS } from '../defs/districts'
+import { terrainModifier } from '../defs/terrain'
 import type { BuildingId, Planet } from '../types/game'
 import { getAdjacentSlotIndices } from '../types/planetSlots'
 
@@ -106,11 +107,15 @@ function districtSlotOutput(planet: Planet, slotIndex: number): SlotOutput {
     research = research * (1 + COMPUTE_UPLINK_PER_ENERGY_DISTRICT * uplink)
   }
 
+  // Terrain bonus/malus for this district type (the district produces one main resource,
+  // so a single multiplier scales the right output).
+  const terrain = terrainModifier(slot.terrain, slot.districtType)
+
   return {
-    energy: Math.round(energy * weight),
-    minerals: Math.round(minerals * weight),
+    energy: Math.round(energy * weight * terrain),
+    minerals: Math.round(minerals * weight * terrain),
     rare: 0,
-    research: Math.round(research * weight)
+    research: Math.round(research * weight * terrain)
   }
 }
 
@@ -123,7 +128,7 @@ export function districtSlotProduction(planet: Planet, slotIndex: number): numbe
   for (const nodeId of slot.nodes) {
     production += def.tree.find(n => n.id === nodeId)?.output?.production ?? 0
   }
-  return production
+  return Math.round(production * terrainModifier(slot.terrain, slot.districtType))
 }
 
 /** Per-turn energy upkeep a district slot draws (sum of its nodes' energyUpkeep; base nodes are free). */

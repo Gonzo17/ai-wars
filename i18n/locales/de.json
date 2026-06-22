@@ -481,6 +481,12 @@
       "shipyard": "Werft",
       "defense": "Verteidigung"
     },
+    "terrain": {
+      "plains": "Ebene",
+      "mountains": "Gebirge",
+      "volcanic": "Vulkanisch",
+      "tundra": "Tundra"
+    },
     "projects": {
       "research-initiative": {
         "name": "Forschungsinitiative",

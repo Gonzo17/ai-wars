@@ -481,6 +481,12 @@
       "shipyard": "Shipyard",
       "defense": "Defense"
     },
+    "terrain": {
+      "plains": "Plains",
+      "mountains": "Mountains",
+      "volcanic": "Volcanic",
+      "tundra": "Tundra"
+    },
     "projects": {
       "research-initiative": {
         "name": "Research Initiative",

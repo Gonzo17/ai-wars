@@ -51,9 +51,14 @@ export type PlanetId = Id<'pl'>
  */
 export type ResourceNodeType = 'ore' | 'exotic-matter' | 'antimatter'
 
+/** Surface terrain on a slot — gates which districts can be built there and how well. */
+export type TerrainType = 'plains' | 'mountains' | 'volcanic' | 'tundra'
+
 export interface PlanetSlotData {
   index: number
   zone: 'surface' | 'orbital'
+  /** Surface terrain (absent on orbital slots) — gates/scales districts built here. */
+  terrain?: TerrainType | null
   /**
    * In-progress build (a district node OR a megastructure), or a completed
    * megastructure. For a district slot this is the node currently constructing

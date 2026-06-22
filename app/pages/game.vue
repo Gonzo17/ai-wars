@@ -236,7 +236,7 @@ interface GamePlanet {
   sizeLabel: string
   productionPerRound: number
   buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
-  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, districtType?: string | null, nodes?: string[] }>
+  slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, terrain?: string | null, districtType?: string | null, nodes?: string[] }>
   buildQueue: Array<{ id: string, kind: 'building' | 'unit' | 'project', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
   shipyardQueue: Array<{ id: string }>
   stationedUnits: Array<{ unitDefId: string, count: number }>
@@ -1104,6 +1104,7 @@ const toPlanetView = (planet: Planet): GamePlanet => ({
     constructionTimeLeft: s.constructionTimeLeft,
     zone: s.zone,
     resourceNode: s.resourceNode,
+    terrain: s.terrain ?? null,
     districtType: s.districtType ?? null,
     nodes: s.nodes ?? []
   })),
