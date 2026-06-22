@@ -304,6 +304,8 @@ interface DistrictNode {
   slotIndex: number | null
   foundSlots: number[]
   lockedByTechName: string | null
+  /** Finished on this planet last turn → flagged in the catalog. */
+  justCompleted?: boolean
 }
 interface DistrictGroup {
   type: string
@@ -859,6 +861,34 @@ const nodeYields = (output: { energy?: number, matter?: number, research?: numbe
 const projectNameKey = (id: string) => `game.projects.${id.replace('proj:', '')}.name`
 const projectDescKey = (id: string) => `game.projects.${id.replace('proj:', '')}.description`
 
+// Things finished on the OPEN planet last turn → flagged in the catalog so the player can
+// see what just got built. Derived from the viewer's completion events.
+const CATALOG_PREFIX: Record<string, string> = { buildings: 'bld:', units: 'unit:', projects: 'proj:' }
+const idFromNameKey = (key?: string | number): string | null => {
+  if (typeof key !== 'string') return null
+  const parts = key.split('.') // game.<category>.<slug>.name
+  const prefix = CATALOG_PREFIX[parts[1] ?? '']
+  const slug = parts.slice(2, -1).join('.')
+  return prefix && slug ? prefix + slug : null
+}
+const lastTurnCompletions = computed((): Set<string> => {
+  const set = new Set<string>()
+  const planet = selectedRawPlanet.value
+  if (!planet || !snapshot.value || !myPlayerId.value) return set
+  const me = snapshot.value.players.find(p => p.id === myPlayerId.value)
+  const lastTurn = gameTurn.value - 1
+  for (const e of me?.events ?? []) {
+    if (e.year !== lastTurn || e.relatedEntityId !== planet.id) continue
+    if (e.type !== 'building-complete' && e.type !== 'ship-complete') continue
+    const id = idFromNameKey(e.titleParams?.name)
+    if (id) set.add(id)
+  }
+  return set
+})
+
+// Only buildable-or-present items are shown (research-locked / not-yet-unlocked are hidden).
+const VISIBLE_NODE_STATES = new Set(['available', 'built', 'building'])
+
 const planetDistrictCatalogView = computed((): DistrictGroup[] => {
   const planet = selectedRawPlanet.value
   if (!planet || planet.kind === 'star') return []
@@ -933,6 +963,11 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
       }
     })
 
+    const completions = lastTurnCompletions.value
+    const nodes = [...buildingNodes, ...unitNodes, ...projectNodes]
+      .filter(n => VISIBLE_NODE_STATES.has(n.state)) // hide research-locked / not-yet-unlocked
+      .map(n => ({ ...n, justCompleted: completions.has(n.id) }))
+
     return {
       type: group.type,
       name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
@@ -940,9 +975,9 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
       founded: group.founded,
       operational: group.operational,
       available: group.available,
-      nodes: [...buildingNodes, ...unitNodes, ...projectNodes]
+      nodes
     }
-  })
+  }).filter(group => group.nodes.length > 0) // drop districts with nothing to show
 })
 
 const unitCatalog = computed((): UnitDefinition[] => {

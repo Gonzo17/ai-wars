@@ -34,6 +34,7 @@ interface DistrictNode {
   slotIndex: number | null
   foundSlots: number[]
   lockedByTechName: string | null
+  justCompleted?: boolean
 }
 
 interface DistrictGroup {
@@ -141,8 +142,29 @@ const onKeydown = (e: KeyboardEvent) => {
     cancelPlacement()
   }
 }
-onMounted(() => window.addEventListener('keydown', onKeydown, true))
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown, true)
+  try {
+    minimizedByPlanet.value = JSON.parse(localStorage.getItem(MIN_KEY) ?? '{}')
+  } catch { /* ignore malformed storage */ }
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
+
+// ── Minimised districts (remembered locally per planet, so the view persists) ──
+const MIN_KEY = 'aoi:min-districts'
+const minimizedByPlanet = ref<Record<string, string[]>>({})
+const isMinimized = (type: string) => (minimizedByPlanet.value[props.planet.id] ?? []).includes(type)
+const toggleMinimize = (type: string) => {
+  const set = new Set(minimizedByPlanet.value[props.planet.id] ?? [])
+  if (set.has(type)) set.delete(type)
+  else set.add(type)
+  minimizedByPlanet.value = { ...minimizedByPlanet.value, [props.planet.id]: [...set] }
+  try {
+    localStorage.setItem(MIN_KEY, JSON.stringify(minimizedByPlanet.value))
+  } catch { /* ignore (private mode etc.) */ }
+}
+/** A minimised district flags an exclamation mark when it has anything buildable. */
+const groupHasBuildable = (group: DistrictGroup) => group.nodes.some(n => n.state === 'available')
 
 // ── Flat node lookup (queue + slot rendering need names/icons) ────────
 const allNodes = computed(() => props.districtCatalog.flatMap(g => g.nodes))
@@ -500,23 +522,37 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
           class="rounded-lg border"
           :class="group.founded ? 'border-primary-700/40 bg-primary-950/20' : 'border-neutral-800 bg-neutral-900/30'"
         >
-          <!-- District header -->
-          <div class="flex items-center gap-2 px-2.5 py-1.5">
+          <!-- District header (click to minimise → keeps late-game lists tidy) -->
+          <button
+            type="button"
+            :data-testid="`district-header-${group.type}`"
+            class="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-neutral-800/40 rounded-lg transition"
+            @click="toggleMinimize(group.type)"
+          >
             <UIcon
               :name="group.icon"
               class="w-4 h-4 shrink-0"
               :class="group.founded ? 'text-primary-300' : 'text-neutral-400'"
             />
             <span class="text-sm font-semibold text-neutral-100">{{ group.name }}</span>
+            <!-- Minimised + something buildable → exclamation -->
             <UIcon
-              v-if="!group.available"
-              name="i-lucide-lock"
-              class="ml-auto w-3.5 h-3.5 text-neutral-600"
+              v-if="isMinimized(group.type) && groupHasBuildable(group)"
+              name="i-lucide-circle-alert"
+              class="ml-auto w-4 h-4 text-warning-300"
             />
-          </div>
+            <UIcon
+              :name="isMinimized(group.type) ? 'i-lucide-chevron-right' : 'i-lucide-chevron-down'"
+              class="w-3.5 h-3.5 text-neutral-500"
+              :class="(isMinimized(group.type) && groupHasBuildable(group)) ? 'ml-1' : 'ml-auto'"
+            />
+          </button>
 
           <!-- Buildings, units and projects inside the district -->
-          <div class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1">
+          <div
+            v-if="!isMinimized(group.type)"
+            class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1"
+          >
             <GameBuildListRow
               v-for="n in group.nodes"
               :key="n.id"
@@ -526,6 +562,7 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
               :rounds="estimateRounds(n.productionCost)"
               :disabled="!canQueueNode(n)"
               :selected="placementNodeId === n.id"
+              :just-completed="n.justCompleted"
               :accent="n.kind === 'unit' ? 'sky' : n.kind === 'project' ? 'amber' : 'primary'"
               :description="n.description"
               :yields="n.yields"

@@ -65,11 +65,13 @@ const galaxyImage = (id: string) => `/galaxies/${hashId(id) % GALAXY_VARIANTS}.w
 const systemImage = (id: string) => `/systems/${hashId(id) % SYSTEM_VARIANTS}.webp`
 const sunImage = '/sun.webp'
 
+// Sizes exaggerate the differences between planet classes so they read at a glance:
+// the smallest stays small, medium a touch bigger, large clearly bigger.
 const planetSizeMap: Record<PlanetSize, number> = {
   small: 56,
-  medium: 76,
-  large: 96,
-  huge: 124
+  medium: 84,
+  large: 120,
+  huge: 140
 }
 
 const sizeFromChildren = (childCount: number, base: number, max: number) => {
@@ -141,7 +143,7 @@ const nodes = computed<MapNode[]>(() => {
     name: t('game.map.sun'),
     type: 'sun',
     location: { x: 50, y: 50 },
-    sizePx: 180,
+    sizePx: 208,
     image: sunImage
   }
 

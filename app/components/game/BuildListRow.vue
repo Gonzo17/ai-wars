@@ -21,6 +21,8 @@ const props = defineProps<{
   hint?: string | null
   /** Already built / building — show as completed (check) rather than dimmed-disabled. */
   done?: boolean
+  /** Finished on this planet last turn — highlight with a "just completed" marker. */
+  justCompleted?: boolean
 }>()
 
 const emit = defineEmits<{ select: [] }>()
@@ -63,9 +65,10 @@ const closeTip = () => {
     :data-testid="testid"
     class="group relative flex w-full items-center gap-3 rounded-md border px-2 py-2 text-left transition"
     :class="[
-      done ? 'border-primary-700/40 bg-primary-950/30 cursor-default'
-      : selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
-      disabled && !done ? 'opacity-40 cursor-not-allowed' : ''
+      justCompleted ? 'border-success-500/50 bg-success-950/20'
+      : done ? 'border-primary-700/40 bg-primary-950/30 cursor-default'
+        : selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
+      disabled && !done && !justCompleted ? 'opacity-40 cursor-not-allowed' : ''
     ]"
     :disabled="disabled"
     @click="emit('select')"
@@ -88,7 +91,12 @@ const closeTip = () => {
       {{ name }}
     </span>
     <UIcon
-      v-if="done"
+      v-if="justCompleted"
+      name="i-lucide-circle-check-big"
+      class="h-4 w-4 shrink-0 text-success-300"
+    />
+    <UIcon
+      v-else-if="done"
       name="i-lucide-check"
       class="h-4 w-4 shrink-0 text-primary-300"
     />
