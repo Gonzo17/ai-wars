@@ -8,6 +8,7 @@ import {
 import { activeSynergies } from '~~/shared/utils/synergies'
 import { DISTRICT_ICONS } from '~~/shared/utils/districts'
 import { DISTRICT_DEFS, findDistrictNode } from '~~/shared/defs/districts'
+import { getProjectDef } from '~~/shared/defs/projects'
 import type { DistrictType } from '~~/shared/types/districts'
 
 interface BuildCosts {
@@ -19,6 +20,7 @@ interface BuildCosts {
 type DistrictNodeState = 'built' | 'building' | 'available' | 'locked' | 'blocked'
 
 interface DistrictNode {
+  kind: 'building' | 'unit' | 'project'
   id: string
   name: string
   description: string
@@ -39,6 +41,7 @@ interface DistrictGroup {
   name: string
   icon: string
   founded: boolean
+  operational: boolean
   available: boolean
   nodes: DistrictNode[]
 }
@@ -59,7 +62,7 @@ interface UnitDefinition {
 
 interface QueueEntry {
   id: string
-  kind: 'building' | 'unit'
+  kind: 'building' | 'unit' | 'project'
   productionSpent: number
   resourcePaid: boolean
   slotIndex?: number
@@ -102,7 +105,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'close': []
-  'queue-build': [planetId: string, buildId: string, kind: 'building' | 'unit', slotIndex?: number]
+  'queue-build': [planetId: string, buildId: string, kind: 'building' | 'unit' | 'project', slotIndex?: number]
   'remove-queue-item': [planetId: string, index: number]
   'reorder-queue': [planetId: string, from: number, to: number]
 }>()
@@ -117,8 +120,7 @@ const HEX_GAP = 6
 const ORBITAL_SLOT_SIZE = 42
 const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)'
 
-// ── Placement + catalog state ─────────────────────────────────────────
-const catalogTab = ref<'buildings' | 'units'>('buildings')
+// ── Placement state ───────────────────────────────────────────────────
 // The base node currently being placed (founding a district), or null.
 const placementNodeId = ref<string | null>(null)
 const hoveredSlotIndex = ref<number | null>(null)
@@ -131,7 +133,6 @@ const cancelPlacement = () => {
 watch(() => props.planet.id, () => {
   placementNodeId.value = null
   hoveredSlotIndex.value = null
-  catalogTab.value = 'buildings'
 })
 
 const onKeydown = (e: KeyboardEvent) => {
@@ -250,9 +251,7 @@ const orbitalPositions = computed(() =>
     return { ...slot, px: Math.cos(angle) * orbitalRingRadius.value, py: Math.sin(angle) * orbitalRingRadius.value }
   }))
 
-// ── Catalog ───────────────────────────────────────────────────────────
-const unitList = computed(() => props.unitCatalog.filter(u => !u.locked))
-
+// ── Catalog (one combined list; districts hold buildings, units and projects) ──
 const canAfford = (costs: BuildCosts): boolean => {
   if (!props.playerResources) return true
   return props.playerResources.energy >= costs.energy
@@ -282,11 +281,6 @@ const queueFull = computed(() => props.planet.buildQueue.length >= props.buildQu
 const canQueueNode = (n: DistrictNode) =>
   props.canBuild && n.state === 'available' && !queueFull.value && canAfford(n.resourceCosts) && canAffordStrategic(n.strategicCosts)
 
-const hasOrbitalDock = computed(() => props.planet.slots.some(s => s.buildingId === 'bld:orbital-dock' && !s.isConstructing))
-const canTrainUnit = (u: UnitDefinition) => (!u.requiresFacility || hasOrbitalDock.value)
-const canQueueUnit = (u: UnitDefinition) =>
-  props.canBuild && !u.locked && !queueFull.value && canTrainUnit(u) && canAfford(u.resourceCosts) && canAffordStrategic(u.strategicCosts)
-
 const productionPerRound = computed(() => props.planet.productionPerRound)
 const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
 
@@ -311,27 +305,21 @@ const nodeHint = (n: DistrictNode, founded: boolean): string | null => {
   return null
 }
 
-const unitHint = (u: UnitDefinition): string | null => {
-  if (!canTrainUnit(u)) return t('game.slots.tooltip-requires-dock')
-  if (!canAfford(u.resourceCosts) || !canAffordStrategic(u.strategicCosts)) return t('game.slots.tooltip-insufficient')
-  return null
-}
-
-// ── Node selection (found = placement; deeper = auto-build in district) ─
+// ── Node selection ────────────────────────────────────────────────────
+// Founding a district uses placement (pick a slot); buildings auto-build into their
+// district's slot; units and projects just queue.
 const selectNode = (n: DistrictNode) => {
   if (!canQueueNode(n)) return
-  if (n.isBase) {
-    // Founding a district → enter placement so the player picks the slot.
-    placementNodeId.value = placementNodeId.value === n.id ? null : n.id
+  if (n.kind === 'building') {
+    if (n.isBase) {
+      placementNodeId.value = placementNodeId.value === n.id ? null : n.id
+      return
+    }
+    if (n.slotIndex !== null) emit('queue-build', props.planet.id, n.id, 'building', n.slotIndex)
     return
   }
-  // A building inside an existing district just builds into that district's slot.
-  if (n.slotIndex !== null) emit('queue-build', props.planet.id, n.id, 'building', n.slotIndex)
-}
-
-const selectUnit = (u: UnitDefinition) => {
-  if (!canQueueUnit(u)) return
-  emit('queue-build', props.planet.id, u.id, 'unit')
+  // Unit or project — built from the district, no slot.
+  emit('queue-build', props.planet.id, n.id, n.kind)
 }
 
 // ── Placement (founding a district base only) ─────────────────────────
@@ -430,17 +418,30 @@ const slotTooltip = computed(() => {
 // ── Queue strip ───────────────────────────────────────────────────────
 const queueItems = computed(() =>
   props.planet.buildQueue.map((entry, index) => {
-    const isBuilding = entry.kind === 'building'
-    const def = isBuilding ? null : props.unitCatalog.find(u => u.id === entry.id)
-    const cost = isBuilding
-      ? ((findDistrictNode(entry.id as BuildingId)?.node.buildTime ?? 0) * 20)
-      : (def?.productionCost ?? 0)
+    let name = entry.id
+    let icon = 'i-lucide-hammer'
+    let cost = 0
+    if (entry.kind === 'building') {
+      name = nodeName(entry.id)
+      icon = nodeIcon(entry.id)
+      cost = (findDistrictNode(entry.id as BuildingId)?.node.buildTime ?? 0) * 20
+    } else if (entry.kind === 'project') {
+      const def = getProjectDef(entry.id)
+      name = nodeById.value.get(entry.id)?.name ?? entry.id
+      icon = def?.icon ?? 'i-lucide-sparkles'
+      cost = def?.productionCost ?? 0
+    } else {
+      const def = props.unitCatalog.find(u => u.id === entry.id)
+      name = def?.name ?? entry.id
+      icon = def?.icon ?? 'i-lucide-rocket'
+      cost = def?.productionCost ?? 0
+    }
     const progress = cost > 0 ? Math.min(100, Math.round((entry.productionSpent / cost) * 100)) : 0
     return {
       index,
       kind: entry.kind,
-      name: isBuilding ? nodeName(entry.id) : (def?.name ?? entry.id),
-      icon: isBuilding ? nodeIcon(entry.id) : (def?.icon ?? 'i-lucide-rocket'),
+      name,
+      icon,
       progress,
       roundsLeft: estimateRounds(Math.max(0, cost - entry.productionSpent)),
       isFront: index === 0
@@ -482,125 +483,64 @@ const slotBuiltIcons = (builtNodes: string[] | undefined) =>
       @click="emit('close')"
     />
 
-    <!-- ═══════ Catalog rail (owner only) ═══════ -->
+    <!-- ═══════ Catalog rail (owner only) — districts hold buildings/units/projects ═══ -->
     <aside
       v-if="canBuild"
       class="relative z-10 flex w-80 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/95"
     >
-      <div class="flex items-center gap-2 px-3 py-2 border-b border-neutral-800">
-        <button
-          type="button"
-          data-testid="build-list-tab-buildings"
-          class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
-          :class="catalogTab === 'buildings' ? 'bg-primary-900/50 text-primary-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
-          @click="catalogTab = 'buildings'"
-        >
-          {{ $t('game.slots.tab-buildings') }}
-        </button>
-        <button
-          type="button"
-          data-testid="build-list-tab-units"
-          class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
-          :class="catalogTab === 'units' ? 'bg-sky-900/50 text-sky-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
-          @click="catalogTab = 'units'"
-        >
-          {{ $t('game.slots.tab-units') }}
-        </button>
-      </div>
-
-      <p
-        v-if="catalogTab === 'buildings'"
-        class="px-3 pt-2 text-[11px] text-neutral-500"
-      >
+      <p class="px-3 pt-3 pb-1 text-[11px] text-neutral-500">
         {{ placementNodeId ? $t('game.slots.placement-hint') : $t('game.slots.pick-district-hint') }}
       </p>
 
       <div class="flex-1 overflow-y-auto p-2 space-y-2">
-        <!-- Districts (groups holding their buildings) -->
-        <template v-if="catalogTab === 'buildings'">
-          <div
-            v-for="group in districtCatalog"
-            :key="group.type"
-            :data-testid="`district-group-${group.type}`"
-            class="rounded-lg border"
-            :class="group.founded ? 'border-primary-700/40 bg-primary-950/20' : 'border-neutral-800 bg-neutral-900/30'"
-          >
-            <!-- District header -->
-            <div class="flex items-center gap-2 px-2.5 py-1.5">
-              <UIcon
-                :name="group.icon"
-                class="w-4 h-4 shrink-0"
-                :class="group.founded ? 'text-primary-300' : 'text-neutral-400'"
-              />
-              <span class="text-sm font-semibold text-neutral-100">{{ group.name }}</span>
-              <UBadge
-                v-if="group.founded"
-                color="primary"
-                variant="subtle"
-                size="xs"
-                class="ml-auto"
-              >
-                {{ $t('game.slots.district-built') }}
-              </UBadge>
-              <UIcon
-                v-else-if="!group.available"
-                name="i-lucide-lock"
-                class="ml-auto w-3.5 h-3.5 text-neutral-600"
-              />
-            </div>
-
-            <!-- Building nodes inside the district (the bracket) -->
-            <div class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1">
-              <GameBuildListRow
-                v-for="n in group.nodes"
-                :key="n.id"
-                :testid="`build-list-option-${n.id}`"
-                :name="n.isBase ? $t('game.slots.found-district') : n.name"
-                :icon="n.icon"
-                :rounds="estimateRounds(n.productionCost)"
-                :disabled="!canQueueNode(n)"
-                :selected="placementNodeId === n.id"
-                :done="n.state === 'built' || n.state === 'building'"
-                accent="primary"
-                :description="n.isBase ? n.name : n.description"
-                :yields="n.yields"
-                :costs="n.state === 'built' || n.state === 'building' ? [] : costLines(n.resourceCosts, n.strategicCosts)"
-                :hint="nodeHint(n, group.founded)"
-                @select="selectNode(n)"
-              />
-            </div>
+        <div
+          v-for="group in districtCatalog"
+          :key="group.type"
+          :data-testid="`district-group-${group.type}`"
+          class="rounded-lg border"
+          :class="group.founded ? 'border-primary-700/40 bg-primary-950/20' : 'border-neutral-800 bg-neutral-900/30'"
+        >
+          <!-- District header -->
+          <div class="flex items-center gap-2 px-2.5 py-1.5">
+            <UIcon
+              :name="group.icon"
+              class="w-4 h-4 shrink-0"
+              :class="group.founded ? 'text-primary-300' : 'text-neutral-400'"
+            />
+            <span class="text-sm font-semibold text-neutral-100">{{ group.name }}</span>
+            <UIcon
+              v-if="!group.available"
+              name="i-lucide-lock"
+              class="ml-auto w-3.5 h-3.5 text-neutral-600"
+            />
           </div>
-          <p
-            v-if="!districtCatalog.length"
-            class="px-2 py-4 text-center text-xs text-neutral-500"
-          >
-            {{ $t('game.slots.none-researched') }}
-          </p>
-        </template>
 
-        <!-- Units -->
-        <template v-else>
-          <GameBuildListRow
-            v-for="u in unitList"
-            :key="u.id"
-            :testid="`build-list-option-${u.id}`"
-            :name="u.name"
-            :icon="u.icon"
-            :rounds="estimateRounds(u.productionCost)"
-            :disabled="!canQueueUnit(u)"
-            accent="sky"
-            :description="u.role"
-            :costs="costLines(u.resourceCosts, u.strategicCosts)"
-            :hint="unitHint(u)"
-            @select="selectUnit(u)"
-          />
-          <p
-            v-if="!unitList.length"
-            class="px-2 py-4 text-center text-xs text-neutral-500"
-          >
-            {{ $t('game.slots.none-researched') }}
-          </p>
-        </template>
+          <!-- Buildings, units and projects inside the district -->
+          <div class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1">
+            <GameBuildListRow
+              v-for="n in group.nodes"
+              :key="n.id"
+              :testid="`build-list-option-${n.id}`"
+              :name="n.name"
+              :icon="n.icon"
+              :rounds="estimateRounds(n.productionCost)"
+              :disabled="!canQueueNode(n)"
+              :selected="placementNodeId === n.id"
+              :accent="n.kind === 'unit' ? 'sky' : n.kind === 'project' ? 'amber' : 'primary'"
+              :description="n.description"
+              :yields="n.yields"
+              :costs="costLines(n.resourceCosts, n.strategicCosts)"
+              :hint="nodeHint(n, group.operational)"
+              @select="selectNode(n)"
+            />
+          </div>
+        </div>
+        <p
+          v-if="!districtCatalog.length"
+          class="px-2 py-4 text-center text-xs text-neutral-500"
+        >
+          {{ $t('game.slots.none-researched') }}
+        </p>
       </div>
     </aside>
 

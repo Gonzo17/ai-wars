@@ -479,6 +479,20 @@
       "shipyard": "Werft",
       "defense": "Verteidigung"
     },
+    "projects": {
+      "research-initiative": {
+        "name": "Forschungsinitiative",
+        "description": "Produktion in das laufende Forschungsprojekt stecken."
+      },
+      "energy-reserve": {
+        "name": "Energiereserve",
+        "description": "Produktion in gespeicherte Energie umwandeln."
+      },
+      "matter-reserve": {
+        "name": "Materiereserve",
+        "description": "Produktion in gespeicherte Materie umwandeln."
+      }
+    },
     "buildings": {
       "power-relay": {
         "name": "Energierelais",

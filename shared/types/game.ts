@@ -83,6 +83,9 @@ export interface PlanetSlotData {
 export type ProductionQueueItem
   = | { kind: 'building', slotIndex: number, buildingId: BuildingId }
     | { kind: 'unit', unitId: UnitId, productionSpent: number }
+    // A repeatable project: consumes production (no resource cost) and yields a lump of
+    // a resource / research on completion. Progress travels with the item like a unit.
+    | { kind: 'project', projectId: ProjectId, productionSpent: number }
 
 export interface Planet {
   id: PlanetId
@@ -134,6 +137,8 @@ export interface Research {
   yearsRequired: number
   prerequisites: string[]
 }
+
+export type ProjectId = Id<'proj'>
 
 export type TravelStatus = 'idle' | 'en-route'
 

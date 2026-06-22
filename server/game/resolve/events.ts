@@ -1,9 +1,10 @@
 import type { GameEvent } from '~~/shared/types/events'
-import type { BuildingId, GameSnapshot, PlanetId, PlayerId, ResearchId, UnitId } from '~~/shared/types/game'
+import type { BuildingId, GameSnapshot, PlanetId, PlayerId, ProjectId, ResearchId, UnitId } from '~~/shared/types/game'
 
 /** i18n key helpers — entity id → translation key for event titles. */
 export const buildingNameKey = (buildingId: BuildingId) => `game.buildings.${buildingId.replace('bld:', '')}.name`
 export const unitNameKey = (unitId: UnitId) => `game.units.${unitId.replace('unit:', '')}.name`
+export const projectNameKey = (projectId: ProjectId) => `game.projects.${projectId.replace('proj:', '')}.name`
 export const techNameKey = (techId: ResearchId) => `game.research.techs.${techId.replace('tech:', '')}.name`
 
 export function getPlanetName(snapshot: GameSnapshot, planetId: PlanetId): string {

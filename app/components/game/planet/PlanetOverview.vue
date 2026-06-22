@@ -33,7 +33,7 @@ interface PlanetOverviewItem {
   size: string
   sizeLabel: string
   productionPerRound: number
-  buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean }>
+  buildQueue: Array<{ id: string, kind: 'building' | 'unit' | 'project', productionSpent: number, resourcePaid: boolean }>
 }
 
 const props = defineProps<{
@@ -51,13 +51,15 @@ const emit = defineEmits<{
 
 const productionPerRound = (planet: PlanetOverviewItem) => planet.productionPerRound
 
-const getDefinition = (kind: 'building' | 'unit', id: string) => {
+const getDefinition = (kind: 'building' | 'unit' | 'project', id: string) => {
   return kind === 'building'
     ? props.buildingCatalog.find(building => building.id === id)
-    : props.unitCatalog.find(unit => unit.id === id)
+    : kind === 'unit'
+      ? props.unitCatalog.find(unit => unit.id === id)
+      : undefined
 }
 
-const getProgressPercent = (planetId: string, entry: { id: string, kind: 'building' | 'unit', productionSpent: number }) => {
+const getProgressPercent = (planetId: string, entry: { id: string, kind: 'building' | 'unit' | 'project', productionSpent: number }) => {
   const saved = props.progressMemory[planetId]?.[entry.id]
   const spent = entry.productionSpent ?? saved?.productionSpent ?? 0
   const def = getDefinition(entry.kind, entry.id)

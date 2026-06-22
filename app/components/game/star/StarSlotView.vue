@@ -41,7 +41,7 @@ interface UnitDefinition {
 
 interface QueueEntry {
   id: string
-  kind: 'building' | 'unit'
+  kind: 'building' | 'unit' | 'project'
   productionSpent: number
   resourcePaid: boolean
   slotIndex?: number

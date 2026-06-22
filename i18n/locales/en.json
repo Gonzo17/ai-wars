@@ -479,6 +479,20 @@
       "shipyard": "Shipyard",
       "defense": "Defense"
     },
+    "projects": {
+      "research-initiative": {
+        "name": "Research Initiative",
+        "description": "Pour production into the current research project."
+      },
+      "energy-reserve": {
+        "name": "Energy Reserve",
+        "description": "Convert production into stockpiled energy."
+      },
+      "matter-reserve": {
+        "name": "Matter Reserve",
+        "description": "Convert production into stockpiled matter."
+      }
+    },
     "buildings": {
       "power-relay": {
         "name": "Power Relay",

@@ -193,7 +193,8 @@
 
 <script setup lang="ts">
 import { BASE_PLANET_PRODUCTION, BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
-import { findDistrictNode } from '~~/shared/defs/districts'
+import { findDistrictNode, unitDistrict } from '~~/shared/defs/districts'
+import { projectsForDistrict } from '~~/shared/defs/projects'
 import { DISTRICT_ICONS, planetDistrictCatalog, hasResearchDistrict } from '~~/shared/utils/districts'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
@@ -235,7 +236,7 @@ interface GamePlanet {
   productionPerRound: number
   buildings: Array<{ id: string, level: number, isConstructing?: boolean }>
   slots: Array<{ buildingId: string | null, buildingLevel: number, isConstructing: boolean, constructionTimeLeft: number, zone: string, resourceNode: string | null, districtType?: string | null, nodes?: string[] }>
-  buildQueue: Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
+  buildQueue: Array<{ id: string, kind: 'building' | 'unit' | 'project', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>
   shipyardQueue: Array<{ id: string }>
   stationedUnits: Array<{ unitDefId: string, count: number }>
   location: { x: number, y: number }
@@ -285,8 +286,10 @@ interface UnitDefinition {
   lockedByTechName: string | null
 }
 
-// Grouped district catalog passed to the planet builder (districts hold their buildings).
+// Grouped district catalog passed to the planet builder. A district holds its buildings,
+// units and projects as one combined list of items (no separate tabs).
 interface DistrictNode {
+  kind: 'building' | 'unit' | 'project'
   id: string
   name: string
   description: string
@@ -297,6 +300,7 @@ interface DistrictNode {
   strategicCosts?: Partial<Record<string, number>>
   productionCost: number
   yields: Array<{ icon: string, amount: number }>
+  /** Building placement: the district slot to build into (deeper) or null (found). */
   slotIndex: number | null
   foundSlots: number[]
   lockedByTechName: string | null
@@ -306,6 +310,7 @@ interface DistrictGroup {
   name: string
   icon: string
   founded: boolean
+  operational: boolean
   available: boolean
   nodes: DistrictNode[]
 }
@@ -851,19 +856,19 @@ const nodeYields = (output: { energy?: number, matter?: number, research?: numbe
   if (output.production) out.push({ icon: 'i-lucide-hammer', amount: output.production })
   return out
 }
+const projectNameKey = (id: string) => `game.projects.${id.replace('proj:', '')}.name`
+const projectDescKey = (id: string) => `game.projects.${id.replace('proj:', '')}.description`
+
 const planetDistrictCatalogView = computed((): DistrictGroup[] => {
   const planet = selectedRawPlanet.value
   if (!planet || planet.kind === 'star') return []
-  return planetDistrictCatalog(planet, completedTechIds.value, researchEstablished.value).map(group => ({
-    type: group.type,
-    name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
-    icon: DISTRICT_ICONS[group.type],
-    founded: group.founded,
-    available: group.available,
-    nodes: group.nodes.map((n) => {
+  const completed = completedTechIds.value
+  return planetDistrictCatalog(planet, completed, researchEstablished.value).map((group) => {
+    const buildingNodes: DistrictNode[] = group.nodes.map((n) => {
       const nameKey = buildingNameKey(n.nodeId)
       const descKey = buildingDescriptionKey(n.nodeId)
       return {
+        kind: 'building',
         id: n.nodeId,
         name: te(nameKey) ? t(nameKey) : n.nodeId,
         description: te(descKey) ? t(descKey) : '',
@@ -879,7 +884,65 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
         lockedByTechName: n.research ? techDisplayName(n.research) : null
       }
     })
-  }))
+
+    // Units built from this district (ships → Shipyard). Available once the district is
+    // operational (its base built) and the unit's research is done; else locked/blocked.
+    const unitNodes: DistrictNode[] = UNIT_DEFS
+      .filter(def => unitDistrict(def.id) === group.type)
+      .map((def) => {
+        const missing = getMissingResearch(def.requirements, completed)
+        const state: DistrictNode['state'] = missing.length > 0 ? 'locked' : (group.operational ? 'available' : 'blocked')
+        return {
+          kind: 'unit',
+          id: def.id,
+          name: te(unitNameKey(def.id)) ? t(unitNameKey(def.id)) : def.id,
+          description: te(unitRoleKey(def.id)) ? t(unitRoleKey(def.id)) : '',
+          icon: def.icon ?? 'i-lucide-rocket',
+          state,
+          isBase: false,
+          resourceCosts: def.resourceCosts,
+          strategicCosts: def.strategicCosts,
+          productionCost: def.productionCost,
+          yields: [],
+          slotIndex: null,
+          foundSlots: [],
+          lockedByTechName: missing.length > 0 ? techDisplayName(missing[0]!) : null
+        }
+      })
+
+    // Repeatable projects offered under this district (available once it's founded).
+    const projectNodes: DistrictNode[] = projectsForDistrict(group.type as never).map((def) => {
+      const out = def.output
+      const yields = out.research
+        ? [{ icon: 'i-lucide-flask-conical', amount: out.research }]
+        : (out.amount ? nodeYields({ [out.resource === 'res:energy' ? 'energy' : 'matter']: out.amount }) : [])
+      return {
+        kind: 'project',
+        id: def.id,
+        name: te(projectNameKey(def.id)) ? t(projectNameKey(def.id)) : def.id,
+        description: te(projectDescKey(def.id)) ? t(projectDescKey(def.id)) : '',
+        icon: def.icon,
+        state: group.operational ? 'available' : 'blocked',
+        isBase: false,
+        resourceCosts: { energy: 0, minerals: 0, rare: 0 },
+        productionCost: def.productionCost,
+        yields,
+        slotIndex: null,
+        foundSlots: [],
+        lockedByTechName: null
+      }
+    })
+
+    return {
+      type: group.type,
+      name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
+      icon: DISTRICT_ICONS[group.type],
+      founded: group.founded,
+      operational: group.operational,
+      available: group.available,
+      nodes: [...buildingNodes, ...unitNodes, ...projectNodes]
+    }
+  })
 })
 
 const unitCatalog = computed((): UnitDefinition[] => {
@@ -1011,6 +1074,14 @@ const toPlanetView = (planet: Planet): GamePlanet => ({
         slotIndex: entry.slotIndex
       }
     }
+    if (entry.kind === 'project') {
+      return {
+        id: entry.projectId,
+        kind: 'project' as const,
+        productionSpent: entry.productionSpent,
+        resourcePaid: true
+      }
+    }
     return {
       id: entry.unitId,
       kind: 'unit' as const,
@@ -1030,7 +1101,7 @@ const starsView = computed((): GamePlanet[] =>
   planets.value.filter(planet => planet.kind === 'star').map(toPlanetView))
 
 const buildQueueLimit = BUILD_QUEUE_LIMIT
-const buildQueueOverrides = ref<Record<string, Array<{ id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>>>({})
+const buildQueueOverrides = ref<Record<string, Array<{ id: string, kind: 'building' | 'unit' | 'project', productionSpent: number, resourcePaid: boolean, slotIndex?: number }>>>({})
 const buildProgressMemory = ref<Record<string, Record<string, { productionSpent: number, resourcePaid: boolean }>>>({})
 
 const selectedPlanet = computed(() => planetsView.value.find(planet => planet.id === selectedId.value))
@@ -1070,7 +1141,7 @@ const handleOpenPlanetFromOverview = (planetId: string) => {
   handleSelectPlanet(planetId)
 }
 
-type QueueEntry = { id: string, kind: 'building' | 'unit', productionSpent: number, resourcePaid: boolean, slotIndex?: number }
+type QueueEntry = { id: string, kind: 'building' | 'unit' | 'project', productionSpent: number, resourcePaid: boolean, slotIndex?: number }
 
 // The override is the client's desired queue for a planet. It starts as a copy of
 // the server queue (so in-progress builds are preserved) the first time the player
@@ -1098,10 +1169,12 @@ const isOwnedSite = (planetId: string): boolean => {
 // store the override. Declarative: add/remove/reorder all funnel through here.
 const commitQueue = (planetId: string, queue: QueueEntry[]) => {
   buildQueueOverrides.value = { ...buildQueueOverrides.value, [planetId]: queue }
-  const items: ProductionQueueCommandItem[] = queue.map(entry =>
+  const items: ProductionQueueCommandItem[] = queue.map((entry): ProductionQueueCommandItem =>
     entry.kind === 'building'
       ? { kind: 'building', slotIndex: entry.slotIndex ?? 0, buildingId: entry.id as BuildingId }
-      : { kind: 'unit', unitId: entry.id as UnitId }
+      : entry.kind === 'project'
+        ? { kind: 'project', projectId: entry.id as ProjectId }
+        : { kind: 'unit', unitId: entry.id as UnitId }
   )
   const next: TurnCommand[] = turnPlan.value.commands.filter(command =>
     !(command.type === 'setProductionQueue' && command.planetId === planetId))
@@ -1109,7 +1182,7 @@ const commitQueue = (planetId: string, queue: QueueEntry[]) => {
   turnPlan.value = { commands: next }
 }
 
-const handleQueueBuild = (planetId: string, buildId: string, kind: 'building' | 'unit', slotIndex?: number) => {
+const handleQueueBuild = (planetId: string, buildId: string, kind: 'building' | 'unit' | 'project', slotIndex?: number) => {
   if (!isOwnedSite(planetId)) return
   const current = effectiveQueue(planetId)
   if (current.length >= buildQueueLimit) {

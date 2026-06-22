@@ -1,8 +1,9 @@
 import { getBuildingDef, getUnitDef } from '~~/shared/defs/production'
 import { findDistrictNode } from '~~/shared/defs/districts'
+import { getProjectDef } from '~~/shared/defs/projects'
 import type { GameSnapshot, Unit, UnitId } from '~~/shared/types/game'
 import { planetProductionPerTurn } from '~~/shared/utils/economy'
-import { addEvent, buildingNameKey, getPlanetName, unitNameKey } from './events'
+import { addEvent, buildingNameKey, getPlanetName, projectNameKey, unitNameKey } from './events'
 
 /**
  * Keep each player's empireState in sync with ownership: planets controlled,
@@ -88,6 +89,49 @@ export function advanceQueues(snapshot: GameSnapshot, turn: number, nextEventId:
         }
         planet.queues.production = queue.slice(1)
         if (overflow > 0) planet.productionCarryover = overflow
+      }
+      continue
+    }
+
+    // ── Project item ─────────────────────────────────────────────────
+    if (entry.kind === 'project') {
+      const project = getProjectDef(entry.projectId)
+      const projectCost = project?.productionCost ?? 0
+      const remaining = Math.max(0, projectCost - entry.productionSpent)
+      const overflow = available - remaining
+
+      if (project && available >= remaining) {
+        const owner = snapshot.players.find(pl => pl.id === planet.owner)
+        if (owner) {
+          // Research projects push the active research; resource projects top up a stockpile.
+          if (project.output.research && owner.research.activeResearch) {
+            owner.research.activeResearch.progressPoints += project.output.research
+          }
+          if (project.output.resource && project.output.amount) {
+            const res = owner.resources.find(r => r.key === project.output.resource)
+            if (res) res.current = Math.min(res.max, res.current + project.output.amount)
+          }
+        }
+        if (planet.owner !== 'unclaimed' && planet.owner !== 'unknown') {
+          addEvent(snapshot, planet.owner, {
+            id: nextEventId(),
+            type: 'building-complete',
+            severity: 'success',
+            year: turn,
+            titleKey: 'events.types.building-complete.title',
+            titleParams: { name: projectNameKey(entry.projectId) },
+            descriptionKey: 'events.types.building-complete.description',
+            descriptionParams: { location: getPlanetName(snapshot, planet.id) },
+            relatedEntityId: planet.id,
+            relatedEntityType: 'planet',
+            read: false,
+            timestamp: Date.now()
+          })
+        }
+        planet.queues.production = queue.slice(1)
+        if (overflow > 0) planet.productionCarryover = overflow
+      } else {
+        entry.productionSpent += available
       }
       continue
     }

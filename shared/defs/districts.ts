@@ -1,4 +1,4 @@
-import type { BuildingId } from '../types/game'
+import type { BuildingId, UnitId } from '../types/game'
 import type { DistrictDef, DistrictType } from '../types/districts'
 
 /**
@@ -73,8 +73,18 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     ]
   },
 
+  // 🚀 SHIPYARD — the orbital dock that lets a planet build ships. Founding it IS the
+  // orbital dock (units list under this district and require it). Gated by first-shipyard.
+  shipyard: {
+    type: 'shipyard',
+    availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant', 'barren'],
+    zone: 'orbital',
+    tree: [
+      { id: b('bld:orbital-dock'), prereqIds: [], research: 'tech:first-shipyard', cost: { energy: 90, matter: 110 }, buildTime: 4, output: {} }
+    ]
+  },
+
   // ── Stubs (filled in 2b with the tech tree) ──────────────────────────
-  shipyard: { type: 'shipyard', availableOn: [], zone: 'orbital', tree: [] },
   defense: { type: 'defense', availableOn: [], zone: 'orbital', tree: [] },
   rare: { type: 'rare', availableOn: [], zone: 'surface', tree: [] },
   exotic: { type: 'exotic', availableOn: [], zone: 'surface', tree: [] },
@@ -95,4 +105,9 @@ export function findDistrictNode(nodeId: BuildingId) {
 /** Which districts a planet of this type may open. */
 export function districtsForPlanetType(type: DistrictDef['availableOn'][number]): DistrictDef[] {
   return Object.values(DISTRICT_DEFS).filter(d => d.availableOn.includes(type))
+}
+
+/** The district a unit is built from. All ships come from the Shipyard for now. */
+export function unitDistrict(_unitId: UnitId | string): DistrictType {
+  return 'shipyard'
 }

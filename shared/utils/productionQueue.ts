@@ -1,4 +1,4 @@
-import type { BuildingId, Planet, ProductionQueueItem, UnitId } from '../types/game'
+import type { BuildingId, Planet, ProductionQueueItem, ProjectId, UnitId } from '../types/game'
 import type { ProductionQueueCommandItem } from '../types/turn'
 import { getBuildingDef, getUnitDef } from '../defs/production'
 import { findDistrictNode } from '../defs/districts'
@@ -37,6 +37,8 @@ export function queueItemCosts(_planet: Planet, items: ProductionQueueCommandIte
       if (!def) return ZERO_COST()
       return { ...def.resourceCosts, strategic: cleanStrategic(def.strategicCosts) }
     }
+    // Projects cost no resources — they consume production only.
+    if (item.kind === 'project') return ZERO_COST()
     const def = getUnitDef(item.unitId)
     if (!def) return ZERO_COST()
     return { ...def.resourceCosts, strategic: cleanStrategic(def.strategicCosts) }
@@ -54,6 +56,8 @@ export type QueueReconciliation = {
   newUnits: Array<{ unitId: UnitId }>
 }
 
+type OldProgress<TKey> = { key: TKey, productionSpent: number, consumed: boolean }
+
 /**
  * Pure: given a planet's *current* (pre-mutation) state and the desired queue items,
  * compute the reconciled production queue and which items are newly added this turn.
@@ -67,9 +71,12 @@ export type QueueReconciliation = {
  * same pre-state, so "new vs resume" (and therefore what gets charged) always agrees.
  */
 export function reconcileProductionQueue(planet: Planet, items: ProductionQueueCommandItem[]): QueueReconciliation {
-  const oldUnits = (planet.queues?.production ?? [])
+  const oldUnits: OldProgress<UnitId>[] = (planet.queues?.production ?? [])
     .filter((i): i is Extract<ProductionQueueItem, { kind: 'unit' }> => i.kind === 'unit')
-    .map(i => ({ unitId: i.unitId, productionSpent: i.productionSpent, consumed: false }))
+    .map(i => ({ key: i.unitId, productionSpent: i.productionSpent, consumed: false }))
+  const oldProjects: OldProgress<ProjectId>[] = (planet.queues?.production ?? [])
+    .filter((i): i is Extract<ProductionQueueItem, { kind: 'project' }> => i.kind === 'project')
+    .map(i => ({ key: i.projectId, productionSpent: i.productionSpent, consumed: false }))
 
   const queue: ProductionQueueItem[] = []
   const isNew: boolean[] = []
@@ -83,8 +90,14 @@ export function reconcileProductionQueue(planet: Planet, items: ProductionQueueC
       isNew.push(!isResume)
       if (!isResume) newBuildings.push({ slotIndex: item.slotIndex, buildingId: item.buildingId })
       queue.push({ kind: 'building', slotIndex: item.slotIndex, buildingId: item.buildingId })
+    } else if (item.kind === 'project') {
+      // Projects carry progress like units (matched greedily by id); never charged.
+      const match = oldProjects.find(p => !p.consumed && p.key === item.projectId)
+      if (match) match.consumed = true
+      isNew.push(false)
+      queue.push({ kind: 'project', projectId: item.projectId, productionSpent: match?.productionSpent ?? 0 })
     } else {
-      const match = oldUnits.find(u => !u.consumed && u.unitId === item.unitId)
+      const match = oldUnits.find(u => !u.consumed && u.key === item.unitId)
       if (match) {
         match.consumed = true
         isNew.push(false)

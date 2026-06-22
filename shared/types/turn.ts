@@ -1,4 +1,4 @@
-import type { BuildingId, PlanetId, ResearchId, SolarSystemId, UnitId } from './game'
+import type { BuildingId, PlanetId, ProjectId, ResearchId, SolarSystemId, UnitId } from './game'
 
 export type TurnCommandType = 'startResearch' | 'setProductionQueue' | 'moveFleet'
 
@@ -11,6 +11,7 @@ export type StartResearchCommand = {
 export type ProductionQueueCommandItem
   = | { kind: 'building', slotIndex: number, buildingId: BuildingId }
     | { kind: 'unit', unitId: UnitId }
+    | { kind: 'project', projectId: ProjectId }
 
 /**
  * The full, ordered production queue the client wants for one planet this turn.

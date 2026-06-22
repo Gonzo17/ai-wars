@@ -138,7 +138,10 @@ export interface CatalogNode {
 export interface CatalogDistrict {
   type: DistrictType
   zone: SlotZonePlacement
+  /** A slot hosts this district (its base built or under construction). */
   founded: boolean
+  /** The base node is COMPLETE — units/projects under this district can be built. */
+  operational: boolean
   /** The slot hosting this district, or null if not founded yet. */
   slotIndex: number | null
   /** False while gated (e.g. no Research district yet) — the whole group is greyed. */
@@ -201,7 +204,8 @@ export function planetDistrictCatalog(
       }
     })
 
-    return { type: def.type, zone: def.zone, founded, slotIndex: founded ? existingIndex : null, available, nodes }
+    const operational = (slot?.nodes?.length ?? 0) > 0
+    return { type: def.type, zone: def.zone, founded, operational, slotIndex: founded ? existingIndex : null, available, nodes }
   })
 }
 

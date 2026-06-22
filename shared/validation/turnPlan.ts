@@ -1,6 +1,7 @@
 import type { GameSnapshot, Planet, PlayerSnapshot, ResearchId } from '../types/game'
 import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
+import { getProjectDef } from '../defs/projects'
 import type { StrategicCosts } from '../defs/production'
 import { findDistrictNode } from '../defs/districts'
 import { hasResearchDistrict } from '../utils/districts'
@@ -27,7 +28,11 @@ const FACILITY_SUBSTITUTES: Record<string, string[]> = {
 
 const hasSlotBuildingRequirement = (planet: Planet, requirements: Array<{ id: string, level: number }>) => {
   for (const req of requirements) {
-    const direct = planet.slots.find(s => s.buildingId === req.id && !s.isConstructing && s.buildingLevel >= req.level)
+    // Satisfied by a completed building in a slot, OR by the facility built as a district
+    // node (e.g. the orbital dock is the Shipyard district's base node).
+    const direct = planet.slots.find(s =>
+      (s.buildingId === req.id && !s.isConstructing && s.buildingLevel >= req.level)
+      || (s.nodes?.includes(req.id as never)))
     if (direct) continue
     const substitutes = FACILITY_SUBSTITUTES[req.id] ?? []
     const hasSubstitute = substitutes.length > 0
@@ -36,6 +41,10 @@ const hasSlotBuildingRequirement = (planet: Planet, requirements: Array<{ id: st
   }
   return true
 }
+
+/** True when the planet has a founded district of `type` (its base node is built). */
+const hasFoundedDistrict = (planet: Planet, type: string) =>
+  planet.slots.some(s => s.districtType === type && (s.nodes?.length ?? 0) > 0)
 
 const hasResearchRequirement = (player: PlayerSnapshot, researchIds: string[]) => {
   return researchIds.every(id => player.research.completedTechIds.includes(id))
@@ -268,6 +277,19 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
               availableResources = subtractCosts(availableResources, cost)
               subtractStrategic(availableStrategic, cost.strategic)
             }
+          }
+          continue
+        }
+
+        // Project item — repeatable, no resource cost; only needs its district founded.
+        if (item.kind === 'project') {
+          const project = getProjectDef(item.projectId)
+          if (!project) {
+            errors.push({ code: 'NOT_FOUND', message: 'Project not found', path: itemPath })
+            continue
+          }
+          if (!hasFoundedDistrict(planet, project.districtType)) {
+            errors.push({ code: 'INVALID_STATE', message: 'Project requires its district', path: itemPath })
           }
           continue
         }

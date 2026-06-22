@@ -18,6 +18,7 @@ const queueCmd = (planetId: string, items: ProductionQueueCommandItem[]): TurnPl
 const building = (slotIndex: number, buildingId: string): ProductionQueueCommandItem =>
   ({ kind: 'building', slotIndex, buildingId: buildingId as never })
 const unit = (unitId: string): ProductionQueueCommandItem => ({ kind: 'unit', unitId: unitId as never })
+const project = (projectId: string): ProductionQueueCommandItem => ({ kind: 'project', projectId: projectId as never })
 
 function seedGame() {
   return new InMemoryGameRepository({
@@ -144,6 +145,45 @@ describe('shared production queue', () => {
     expect(cancelled.slots[3]!.buildingId).toBeNull()
     expect(cancelled.queues.production).toHaveLength(0)
     expect(getResource(getPlayer(getSnapshot(repo, 3), U1), 'res:material')).toBe(50)
+  })
+})
+
+describe('projects', () => {
+  function foundEnergyDistrict(snapshot: GameSnapshot) {
+    const slot = homePlanet(snapshot).slots[0]!
+    slot.districtType = 'energy'
+    slot.nodes = ['bld:solar-array' as never]
+  }
+
+  it('rejects a project whose district is not founded, allows it once founded', () => {
+    const snap = initialState([U1, U2], 1)
+    const reserve = queueCmd(HOME, [project('proj:energy-reserve')])
+    expect(validateTurnPlan(snap, toPlayerId(U1), reserve).length).toBeGreaterThan(0)
+
+    foundEnergyDistrict(snap)
+    expect(validateTurnPlan(snap, toPlayerId(U1), reserve)).toHaveLength(0)
+  })
+
+  it('consumes production, yields its output on completion, then pops (no resource cost)', async () => {
+    const repo = seedGame()
+    const seed = getSnapshot(repo, 1)
+    foundEnergyDistrict(seed)
+    const e0 = getResource(getPlayer(seed, U1), 'res:energy')
+
+    // Energy reserve: cost 70, base production 20/turn → completes on turn 4.
+    await playTurn(repo, 1, queueCmd(HOME, [project('proj:energy-reserve')]))
+    // Still running, charged nothing up-front.
+    expect(homePlanet(getSnapshot(repo, 2)).queues.production).toHaveLength(1)
+
+    await playTurn(repo, 2)
+    await playTurn(repo, 3)
+    await playTurn(repo, 4)
+
+    const after = getSnapshot(repo, 5)
+    // Completed → popped from the queue.
+    expect(homePlanet(after).queues.production).toHaveLength(0)
+    // Energy = start + solar (20/turn × 4) + the project's +90 lump.
+    expect(getResource(getPlayer(after, U1), 'res:energy')).toBe(e0 + 80 + 90)
   })
 })
 
