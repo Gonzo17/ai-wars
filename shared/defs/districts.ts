@@ -47,15 +47,17 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     ]
   },
 
-  // 🔬 RESEARCH — the only source of science (no per-planet base). Base node is
-  // research-free so an empty planet can bootstrap science by building one.
+  // 🔬 RESEARCH — the only source of science (no per-planet base). The data center
+  // houses the AI core, so it is the MANDATORY first build on a fresh planet (every
+  // other district needs it to run). Cheap, energy-only, ONE round — surface, since a
+  // research centre in orbit makes little sense. Base node is research-free to bootstrap.
   research: {
     type: 'research',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant'],
-    zone: 'orbital',
+    zone: 'surface',
     weights: { terrestrial: 1.2, oceanic: 1.2 },
     tree: [
-      { id: b('bld:data-center'), prereqIds: [], cost: { energy: 80, matter: 60 }, buildTime: 6, output: { research: 20 } }
+      { id: b('bld:data-center'), prereqIds: [], cost: { energy: 50 }, buildTime: 1, output: { research: 20 } }
     ]
   },
 

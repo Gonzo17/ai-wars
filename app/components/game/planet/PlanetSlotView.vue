@@ -10,6 +10,8 @@ import {
 } from '~~/shared/types/planetSlots'
 import { activeSynergies } from '~~/shared/utils/synergies'
 import { DISTRICT_ICONS } from '~~/shared/utils/districts'
+import { DISTRICT_DEFS, findDistrictNode } from '~~/shared/defs/districts'
+import type { DistrictType } from '~~/shared/types/districts'
 
 interface BuildCosts {
   energy: number
@@ -89,6 +91,8 @@ const props = defineProps<{
   planet: PlanetData
   buildingCatalog: BuildingDefinition[]
   unitCatalog: UnitDefinition[]
+  /** Whether the viewer controls this planet (false → read-only inspection). */
+  canBuild: boolean
   buildQueueLimit: number
   playerResources?: PlayerResources
 }>()
@@ -103,12 +107,12 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 // ── Layout constants ──────────────────────────────────────────────────
-const PLANET_RADIUS = 140
+// The hex size is fixed; the planet SPHERE scales to snugly contain however many
+// surface slots the planet has (small 4 / medium 7 / large 11), so the imagery grows
+// or shrinks with the world instead of every planet sharing one radius.
 const HEX_SIZE = 46
 const HEX_GAP = 6
-const ORBITAL_RING_RADIUS = PLANET_RADIUS + 64
 const ORBITAL_SLOT_SIZE = 42
-const CANVAS_SIZE = (ORBITAL_RING_RADIUS + ORBITAL_SLOT_SIZE + 28) * 2
 const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6.7% 25%)'
 
 // ── Placement + catalog state ─────────────────────────────────────────
@@ -216,10 +220,20 @@ const surfacePositions = computed(() =>
     return { ...slot, px: x, py: y }
   }))
 
+// Planet radius = far enough to contain the outermost surface hex (its centre distance
+// + half a hex), so the sphere hugs the slots for any planet size; the orbital ring and
+// the canvas then derive from it.
+const planetRadius = computed(() => {
+  const reach = Math.max(0, ...surfacePositions.value.map(p => Math.hypot(p.px, p.py)))
+  return Math.round(reach + HEX_SIZE * 0.95 + 8)
+})
+const orbitalRingRadius = computed(() => planetRadius.value + 64)
+const canvasSize = computed(() => (orbitalRingRadius.value + ORBITAL_SLOT_SIZE + 28) * 2)
+
 const orbitalPositions = computed(() =>
   orbitalSlots.value.map((slot, i) => {
     const angle = (2 * Math.PI * i) / Math.max(1, orbitalCount.value) - Math.PI / 2
-    return { ...slot, px: Math.cos(angle) * ORBITAL_RING_RADIUS, py: Math.sin(angle) * ORBITAL_RING_RADIUS }
+    return { ...slot, px: Math.cos(angle) * orbitalRingRadius.value, py: Math.sin(angle) * orbitalRingRadius.value }
   }))
 
 // ── Catalog split per zone (only researched items are listed) ─────────
@@ -256,12 +270,12 @@ const canAffordStrategic = (costs?: Partial<Record<string, number>>): boolean =>
 const queueFull = computed(() => props.planet.buildQueue.length >= props.buildQueueLimit)
 
 const canQueueBuilding = (b: BuildingDefinition) =>
-  !b.locked && !queueFull.value && canAfford(b.resourceCosts) && canAffordStrategic(b.strategicCosts)
+  props.canBuild && !b.locked && !queueFull.value && canAfford(b.resourceCosts) && canAffordStrategic(b.strategicCosts)
 
 const hasOrbitalDock = computed(() => props.planet.slots.some(s => s.buildingId === 'bld:orbital-dock' && !s.isConstructing))
 const canTrainUnit = (u: UnitDefinition) => (!u.requiresFacility || hasOrbitalDock.value)
 const canQueueUnit = (u: UnitDefinition) =>
-  !u.locked && !queueFull.value && canTrainUnit(u) && canAfford(u.resourceCosts) && canAffordStrategic(u.strategicCosts)
+  props.canBuild && !u.locked && !queueFull.value && canTrainUnit(u) && canAfford(u.resourceCosts) && canAffordStrategic(u.strategicCosts)
 
 const productionPerRound = computed(() => props.planet.productionPerRound)
 const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
@@ -413,6 +427,59 @@ const getDistrictName = (type: string) => {
   const key = `game.districts.${type}`
   return t(key) === key ? type : t(key)
 }
+const nodeName = (id: string) => {
+  const key = `game.buildings.${id.replace('bld:', '')}.name`
+  return t(key) === key ? id : t(key)
+}
+
+// ── Slot inspection tooltip (what's built here + its effects) ──────────
+// Shown on hover whenever we are NOT placing a building (placement has its own preview).
+const OUTPUT_ICONS = {
+  energy: 'i-lucide-zap',
+  matter: 'i-lucide-pickaxe',
+  research: 'i-lucide-flask-conical',
+  production: 'i-lucide-hammer'
+} as const
+
+const slotTooltip = computed(() => {
+  if (placementBuildingId.value) return null
+  const index = hoveredSlotIndex.value
+  if (index === null) return null
+  const slot = props.planet.slots[index]
+  if (!slot) return null
+
+  const districtType = slot.districtType ?? null
+  const built = slot.nodes ?? []
+  const constructing = slot.isConstructing && slot.buildingId ? slot.buildingId : null
+
+  if (districtType && (built.length || constructing)) {
+    const dDef = DISTRICT_DEFS[districtType as DistrictType]
+    const weight = dDef?.weights?.[props.planet.type as keyof typeof dDef.weights] ?? 1
+    const totals = { energy: 0, matter: 0, research: 0, production: 0 }
+    let upkeep = 0
+    const nodes = built.map((id) => {
+      const found = findDistrictNode(id as BuildingId)
+      const out = found?.node.output ?? {}
+      totals.energy += Math.round((out.energy ?? 0) * weight)
+      totals.matter += Math.round((out.matter ?? 0) * weight)
+      totals.research += Math.round((out.research ?? 0) * weight)
+      totals.production += out.production ?? 0
+      upkeep += found?.node.energyUpkeep ?? 0
+      return { name: nodeName(id), building: false }
+    })
+    if (constructing) nodes.push({ name: nodeName(constructing), building: true })
+    const outputs = (['energy', 'matter', 'research', 'production'] as const)
+      .filter(k => totals[k] > 0)
+      .map(k => ({ icon: OUTPUT_ICONS[k], amount: totals[k] }))
+    return { title: getDistrictName(districtType), nodes, outputs, upkeep }
+  }
+
+  // Legacy / megastructure building completed on this slot.
+  if (slot.buildingId && !slot.isConstructing) {
+    return { title: nodeName(slot.buildingId), nodes: [], outputs: [], upkeep: 0 }
+  }
+  return null
+})
 
 const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
 const planetImageSrc = computed(() =>
@@ -432,8 +499,11 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
       @click="emit('close')"
     />
 
-    <!-- ═══════ Catalog rail ═══════ -->
-    <aside class="relative z-10 flex w-80 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/95">
+    <!-- ═══════ Catalog rail (owner only) ═══════ -->
+    <aside
+      v-if="canBuild"
+      class="relative z-10 flex w-80 shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/95"
+    >
       <div class="flex items-center gap-2 px-3 py-2 border-b border-neutral-800">
         <button
           type="button"
@@ -529,7 +599,8 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
               {{ planet.name }}
             </h2>
             <p class="text-xs text-neutral-400">
-              {{ planet.typeLabel }} · {{ planet.sizeLabel }} · {{ planet.ownerLabel }}
+              {{ planet.typeLabel }} · {{ planet.sizeLabel }} ·
+              <span :class="canBuild ? '' : 'text-amber-300/80'">{{ planet.ownerLabel }}</span>
             </p>
           </div>
         </div>
@@ -555,17 +626,17 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
       <div class="flex flex-1 items-center justify-center">
         <div
           class="relative"
-          :style="{ width: `${CANVAS_SIZE}px`, height: `${CANVAS_SIZE}px` }"
+          :style="{ width: `${canvasSize}px`, height: `${canvasSize}px` }"
         >
           <!-- Orbital ring -->
           <div
             class="absolute rounded-full border border-dashed border-sky-500/20 pointer-events-none"
-            :style="{ width: `${ORBITAL_RING_RADIUS * 2}px`, height: `${ORBITAL_RING_RADIUS * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
+            :style="{ width: `${orbitalRingRadius * 2}px`, height: `${orbitalRingRadius * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           />
           <!-- Planet sphere -->
           <div
             class="absolute rounded-full overflow-hidden pointer-events-none planet-glow"
-            :style="{ width: `${PLANET_RADIUS * 2}px`, height: `${PLANET_RADIUS * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
+            :style="{ width: `${planetRadius * 2}px`, height: `${planetRadius * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           >
             <!-- scale-110: overfill the circle so the planet meets the ring with no gap,
                  cropping a few px of the edge (we favour the surface over the rim). -->
@@ -613,7 +684,7 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 :style="{ clipPath: hexClipPath }"
               />
               <div
-                v-if="slotPos.state === 'empty'"
+                v-if="slotPos.state === 'empty' && canBuild"
                 class="absolute inset-0 flex items-center justify-center"
               >
                 <UIcon
@@ -679,7 +750,7 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 }"
               />
               <div
-                v-if="slotPos.state === 'empty'"
+                v-if="slotPos.state === 'empty' && canBuild"
                 class="absolute inset-0 flex items-center justify-center"
               >
                 <UIcon
@@ -759,6 +830,57 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
               </div>
             </div>
           </Transition>
+
+          <!-- Slot inspection tooltip (what's built here + its effects) -->
+          <Transition name="fade">
+            <div
+              v-if="slotTooltip"
+              data-testid="slot-tooltip"
+              class="absolute left-1/2 top-0 z-30 -translate-x-1/2 px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-900 shadow-xl text-xs max-w-72 pointer-events-none"
+            >
+              <p class="font-semibold text-neutral-100 mb-1">
+                {{ slotTooltip.title }}
+              </p>
+              <ul
+                v-if="slotTooltip.nodes.length"
+                class="space-y-0.5 mb-1"
+              >
+                <li
+                  v-for="(n, i) in slotTooltip.nodes"
+                  :key="i"
+                  class="flex items-center gap-1 text-neutral-300"
+                >
+                  <UIcon
+                    :name="n.building ? 'i-lucide-hammer' : 'i-lucide-dot'"
+                    class="w-3 h-3"
+                    :class="n.building ? 'text-warning-300' : 'text-neutral-500'"
+                  />
+                  <span :class="n.building ? 'text-warning-200' : ''">{{ n.name }}</span>
+                </li>
+              </ul>
+              <div class="flex flex-wrap items-center gap-2">
+                <span
+                  v-for="o in slotTooltip.outputs"
+                  :key="o.icon"
+                  class="flex items-center gap-0.5 text-success-300"
+                >
+                  <UIcon
+                    :name="o.icon"
+                    class="w-3 h-3"
+                  />+{{ o.amount }}
+                </span>
+                <span
+                  v-if="slotTooltip.upkeep > 0"
+                  class="flex items-center gap-0.5 text-critical-300"
+                >
+                  <UIcon
+                    name="i-lucide-zap"
+                    class="w-3 h-3"
+                  />−{{ slotTooltip.upkeep }}/{{ $t('game.slots.round-short') }}
+                </span>
+              </div>
+            </div>
+          </Transition>
         </div>
       </div>
 
@@ -787,8 +909,21 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
         >{{ $t('game.slots.no-units') }}</span>
       </div>
 
-      <!-- ═══════ Queue strip ═══════ -->
+      <!-- Read-only hint for planets the viewer doesn't control -->
       <div
+        v-if="!canBuild"
+        class="mb-2 z-20 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200"
+      >
+        <UIcon
+          name="i-lucide-eye"
+          class="w-4 h-4"
+        />
+        {{ $t('game.slots.read-only-hint') }}
+      </div>
+
+      <!-- ═══════ Queue strip (owner only) ═══════ -->
+      <div
+        v-if="canBuild"
         data-testid="build-queue"
         class="flex w-full items-center gap-2 border-t border-neutral-800 bg-neutral-950/95 px-4 py-3 overflow-x-auto"
       >

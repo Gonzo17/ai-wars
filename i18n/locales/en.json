@@ -458,9 +458,11 @@
       "tooltip-free": "Free",
       "tooltip-insufficient": "Not enough resources",
       "tooltip-requires-dock": "Requires an orbital dock",
-      "none-researched": "Nothing available yet — research unlocks more."
+      "none-researched": "Nothing available yet — research unlocks more.",
+      "read-only-hint": "You don't control this world — inspection only."
     },
     "districts": {
+      "label": "District",
       "energy": "Energy",
       "matter": "Matter",
       "rare": "Rare Alloys",

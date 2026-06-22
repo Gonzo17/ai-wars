@@ -458,9 +458,11 @@
       "tooltip-free": "Kostenlos",
       "tooltip-insufficient": "Nicht genug Ressourcen",
       "tooltip-requires-dock": "Benötigt ein Orbitaldock",
-      "none-researched": "Noch nichts verfügbar — Forschung schaltet mehr frei."
+      "none-researched": "Noch nichts verfügbar — Forschung schaltet mehr frei.",
+      "read-only-hint": "Diese Welt gehört dir nicht — nur Ansicht."
     },
     "districts": {
+      "label": "Bezirk",
       "energy": "Energie",
       "matter": "Materie",
       "rare": "Seltene Legierungen",

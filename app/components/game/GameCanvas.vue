@@ -154,6 +154,9 @@ const nodeStyle = (node: MapNode) => ({
   width: `${node.sizePx}px`,
   height: `${node.sizePx}px`,
   backgroundImage: `url('${node.image}')`,
+  // Planet/sun art has dark margins around the disk; overfill the circular crop so the
+  // disk meets the ownership ring with no gap (matches the planet view's scale-110).
+  backgroundSize: node.type === 'planet' || node.type === 'sun' ? '116%' : 'cover',
   transform: 'translate(-50%, -50%)'
 })
 

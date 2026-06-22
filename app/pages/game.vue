@@ -64,6 +64,7 @@
           :planet="selectedPlanetWithQueue"
           :building-catalog="planetBuildCatalog"
           :unit-catalog="unitCatalog"
+          :can-build="planetCanBuild"
           :build-queue-limit="buildQueueLimit"
           :player-resources="playerResources"
           @close="handleExitPlanetView"
@@ -193,7 +194,7 @@
 <script setup lang="ts">
 import { BASE_PLANET_PRODUCTION, BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
 import { findDistrictNode } from '~~/shared/defs/districts'
-import { DISTRICT_ICONS, buildableDistrictNodes } from '~~/shared/utils/districts'
+import { DISTRICT_ICONS, buildableDistrictNodes, hasResearchDistrict } from '~~/shared/utils/districts'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -807,16 +808,25 @@ const starBuildingCatalog = computed((): BuildingDefinition[] => allBuildingCata
 // Districts: the buildable nodes for the OPEN planet, each carrying the slots it may
 // target. Mirrors the engine's district rules so the catalog and server agree.
 const selectedRawPlanet = computed(() => planets.value.find(p => p.id === selectedId.value) ?? null)
+// A Research district must be established (the data center houses the AI core) before
+// any other district can be founded — so the first build of the game is the data center.
+const myOwnedPlanets = computed(() =>
+  myPlayerId.value ? planets.value.filter(p => p.owner === myPlayerId.value) : [])
+const researchEstablished = computed(() => hasResearchDistrict(myOwnedPlanets.value))
 const planetBuildCatalog = computed((): BuildingDefinition[] => {
   const planet = selectedRawPlanet.value
   if (!planet || planet.kind === 'star') return []
-  return buildableDistrictNodes(planet, completedTechIds.value).map((n) => {
+  return buildableDistrictNodes(planet, completedTechIds.value, researchEstablished.value).map((n) => {
     const nameKey = buildingNameKey(n.nodeId)
     const descKey = buildingDescriptionKey(n.nodeId)
+    const buildingName = te(nameKey) ? t(nameKey) : n.nodeId
+    const districtName = `${t(`game.districts.${n.districtType}`)} ${t('game.districts.label')}`
     return {
       id: n.nodeId,
-      name: te(nameKey) ? t(nameKey) : n.nodeId,
-      description: te(descKey) ? t(descKey) : '',
+      // Founding a district is labelled by the DISTRICT; the building it places shows as
+      // the description ("Solar Array" is a building IN the Energy district, not the name).
+      name: n.isBase ? districtName : buildingName,
+      description: n.isBase ? buildingName : (te(descKey) ? t(descKey) : ''),
       category: 'infrastructure' as BuildingCategory,
       maxLevel: 1,
       resourceCosts: { energy: n.cost.energy ?? 0, minerals: n.cost.matter ?? 0, rare: 0 },
@@ -994,6 +1004,9 @@ const selectedPlanetWithQueue = computed(() => {
     buildQueue: override ?? selectedPlanet.value.buildQueue
   }
 })
+// You can only build on a planet you own (enemy/unclaimed worlds open read-only).
+const planetCanBuild = computed(() =>
+  Boolean(selectedPlanet.value && myPlayerId.value && selectedPlanet.value.owner === myPlayerId.value))
 
 const planetsWithEffectiveQueue = computed(() => {
   const playerId = currentUserId.value ? toPlayerId(currentUserId.value) : null

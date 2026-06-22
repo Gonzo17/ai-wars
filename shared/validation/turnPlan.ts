@@ -3,6 +3,7 @@ import type { TurnPlan, ValidationError } from '../types/turn'
 import { BUILD_QUEUE_LIMIT, buildingSite, getBuildingDef, getUnitDef } from '../defs/production'
 import type { StrategicCosts } from '../defs/production'
 import { findDistrictNode } from '../defs/districts'
+import { hasResearchDistrict } from '../utils/districts'
 import { TECH_DEFS } from '../defs/research-tree'
 import { isBuildingAllowedInZone } from '../types/planetSlots'
 import { calculateResourceProduction } from '../utils/economy'
@@ -94,6 +95,8 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
   // Net energy/round budget. Deeper district nodes draw upkeep; queuing one that would
   // push the net below 0 is rejected (base nodes are free, so they never can).
   let availableEnergyFlow = calculateResourceProduction(snapshot.planets, playerId).energy
+  // The data center (Research district) must come first — gates every other district.
+  const researchEstablished = hasResearchDistrict(snapshot.planets.filter(p => p.owner === playerId))
 
   for (const [index, command] of plan.commands.entries()) {
     const path = `commands.${index}`
@@ -158,6 +161,10 @@ export function validateTurnPlan(snapshot: GameSnapshot, playerId: string, plan:
             }
             if (!dDef.availableOn.includes(planet.type)) {
               errors.push({ code: 'INVALID_COMMAND', message: 'District not available on this planet type', path: itemPath })
+              continue
+            }
+            if (dDef.type !== 'research' && !researchEstablished) {
+              errors.push({ code: 'INVALID_STATE', message: 'Build a Research district (data center) first', path: itemPath })
               continue
             }
             if (dDef.zone !== 'any' && slot.zone !== dDef.zone) {

@@ -19,6 +19,19 @@ export interface BuildableNode {
   validSlots: number[]
   /** True when a required tech is not yet completed (shown but greyed in the catalog). */
   locked: boolean
+  /** True when this node FOUNDS a new district (the catalog labels it by district). */
+  isBase: boolean
+}
+
+/**
+ * A research district is "established" once any owned planet has a completed Research
+ * district (its data-center base node, which houses the AI core). Until then every
+ * other district is gated — so the first build of the game is always the data center.
+ */
+export function hasResearchDistrict(planets: Planet[]): boolean {
+  return planets.some(p =>
+    p.kind !== 'star'
+    && p.slots.some(s => s.districtType === 'research' && (s.nodes?.length ?? 0) > 0))
 }
 
 function emptySlotsForZone(planet: Planet, zone: SlotZonePlacement): number[] {
@@ -44,11 +57,19 @@ function chosenNodes(planet: Planet, slotIndex: number): BuildingId[] {
  * is offered (targeting empty slots of the right zone); otherwise the next buildable
  * nodes in that district's tree are offered (targeting the existing district slot).
  */
-export function buildableDistrictNodes(planet: Planet, completedTechIds: string[]): BuildableNode[] {
+export function buildableDistrictNodes(
+  planet: Planet,
+  completedTechIds: string[],
+  researchEstablished = true
+): BuildableNode[] {
   const result: BuildableNode[] = []
   const completed = new Set(completedTechIds)
 
   for (const def of districtsForPlanetType(planet.type)) {
+    // The data center (Research district) houses the AI core and must come first:
+    // until a Research district exists, no other district can be founded.
+    if (!researchEstablished && def.type !== 'research') continue
+
     const existingIndex = planet.slots.findIndex(s => s.districtType === def.type)
 
     for (const node of def.tree) {
@@ -79,7 +100,8 @@ export function buildableDistrictNodes(planet: Planet, completedTechIds: string[
         energyUpkeep: node.energyUpkeep ?? 0,
         output: node.output ?? {},
         validSlots,
-        locked: Boolean(node.research && !completed.has(node.research))
+        locked: Boolean(node.research && !completed.has(node.research)),
+        isBase
       })
     }
   }

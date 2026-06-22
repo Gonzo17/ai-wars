@@ -54,6 +54,16 @@ function getResource(player: PlayerSnapshot, key: ResourceId): number {
   return player.resources.find(r => r.key === key)?.current ?? Number.NaN
 }
 
+/**
+ * Seed a completed Research district (data center) on the homeworld so other districts
+ * pass the "data center first" gate. Uses surface slot 6, untouched by these tests.
+ */
+function establishResearch(snapshot: GameSnapshot, planetId = 'pl:aurora') {
+  const slot = snapshot.planets.find(p => p.id === planetId)!.slots[6]!
+  slot.districtType = 'research'
+  slot.nodes = ['bld:data-center' as never]
+}
+
 describe('initial state', () => {
   it('gives every player a single terrestrial homeworld', () => {
     const snapshot = initialState([U1, U2], 1)
@@ -123,6 +133,7 @@ describe('initial state', () => {
 describe('building construction cycle', () => {
   it('builds a matter district node, completes it, and doubles its yield on the ore node', async () => {
     const repo = seedTwoPlayerGame()
+    establishResearch(getSnapshot(repo, 1))
     const plan: TurnPlan = {
       // Slot 2 on the primary planet is empty and has an ore node → a Matter
       // district mining node (cost 30 energy, build time 3 turns at 20/turn = 60).
@@ -163,6 +174,7 @@ describe('building construction cycle', () => {
 
   it('resuming the same build in the same slot does not charge again', async () => {
     const repo = seedTwoPlayerGame()
+    establishResearch(getSnapshot(repo, 1))
     const plan: TurnPlan = {
       commands: [buildCmd('pl:aurora', 'bld:solar-array', 3)]
     }
@@ -199,12 +211,12 @@ describe('research cycle', () => {
     const homeSlot = seed.planets.find(p => p.id === 'pl:aurora')!.slots.find(s => s.zone === 'orbital')!
     homeSlot.districtType = 'research'
     homeSlot.nodes = ['bld:data-center']
+    // The AI core is already bootstrapped at start, so the first real choice is one of
+    // its branches. Research the energy branch (120 pts; data-center 24/turn → 5 turns).
     const plan: TurnPlan = {
-      commands: [{ type: 'startResearch', researchId: 'tech:bootstrapped-ai-core' }]
+      commands: [{ type: 'startResearch', researchId: 'tech:planetary-grid-management' }]
     }
 
-    // 60 points required. data-center 20 × 1.2 (terrestrial research weight) = 24/turn
-    // → completes in 3 turns.
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
@@ -216,18 +228,14 @@ describe('research cycle', () => {
 
     const final = getSnapshot(repo, 6)
     const p1 = getPlayer(final, U1)
-    expect(p1.research.completedTechIds).toContain('tech:bootstrapped-ai-core')
+    expect(p1.research.completedTechIds).toContain('tech:planetary-grid-management')
     expect(p1.research.activeResearch).toBeUndefined()
-    // Children of the completed tech become available
-    expect(p1.availableResearchIds).toEqual(expect.arrayContaining([
-      'tech:basic-industrial-robotics',
-      'tech:planetary-grid-management',
-      'tech:probe-design'
-    ]))
+    // Its child becomes available
+    expect(p1.availableResearchIds).toContain('tech:data-center-i')
     expect(p1.events.some(e => e.type === 'research-complete')).toBe(true)
 
-    // Player 2 never researched anything
-    expect(getPlayer(final, U2).research.completedTechIds).toHaveLength(0)
+    // Player 2 only has the pre-completed AI core
+    expect(getPlayer(final, U2).research.completedTechIds).toEqual(['tech:bootstrapped-ai-core'])
   })
 })
 

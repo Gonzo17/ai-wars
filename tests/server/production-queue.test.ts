@@ -49,9 +49,21 @@ function homePlanet(snapshot: GameSnapshot) {
   return snapshot.planets.find(p => p.id === HOME)!
 }
 
+/**
+ * The data center (Research district) must come first — every other district is gated
+ * on it. Seed a completed one (surface slot 6, untouched by these tests) so we can test
+ * the rest of the queue mechanics directly.
+ */
+function establishResearch(snapshot: GameSnapshot) {
+  const slot = homePlanet(snapshot).slots[6]!
+  slot.districtType = 'research'
+  slot.nodes = ['bld:data-center' as never]
+}
+
 describe('shared production queue', () => {
   it('only the front item progresses; the rest wait in order', async () => {
     const repo = seedGame()
+    establishResearch(getSnapshot(repo, 1))
     // mining on the ore node (slot 2) first, solar (slot 3) second.
     const plan = queueCmd(HOME, [building(2, 'bld:mining-facility'), building(3, 'bld:solar-array')])
 
@@ -69,6 +81,7 @@ describe('shared production queue', () => {
 
   it('completes items in order across turns', async () => {
     const repo = seedGame()
+    establishResearch(getSnapshot(repo, 1))
     const plan = queueCmd(HOME, [building(2, 'bld:mining-facility'), building(3, 'bld:solar-array')])
     await playTurn(repo, 1, plan)
     // mining 60 at 20/turn → 60 → 40 → 20 → completes (turn 3 resolve), no overflow.
@@ -117,6 +130,7 @@ describe('shared production queue', () => {
 
   it('cancelling a queued build frees the slot and does not refund', async () => {
     const repo = seedGame()
+    establishResearch(getSnapshot(repo, 1))
     // Solar (50 minerals). Home starts with 100 minerals.
     await playTurn(repo, 1, queueCmd(HOME, [building(3, 'bld:solar-array')]))
     const charged = homePlanet(getSnapshot(repo, 2))
@@ -147,6 +161,7 @@ describe('production queue validation', () => {
     const snap = initialState([U1, U2], 1)
     const player = getPlayer(snap, U1)
     for (const r of player.resources) r.current = 100000
+    establishResearch(snap)
     const dup = queueCmd(HOME, [building(3, 'bld:solar-array'), building(3, 'bld:mining-facility')])
     const errors = validateTurnPlan(snap, toPlayerId(U1), dup)
     expect(errors.some(e => e.message === 'Two builds target the same slot')).toBe(true)
@@ -158,6 +173,7 @@ describe('production queue validation', () => {
     // Exactly enough minerals for ONE solar array (50).
     player.resources.find(r => r.key === 'res:material')!.current = 50
     player.resources.find(r => r.key === 'res:energy')!.current = 0
+    establishResearch(snap)
     const two = queueCmd(HOME, [building(3, 'bld:solar-array'), building(2, 'bld:solar-array')])
     const errors = validateTurnPlan(snap, toPlayerId(U1), two)
     expect(errors.some(e => e.code === 'INSUFFICIENT_RESOURCES')).toBe(true)

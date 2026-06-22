@@ -34,6 +34,12 @@ function clearHomeBuildings(snapshot: GameSnapshot) {
 function setRich(player: PlayerSnapshot) {
   for (const r of player.resources) r.current = 5000
 }
+/** Seed a completed Research district so other districts pass the "data center first" gate. */
+function establishResearch(snapshot: GameSnapshot) {
+  const slot = homePlanet(snapshot).slots[6]!
+  slot.districtType = 'research'
+  slot.nodes = ['bld:data-center' as never]
+}
 
 describe('district economy', () => {
   it('sums every node in a district (cumulative output)', () => {
@@ -66,6 +72,7 @@ describe('district validation', () => {
   it('rejects a deeper node when energy flow would go negative (base nodes never do)', () => {
     const snap = initialState([U1, U2], 1)
     clearHomeBuildings(snap) // no energy income at all
+    establishResearch(snap)
     setRich(getPlayer(snap, U1))
     getPlayer(snap, U1).research.completedTechIds.push('tech:basic-industrial-robotics')
     // A Matter district with its (free) base built; the slot index 2 has the ore node.
@@ -85,6 +92,7 @@ describe('district validation', () => {
   it('enforces exclusive branch groups within a district', () => {
     const snap = initialState([U1, U2], 1)
     clearHomeBuildings(snap)
+    establishResearch(snap)
     setRich(getPlayer(snap, U1))
     getPlayer(snap, U1).research.completedTechIds.push('tech:planetary-grid-management')
     // An energy district that already committed to the fusion branch.

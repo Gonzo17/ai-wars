@@ -215,7 +215,14 @@ function makeNeutralPlanet(
 }
 
 export function initialState(userIds: string[], turn = 1): GameSnapshot {
-  const availableResearchIds = TECH_DEFS.filter(t => t.prerequisites.length === 0).map(t => t.id as ResearchId)
+  // We ARE the bootstrapped AI — its core tech is already done, so the very first
+  // research CHOICE already fans out into directions (industry, energy, exploration)
+  // instead of a single forced pick. The core "lives in" the data center you build.
+  const startingTechIds: ResearchId[] = ['tech:bootstrapped-ai-core']
+  const startingTechSet = new Set<string>(startingTechIds)
+  const availableResearchIds = TECH_DEFS
+    .filter(t => !startingTechSet.has(t.id) && t.prerequisites.every(p => startingTechSet.has(p)))
+    .map(t => t.id as ResearchId)
   const baseResources: Resource[] = [
     { key: 'res:energy', current: 500, max: 2000, delta: 0 },
     { key: 'res:material', current: 100, max: 2000, delta: 0 },
@@ -235,7 +242,7 @@ export function initialState(userIds: string[], turn = 1): GameSnapshot {
         starsControlled: 0,
         dysonStages: 0
       },
-      completedTechIds: [],
+      completedTechIds: [...startingTechIds],
       activeResearch: undefined,
       progressMemory: {}
     }
