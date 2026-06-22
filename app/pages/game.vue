@@ -984,7 +984,9 @@ const planetDistrictCatalogView = computed((): DistrictGroup[] => {
 
     return {
       type: group.type,
-      name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
+      // Districts now carry evocative standalone names (Rechenzentrum, Energiematrix, …),
+      // so no generic "District" suffix.
+      name: t(`game.districts.${group.type}`),
       icon: DISTRICT_ICONS[group.type],
       founded: group.founded,
       operational: group.operational,

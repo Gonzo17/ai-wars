@@ -478,15 +478,15 @@
     },
     "districts": {
       "label": "District",
-      "energy": "Energy",
-      "matter": "Matter",
-      "rare": "Rare Alloys",
-      "exotic": "Exotic Matter",
-      "antimatter": "Antimatter",
-      "research": "Research",
-      "production": "Production",
-      "shipyard": "Shipyard",
-      "defense": "Defense"
+      "energy": "Power Matrix",
+      "matter": "Mineral Forge",
+      "rare": "Rare-Earth Mine",
+      "exotic": "Exotic Lab",
+      "antimatter": "Antimatter Trap",
+      "research": "Data Center",
+      "production": "Assembly Complex",
+      "shipyard": "Orbital Shipyard",
+      "defense": "Orbital Bastion"
     },
     "terrain": {
       "plains": "Plains",
@@ -562,8 +562,8 @@
         "description": "Base infrastructure for landings."
       },
       "data-center": {
-        "name": "Data Center",
-        "description": "Generates research points for the empire."
+        "name": "Compute Core",
+        "description": "Houses the AI core; the heart of a Data Center district. Generates research."
       },
       "dyson-sphere": {
         "name": "Dyson Sphere",

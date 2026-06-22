@@ -478,15 +478,15 @@
     },
     "districts": {
       "label": "Bezirk",
-      "energy": "Energie",
-      "matter": "Materie",
-      "rare": "Seltene Legierungen",
-      "exotic": "Exotische Materie",
-      "antimatter": "Antimaterie",
-      "research": "Forschung",
-      "production": "Produktion",
-      "shipyard": "Werft",
-      "defense": "Verteidigung"
+      "energy": "Energiematrix",
+      "matter": "Materieschmiede",
+      "rare": "Seltenerd-Mine",
+      "exotic": "Exotik-Labor",
+      "antimatter": "Antimaterie-Falle",
+      "research": "Rechenzentrum",
+      "production": "Fabrikkomplex",
+      "shipyard": "Orbitale Werft",
+      "defense": "Orbitalbastion"
     },
     "terrain": {
       "plains": "Ebene",
@@ -562,8 +562,8 @@
         "description": "Basis-Infrastruktur für Landung."
       },
       "data-center": {
-        "name": "Rechenzentrum",
-        "description": "Erzeugt Forschungspunkte für das Imperium."
+        "name": "Recheneinheit",
+        "description": "Beherbergt den KI-Kern; das Herz eines Rechenzentrum-Bezirks. Erzeugt Forschung."
       },
       "dyson-sphere": {
         "name": "Dyson-Sphäre",
