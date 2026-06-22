@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import type { BuildingId, Planet, ResourceNodeType } from '~~/shared/types/game'
-import type { PlanetSlot, SlotZone } from '~~/shared/types/planetSlots'
+import type { PlanetSlot, SlotZone, PlanetSizeKey } from '~~/shared/types/planetSlots'
 import {
-  ORBITAL_BUILDING_IDS,
   computeAdjacencyBonuses,
-  generateHexCoords,
-  isBuildingAllowedInZone,
-  isSurfaceBuilding
+  surfaceHexCoords
 } from '~~/shared/types/planetSlots'
 import { activeSynergies } from '~~/shared/utils/synergies'
 import { DISTRICT_ICONS } from '~~/shared/utils/districts'
@@ -19,26 +16,31 @@ interface BuildCosts {
   rare: number
 }
 
-type BuildingCategory = 'energy' | 'minerals' | 'rare' | 'military' | 'research' | 'infrastructure'
+type DistrictNodeState = 'built' | 'building' | 'available' | 'locked' | 'blocked'
 
-interface BuildingDefinition {
+interface DistrictNode {
   id: string
   name: string
   description: string
-  category: BuildingCategory
-  maxLevel: number
-  resourceCosts: BuildCosts
-  productionCost: number
   icon: string
-  resourceProduction?: Partial<Record<'energy' | 'minerals' | 'rare', number>>
-  researchPoints?: number
-  strategicProduction?: { resource: string, amount: number, requiresNode: string }
+  state: DistrictNodeState
+  isBase: boolean
+  resourceCosts: BuildCosts
   strategicCosts?: Partial<Record<string, number>>
-  locked?: boolean
-  lockedByTechName?: string | null
-  /** District-node extras: the slots this node may target + its district type. */
-  validSlots?: number[]
-  districtType?: string
+  productionCost: number
+  yields: Array<{ icon: string, amount: number }>
+  slotIndex: number | null
+  foundSlots: number[]
+  lockedByTechName: string | null
+}
+
+interface DistrictGroup {
+  type: string
+  name: string
+  icon: string
+  founded: boolean
+  available: boolean
+  nodes: DistrictNode[]
 }
 
 interface UnitDefinition {
@@ -89,7 +91,8 @@ interface PlayerResources {
 
 const props = defineProps<{
   planet: PlanetData
-  buildingCatalog: BuildingDefinition[]
+  /** Districts as groups, each holding its building nodes. */
+  districtCatalog: DistrictGroup[]
   unitCatalog: UnitDefinition[]
   /** Whether the viewer controls this planet (false → read-only inspection). */
   canBuild: boolean
@@ -107,9 +110,8 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 // ── Layout constants ──────────────────────────────────────────────────
-// The hex size is fixed; the planet SPHERE scales to snugly contain however many
-// surface slots the planet has (small 4 / medium 7 / large 11), so the imagery grows
-// or shrinks with the world instead of every planet sharing one radius.
+// Hex size is fixed; the planet SPHERE scales to contain its slots (small 4 / medium 7
+// / large 14), laid out as centred rows that fit a circle.
 const HEX_SIZE = 46
 const HEX_GAP = 6
 const ORBITAL_SLOT_SIZE = 42
@@ -117,23 +119,23 @@ const hexClipPath = 'polygon(50% 0%, 93.3% 25%, 93.3% 75%, 50% 100%, 6.7% 75%, 6
 
 // ── Placement + catalog state ─────────────────────────────────────────
 const catalogTab = ref<'buildings' | 'units'>('buildings')
-const placementBuildingId = ref<string | null>(null)
+// The base node currently being placed (founding a district), or null.
+const placementNodeId = ref<string | null>(null)
 const hoveredSlotIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
 
 const cancelPlacement = () => {
-  placementBuildingId.value = null
+  placementNodeId.value = null
 }
 
-// Reset transient state when switching planets (component is reused).
 watch(() => props.planet.id, () => {
-  placementBuildingId.value = null
+  placementNodeId.value = null
   hoveredSlotIndex.value = null
   catalogTab.value = 'buildings'
 })
 
 const onKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && placementBuildingId.value) {
+  if (e.key === 'Escape' && placementNodeId.value) {
     e.stopPropagation()
     cancelPlacement()
   }
@@ -141,15 +143,24 @@ const onKeydown = (e: KeyboardEvent) => {
 onMounted(() => window.addEventListener('keydown', onKeydown, true))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
 
+// ── Flat node lookup (queue + slot rendering need names/icons) ────────
+const allNodes = computed(() => props.districtCatalog.flatMap(g => g.nodes))
+const nodeById = computed(() => new Map(allNodes.value.map(n => [n.id, n])))
+const nodeName = (id: string) => {
+  const fromCatalog = nodeById.value.get(id)
+  if (fromCatalog) return fromCatalog.name
+  const key = `game.buildings.${id.replace('bld:', '')}.name`
+  return t(key) === key ? id : t(key)
+}
+const nodeIcon = (id: string) => nodeById.value.get(id)?.icon ?? 'i-lucide-hammer'
+
 // ── Slots: server state → render state ────────────────────────────────
-// Slot counts come from the planet's actual slots (they scale with planet size);
-// surface hex positions are generated to match.
 const surfaceCount = computed(() => props.planet.slots.filter(s => s.zone === 'surface').length)
 const orbitalCount = computed(() => props.planet.slots.filter(s => s.zone === 'orbital').length)
-const surfaceCoords = computed(() => generateHexCoords(surfaceCount.value))
+const surfaceCoords = computed(() => surfaceHexCoords(props.planet.size as PlanetSizeKey))
 
-// A slot still empty on the server but referenced by a queued building is shown
-// as "pending" (placed this turn, not yet building).
+// A slot still empty on the server but referenced by a queued building is shown as
+// "pending" (placed this turn, not yet building).
 const queuedBuildingBySlot = computed(() => {
   const map = new Map<number, { buildingId: string, queueIndex: number }>()
   props.planet.buildQueue.forEach((entry, queueIndex) => {
@@ -161,7 +172,6 @@ const queuedBuildingBySlot = computed(() => {
   return map
 })
 
-// Production progress of the in-progress build per slot (from the queue item's spend).
 const queueSpentBySlot = computed(() => {
   const map = new Map<number, number>()
   props.planet.buildQueue.forEach((e) => {
@@ -170,13 +180,18 @@ const queueSpentBySlot = computed(() => {
   return map
 })
 
-type RenderSlot = PlanetSlot & { queuedBuildingId?: string, queueIndex?: number, districtType?: string | null, nodeCount?: number }
+type RenderSlot = PlanetSlot & {
+  queuedBuildingId?: string
+  queueIndex?: number
+  districtType?: string | null
+  builtNodes?: string[]
+}
 
 const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | null): RenderSlot => {
   const serverSlot = props.planet.slots[index]
   const districtType = serverSlot?.districtType ?? null
-  const nodeCount = serverSlot?.nodes?.length ?? 0
-  const base = { index, coord: surfaceCoords.value[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, nodeCount }
+  const builtNodes = serverSlot?.nodes ?? []
+  const base = { index, coord: surfaceCoords.value[index] ?? { q: 0, r: 0 }, zone, resourceNode, districtType, builtNodes }
 
   // A node currently building (district node or megastructure).
   if (serverSlot?.buildingId && serverSlot.isConstructing) {
@@ -186,7 +201,7 @@ const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | 
     return { ...base, state: 'under-construction', buildingId: serverSlot.buildingId as BuildingId, progress }
   }
   // An established district sitting idle (has built nodes, nothing in progress).
-  if (districtType && nodeCount > 0) {
+  if (districtType && builtNodes.length > 0) {
     return { ...base, state: 'completed', buildingId: null, progress: 100 }
   }
   // A completed legacy building / megastructure (seeded worlds, stars).
@@ -198,7 +213,7 @@ const toSlot = (index: number, zone: SlotZone, resourceNode: ResourceNodeType | 
   if (queued) {
     return { ...base, state: 'under-construction', buildingId: queued.buildingId as BuildingId, progress: 0, queuedBuildingId: queued.buildingId, queueIndex: queued.queueIndex }
   }
-  return { ...base, state: 'empty', buildingId: null, progress: 0, districtType: null, nodeCount: 0 }
+  return { ...base, state: 'empty', buildingId: null, progress: 0, districtType: null, builtNodes: [] }
 }
 
 const surfaceSlots = computed(() =>
@@ -220,9 +235,8 @@ const surfacePositions = computed(() =>
     return { ...slot, px: x, py: y }
   }))
 
-// Planet radius = far enough to contain the outermost surface hex (its centre distance
-// + half a hex), so the sphere hugs the slots for any planet size; the orbital ring and
-// the canvas then derive from it.
+// Planet radius = far enough to contain the outermost surface hex (centre distance +
+// half a hex), so the sphere hugs the slots for any planet size.
 const planetRadius = computed(() => {
   const reach = Math.max(0, ...surfacePositions.value.map(p => Math.hypot(p.px, p.py)))
   return Math.round(reach + HEX_SIZE * 0.95 + 8)
@@ -236,13 +250,9 @@ const orbitalPositions = computed(() =>
     return { ...slot, px: Math.cos(angle) * orbitalRingRadius.value, py: Math.sin(angle) * orbitalRingRadius.value }
   }))
 
-// ── Catalog split per zone (only researched items are listed) ─────────
-const surfaceBuildings = computed(() => props.buildingCatalog.filter(b => isSurfaceBuilding(b.id as BuildingId)))
-const orbitalBuildings = computed(() => props.buildingCatalog.filter(b => ORBITAL_BUILDING_IDS.includes(b.id as BuildingId)))
-const buildingList = computed(() => [...surfaceBuildings.value, ...orbitalBuildings.value].filter(b => !b.locked))
+// ── Catalog ───────────────────────────────────────────────────────────
 const unitList = computed(() => props.unitCatalog.filter(u => !u.locked))
 
-// ── Affordability ─────────────────────────────────────────────────────
 const canAfford = (costs: BuildCosts): boolean => {
   if (!props.playerResources) return true
   return props.playerResources.energy >= costs.energy
@@ -269,8 +279,8 @@ const canAffordStrategic = (costs?: Partial<Record<string, number>>): boolean =>
 
 const queueFull = computed(() => props.planet.buildQueue.length >= props.buildQueueLimit)
 
-const canQueueBuilding = (b: BuildingDefinition) =>
-  props.canBuild && !b.locked && !queueFull.value && canAfford(b.resourceCosts) && canAffordStrategic(b.strategicCosts)
+const canQueueNode = (n: DistrictNode) =>
+  props.canBuild && n.state === 'available' && !queueFull.value && canAfford(n.resourceCosts) && canAffordStrategic(n.strategicCosts)
 
 const hasOrbitalDock = computed(() => props.planet.slots.some(s => s.buildingId === 'bld:orbital-dock' && !s.isConstructing))
 const canTrainUnit = (u: UnitDefinition) => (!u.requiresFacility || hasOrbitalDock.value)
@@ -279,18 +289,6 @@ const canQueueUnit = (u: UnitDefinition) =>
 
 const productionPerRound = computed(() => props.planet.productionPerRound)
 const estimateRounds = (cost: number) => (productionPerRound.value <= 0 ? 0 : Math.max(1, Math.ceil(cost / productionPerRound.value)))
-
-// ── Tooltip content (costs/yields/hints live in the row's hover tooltip) ──
-const buildingYields = (b: BuildingDefinition) => {
-  const out: Array<{ icon: string, amount: number }> = []
-  const p = b.resourceProduction ?? {}
-  if (p.energy) out.push({ icon: 'i-lucide-zap', amount: p.energy })
-  if (p.minerals) out.push({ icon: 'i-lucide-pickaxe', amount: p.minerals })
-  if (p.rare) out.push({ icon: 'i-lucide-atom', amount: p.rare })
-  if (b.researchPoints) out.push({ icon: 'i-lucide-flask-conical', amount: b.researchPoints })
-  if (b.strategicProduction) out.push({ icon: STRATEGIC_ICONS[b.strategicProduction.resource] ?? 'i-lucide-sparkles', amount: b.strategicProduction.amount })
-  return out
-}
 
 const costLines = (costs: BuildCosts, strategic?: Partial<Record<string, number>>) => {
   const r = props.playerResources
@@ -305,8 +303,13 @@ const costLines = (costs: BuildCosts, strategic?: Partial<Record<string, number>
   return lines
 }
 
-const buildingHint = (b: BuildingDefinition): string | null =>
-  (!canAfford(b.resourceCosts) || !canAffordStrategic(b.strategicCosts)) ? t('game.slots.tooltip-insufficient') : null
+const nodeHint = (n: DistrictNode, founded: boolean): string | null => {
+  if (n.state === 'built' || n.state === 'building') return null
+  if (n.state === 'locked') return n.lockedByTechName ? t('game.slots.requires-tech', { tech: n.lockedByTechName }) : t('game.slots.locked')
+  if (n.state === 'blocked') return founded ? t('game.slots.needs-prereq') : t('game.slots.needs-district')
+  if (!canAfford(n.resourceCosts) || !canAffordStrategic(n.strategicCosts)) return t('game.slots.tooltip-insufficient')
+  return null
+}
 
 const unitHint = (u: UnitDefinition): string | null => {
   if (!canTrainUnit(u)) return t('game.slots.tooltip-requires-dock')
@@ -314,41 +317,32 @@ const unitHint = (u: UnitDefinition): string | null => {
   return null
 }
 
-// ── Placement ─────────────────────────────────────────────────────────
-const placementDef = computed(() => props.buildingCatalog.find(b => b.id === placementBuildingId.value) ?? null)
-
-// District nodes carry the exact slots they may target (computed engine-side); fall
-// back to the legacy zone/strategic rules for non-district builds (megastructures).
-const validPlacementSlots = computed(() => {
-  const def = placementDef.value
-  if (!def) return new Set<number>()
-  if (def.validSlots) return new Set(def.validSlots)
-  const set = new Set<number>()
-  for (const slot of allSlots.value) {
-    if (slot.state !== 'empty') continue
-    if (!isBuildingAllowedInZone(def.id as BuildingId, slot.zone)) continue
-    if (def.strategicProduction && slot.resourceNode !== def.strategicProduction.requiresNode) continue
-    set.add(slot.index)
+// ── Node selection (found = placement; deeper = auto-build in district) ─
+const selectNode = (n: DistrictNode) => {
+  if (!canQueueNode(n)) return
+  if (n.isBase) {
+    // Founding a district → enter placement so the player picks the slot.
+    placementNodeId.value = placementNodeId.value === n.id ? null : n.id
+    return
   }
-  return set
-})
-
-const selectBuildingForPlacement = (b: BuildingDefinition) => {
-  if (!canQueueBuilding(b)) return
-  placementBuildingId.value = placementBuildingId.value === b.id ? null : b.id
-}
-
-const placeAt = (slotIndex: number, zone: SlotZone) => {
-  const def = placementDef.value
-  if (!def || !validPlacementSlots.value.has(slotIndex)) return
-  void zone
-  emit('queue-build', props.planet.id, def.id, 'building', slotIndex)
-  placementBuildingId.value = null
+  // A building inside an existing district just builds into that district's slot.
+  if (n.slotIndex !== null) emit('queue-build', props.planet.id, n.id, 'building', n.slotIndex)
 }
 
 const selectUnit = (u: UnitDefinition) => {
   if (!canQueueUnit(u)) return
   emit('queue-build', props.planet.id, u.id, 'unit')
+}
+
+// ── Placement (founding a district base only) ─────────────────────────
+const placementNode = computed(() => allNodes.value.find(n => n.id === placementNodeId.value) ?? null)
+const validPlacementSlots = computed(() => new Set(placementNode.value?.foundSlots ?? []))
+
+const placeAt = (slotIndex: number) => {
+  const node = placementNode.value
+  if (!node || !validPlacementSlots.value.has(slotIndex)) return
+  emit('queue-build', props.planet.id, node.id, 'building', slotIndex)
+  placementNodeId.value = null
 }
 
 const synergyLabelKeys: Record<string, string> = {
@@ -369,71 +363,19 @@ const previewHasOreBonus = (buildingId: string, slotIndex: number): boolean =>
 
 // Base-yield + bonus preview shown while hovering a valid placement target.
 const hoverPreview = computed(() => {
-  const def = placementDef.value
+  const node = placementNode.value
   const index = hoveredSlotIndex.value
-  if (!def || index === null || !validPlacementSlots.value.has(index)) return null
+  if (!node || index === null || !validPlacementSlots.value.has(index)) return null
   const slot = allSlots.value.find(s => s.index === index)
-  const yields: Array<{ icon: string, label: string, amount: number }> = []
-  const prod = def.resourceProduction ?? {}
-  if (prod.energy) yields.push({ icon: 'i-lucide-zap', label: 'energy', amount: prod.energy })
-  if (prod.minerals) yields.push({ icon: 'i-lucide-pickaxe', label: 'minerals', amount: prod.minerals })
-  if (prod.rare) yields.push({ icon: 'i-lucide-atom', label: 'rare', amount: prod.rare })
-  if (def.researchPoints) yields.push({ icon: 'i-lucide-flask-conical', label: 'research', amount: def.researchPoints })
-  if (def.strategicProduction && slot?.resourceNode === def.strategicProduction.requiresNode) {
-    yields.push({ icon: STRATEGIC_ICONS[def.strategicProduction.resource] ?? 'i-lucide-sparkles', label: 'strategic', amount: def.strategicProduction.amount })
-  }
   return {
-    name: def.name,
-    yields,
-    synergies: slot?.zone === 'surface' ? previewSynergies(def.id, index) : [],
-    oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(def.id, index) : false
+    name: node.name,
+    yields: node.yields,
+    synergies: slot?.zone === 'surface' ? previewSynergies(node.id, index) : [],
+    oreBonus: slot?.zone === 'surface' ? previewHasOreBonus(node.id, index) : false
   }
 })
 
-// ── Queue strip ───────────────────────────────────────────────────────
-const queueItems = computed(() =>
-  props.planet.buildQueue.map((entry, index) => {
-    const def = entry.kind === 'building'
-      ? props.buildingCatalog.find(b => b.id === entry.id)
-      : props.unitCatalog.find(u => u.id === entry.id)
-    const cost = def?.productionCost ?? 0
-    const progress = cost > 0 ? Math.min(100, Math.round((entry.productionSpent / cost) * 100)) : 0
-    return {
-      index,
-      kind: entry.kind,
-      name: def?.name ?? entry.id,
-      icon: def?.icon ?? (entry.kind === 'building' ? 'i-lucide-hammer' : 'i-lucide-rocket'),
-      progress,
-      roundsLeft: estimateRounds(Math.max(0, cost - entry.productionSpent)),
-      isFront: index === 0
-    }
-  }))
-
-const onDragStart = (index: number) => {
-  dragIndex.value = index
-}
-const onDrop = (toIndex: number) => {
-  const from = dragIndex.value
-  dragIndex.value = null
-  if (from === null || from === toIndex) return
-  emit('reorder-queue', props.planet.id, from, toIndex)
-}
-
-const getBuildingName = (id: string) => props.buildingCatalog.find(b => b.id === id)?.name ?? id
-const getBuildingIcon = (id: string) => props.buildingCatalog.find(b => b.id === id)?.icon ?? 'i-lucide-hammer'
-const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.icon ?? 'i-lucide-rocket'
-const getDistrictIcon = (type: string) => (DISTRICT_ICONS as Record<string, string>)[type] ?? 'i-lucide-layout-grid'
-const getDistrictName = (type: string) => {
-  const key = `game.districts.${type}`
-  return t(key) === key ? type : t(key)
-}
-const nodeName = (id: string) => {
-  const key = `game.buildings.${id.replace('bld:', '')}.name`
-  return t(key) === key ? id : t(key)
-}
-
 // ── Slot inspection tooltip (what's built here + its effects) ──────────
-// Shown on hover whenever we are NOT placing a building (placement has its own preview).
 const OUTPUT_ICONS = {
   energy: 'i-lucide-zap',
   matter: 'i-lucide-pickaxe',
@@ -441,8 +383,13 @@ const OUTPUT_ICONS = {
   production: 'i-lucide-hammer'
 } as const
 
+const getDistrictName = (type: string) => {
+  const key = `game.districts.${type}`
+  return t(key) === key ? type : t(key)
+}
+
 const slotTooltip = computed(() => {
-  if (placementBuildingId.value) return null
+  if (placementNodeId.value) return null
   const index = hoveredSlotIndex.value
   if (index === null) return null
   const slot = props.planet.slots[index]
@@ -474,12 +421,44 @@ const slotTooltip = computed(() => {
     return { title: getDistrictName(districtType), nodes, outputs, upkeep }
   }
 
-  // Legacy / megastructure building completed on this slot.
   if (slot.buildingId && !slot.isConstructing) {
     return { title: nodeName(slot.buildingId), nodes: [], outputs: [], upkeep: 0 }
   }
   return null
 })
+
+// ── Queue strip ───────────────────────────────────────────────────────
+const queueItems = computed(() =>
+  props.planet.buildQueue.map((entry, index) => {
+    const isBuilding = entry.kind === 'building'
+    const def = isBuilding ? null : props.unitCatalog.find(u => u.id === entry.id)
+    const cost = isBuilding
+      ? ((findDistrictNode(entry.id as BuildingId)?.node.buildTime ?? 0) * 20)
+      : (def?.productionCost ?? 0)
+    const progress = cost > 0 ? Math.min(100, Math.round((entry.productionSpent / cost) * 100)) : 0
+    return {
+      index,
+      kind: entry.kind,
+      name: isBuilding ? nodeName(entry.id) : (def?.name ?? entry.id),
+      icon: isBuilding ? nodeIcon(entry.id) : (def?.icon ?? 'i-lucide-rocket'),
+      progress,
+      roundsLeft: estimateRounds(Math.max(0, cost - entry.productionSpent)),
+      isFront: index === 0
+    }
+  }))
+
+const onDragStart = (index: number) => {
+  dragIndex.value = index
+}
+const onDrop = (toIndex: number) => {
+  const from = dragIndex.value
+  dragIndex.value = null
+  if (from === null || from === toIndex) return
+  emit('reorder-queue', props.planet.id, from, toIndex)
+}
+
+const getDistrictIcon = (type: string) => (DISTRICT_ICONS as Record<string, string>)[type] ?? 'i-lucide-layout-grid'
+const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.icon ?? 'i-lucide-rocket'
 
 const KNOWN_PLANET_TYPES = new Set(['terrestrial', 'gas-giant', 'ice-giant', 'barren', 'oceanic', 'desert'])
 const planetImageSrc = computed(() =>
@@ -490,6 +469,10 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
   'exotic-matter': 'i-lucide-gem',
   'antimatter': 'i-lucide-orbit'
 }
+
+// Small icons shown inside a built district slot (a glance at how developed it is).
+const slotBuiltIcons = (builtNodes: string[] | undefined) =>
+  (builtNodes ?? []).slice(0, 4).map(id => nodeIcon(id))
 </script>
 
 <template>
@@ -529,30 +512,66 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
         v-if="catalogTab === 'buildings'"
         class="px-3 pt-2 text-[11px] text-neutral-500"
       >
-        {{ placementBuildingId ? $t('game.slots.placement-hint') : $t('game.slots.pick-building-hint') }}
+        {{ placementNodeId ? $t('game.slots.placement-hint') : $t('game.slots.pick-district-hint') }}
       </p>
 
-      <div class="flex-1 overflow-y-auto p-2 space-y-1">
-        <!-- Buildings -->
+      <div class="flex-1 overflow-y-auto p-2 space-y-2">
+        <!-- Districts (groups holding their buildings) -->
         <template v-if="catalogTab === 'buildings'">
-          <GameBuildListRow
-            v-for="b in buildingList"
-            :key="b.id"
-            :testid="`build-list-option-${b.id}`"
-            :name="b.name"
-            :icon="b.icon"
-            :rounds="estimateRounds(b.productionCost)"
-            :disabled="!canQueueBuilding(b)"
-            :selected="placementBuildingId === b.id"
-            accent="primary"
-            :description="b.description"
-            :yields="buildingYields(b)"
-            :costs="costLines(b.resourceCosts, b.strategicCosts)"
-            :hint="buildingHint(b)"
-            @select="selectBuildingForPlacement(b)"
-          />
+          <div
+            v-for="group in districtCatalog"
+            :key="group.type"
+            :data-testid="`district-group-${group.type}`"
+            class="rounded-lg border"
+            :class="group.founded ? 'border-primary-700/40 bg-primary-950/20' : 'border-neutral-800 bg-neutral-900/30'"
+          >
+            <!-- District header -->
+            <div class="flex items-center gap-2 px-2.5 py-1.5">
+              <UIcon
+                :name="group.icon"
+                class="w-4 h-4 shrink-0"
+                :class="group.founded ? 'text-primary-300' : 'text-neutral-400'"
+              />
+              <span class="text-sm font-semibold text-neutral-100">{{ group.name }}</span>
+              <UBadge
+                v-if="group.founded"
+                color="primary"
+                variant="subtle"
+                size="xs"
+                class="ml-auto"
+              >
+                {{ $t('game.slots.district-built') }}
+              </UBadge>
+              <UIcon
+                v-else-if="!group.available"
+                name="i-lucide-lock"
+                class="ml-auto w-3.5 h-3.5 text-neutral-600"
+              />
+            </div>
+
+            <!-- Building nodes inside the district (the bracket) -->
+            <div class="border-t border-neutral-800/60 px-1.5 py-1.5 space-y-1">
+              <GameBuildListRow
+                v-for="n in group.nodes"
+                :key="n.id"
+                :testid="`build-list-option-${n.id}`"
+                :name="n.isBase ? $t('game.slots.found-district') : n.name"
+                :icon="n.icon"
+                :rounds="estimateRounds(n.productionCost)"
+                :disabled="!canQueueNode(n)"
+                :selected="placementNodeId === n.id"
+                :done="n.state === 'built' || n.state === 'building'"
+                accent="primary"
+                :description="n.isBase ? n.name : n.description"
+                :yields="n.yields"
+                :costs="n.state === 'built' || n.state === 'building' ? [] : costLines(n.resourceCosts, n.strategicCosts)"
+                :hint="nodeHint(n, group.founded)"
+                @select="selectNode(n)"
+              />
+            </div>
+          </div>
           <p
-            v-if="!buildingList.length"
+            v-if="!districtCatalog.length"
             class="px-2 py-4 text-center text-xs text-neutral-500"
           >
             {{ $t('game.slots.none-researched') }}
@@ -638,8 +657,7 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
             class="absolute rounded-full overflow-hidden pointer-events-none planet-glow"
             :style="{ width: `${planetRadius * 2}px`, height: `${planetRadius * 2}px`, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }"
           >
-            <!-- scale-110: overfill the circle so the planet meets the ring with no gap,
-                 cropping a few px of the edge (we favour the surface over the rim). -->
+            <!-- scale-110: overfill the circle so the planet meets the ring with no gap. -->
             <img
               :src="planetImageSrc"
               alt=""
@@ -663,10 +681,10 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
               :data-state="slotPos.state"
               class="w-full h-full transition-all duration-200 relative"
               :class="[
-                placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-105' : 'cursor-default'
+                placementNodeId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-105' : 'cursor-default'
               ]"
               :style="{ clipPath: hexClipPath }"
-              @click="placeAt(slotPos.index, 'surface')"
+              @click="placeAt(slotPos.index)"
             >
               <div
                 class="absolute inset-0 transition-colors duration-200"
@@ -677,9 +695,8 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                   'bg-primary-800/40': slotPos.state === 'completed'
                 }"
               />
-              <!-- Valid placement highlight -->
               <div
-                v-if="placementBuildingId && validPlacementSlots.has(slotPos.index)"
+                v-if="placementNodeId && validPlacementSlots.has(slotPos.index)"
                 class="absolute inset-0.5 border-2 border-primary-400/80 animate-pulse"
                 :style="{ clipPath: hexClipPath }"
               />
@@ -690,7 +707,7 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 <UIcon
                   name="i-lucide-plus"
                   class="w-5 h-5"
-                  :class="placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'text-primary-200' : 'text-neutral-600/70'"
+                  :class="placementNodeId && validPlacementSlots.has(slotPos.index) ? 'text-primary-200' : 'text-neutral-600/70'"
                 />
               </div>
               <div
@@ -702,18 +719,31 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                   class="w-4 h-4 text-amber-400/80"
                 />
               </div>
+              <!-- Built / building district: icon + the buildings inside it -->
               <div
                 v-if="slotPos.districtType || ((slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId)"
-                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none"
               >
                 <UIcon
-                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : getBuildingIcon(slotPos.buildingId!)"
+                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : nodeIcon(slotPos.buildingId!)"
                   class="w-5 h-5"
                   :class="slotPos.state === 'completed' ? 'text-primary-200' : 'text-warning-300'"
                 />
                 <span
+                  v-if="slotPos.districtType"
                   class="text-[9px] text-neutral-200 text-center leading-tight px-1 max-w-full truncate"
-                >{{ slotPos.districtType ? `${getDistrictName(slotPos.districtType)}${slotPos.nodeCount ? ' ' + slotPos.nodeCount : ''}` : getBuildingName(slotPos.buildingId!) }}</span>
+                >{{ getDistrictName(slotPos.districtType) }}</span>
+                <div
+                  v-if="slotPos.builtNodes && slotPos.builtNodes.length"
+                  class="flex items-center gap-0.5"
+                >
+                  <UIcon
+                    v-for="(ic, i) in slotBuiltIcons(slotPos.builtNodes)"
+                    :key="i"
+                    :name="ic"
+                    class="w-2.5 h-2.5 text-primary-300/90"
+                  />
+                </div>
                 <span
                   v-if="slotPos.state === 'under-construction'"
                   class="text-[8px] text-warning-200 font-semibold"
@@ -737,9 +767,9 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
               :data-state="slotPos.state"
               class="w-full h-full rounded-full transition-all duration-200 relative border bg-neutral-950"
               :class="[
-                placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-110 border-sky-300/80' : 'cursor-default border-sky-500/30'
+                placementNodeId && validPlacementSlots.has(slotPos.index) ? 'cursor-pointer scale-110 border-sky-300/80' : 'cursor-default border-sky-500/30'
               ]"
-              @click="placeAt(slotPos.index, 'orbital')"
+              @click="placeAt(slotPos.index)"
             >
               <div
                 class="absolute inset-0 rounded-full transition-colors duration-200"
@@ -756,15 +786,15 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                 <UIcon
                   name="i-lucide-plus"
                   class="w-4 h-4"
-                  :class="placementBuildingId && validPlacementSlots.has(slotPos.index) ? 'text-sky-200' : 'text-sky-500/50'"
+                  :class="placementNodeId && validPlacementSlots.has(slotPos.index) ? 'text-sky-200' : 'text-sky-500/50'"
                 />
               </div>
               <div
                 v-if="slotPos.districtType || ((slotPos.state === 'completed' || slotPos.state === 'under-construction') && slotPos.buildingId)"
-                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5"
+                class="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none"
               >
                 <UIcon
-                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : getBuildingIcon(slotPos.buildingId!)"
+                  :name="slotPos.districtType ? getDistrictIcon(slotPos.districtType) : nodeIcon(slotPos.buildingId!)"
                   class="w-5 h-5"
                   :class="slotPos.state === 'completed' ? 'text-sky-200' : 'text-warning-300'"
                 />
@@ -773,9 +803,9 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
                   class="text-[8px] text-warning-200 font-semibold"
                 >{{ slotPos.queueIndex !== undefined ? `#${slotPos.queueIndex + 1}` : `${slotPos.progress}%` }}</span>
                 <span
-                  v-else-if="slotPos.districtType"
+                  v-else-if="slotPos.builtNodes && slotPos.builtNodes.length"
                   class="text-[8px] text-sky-100 font-semibold"
-                >{{ slotPos.nodeCount }}</span>
+                >{{ slotPos.builtNodes.length }}</span>
               </div>
             </button>
           </div>
@@ -792,8 +822,8 @@ const resourceNodeIcons: Record<ResourceNodeType, string> = {
               </p>
               <div class="flex flex-wrap items-center gap-2">
                 <span
-                  v-for="y in hoverPreview.yields"
-                  :key="y.label"
+                  v-for="(y, i) in hoverPreview.yields"
+                  :key="i"
                   class="flex items-center gap-0.5 text-success-300"
                 >
                   <UIcon

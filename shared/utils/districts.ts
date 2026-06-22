@@ -1,4 +1,4 @@
-import type { BuildingId, Planet } from '../types/game'
+import type { BuildingId, Planet, ResearchId } from '../types/game'
 import type { DistrictType, NodeCost, NodeOutput, SlotZonePlacement } from '../types/districts'
 import { DISTRICT_DEFS, districtsForPlanetType } from '../defs/districts'
 
@@ -111,6 +111,98 @@ export function buildableDistrictNodes(
 /** The district type a slot currently hosts (for rendering), or null. */
 export function slotDistrictType(planet: Planet, slotIndex: number): DistrictType | null {
   return planet.slots[slotIndex]?.districtType ?? null
+}
+
+// ── Grouped catalog (districts hold their buildings) ──────────────────
+// The planet builder lists DISTRICTS as groups; founding a district places it on an
+// empty slot, but its deeper buildings are just queued INTO that district's slot (no
+// placement). Built districts/buildings stay in the list, marked, so the group reads
+// like a bracket around its buildings and shows how developed the planet is.
+export type DistrictNodeState = 'built' | 'building' | 'available' | 'locked' | 'blocked'
+
+export interface CatalogNode {
+  nodeId: BuildingId
+  isBase: boolean
+  state: DistrictNodeState
+  cost: NodeCost
+  buildTime: number
+  energyUpkeep: number
+  output: NodeOutput
+  research?: ResearchId
+  /** District slot to build into (deeper nodes / founded base); null until founded. */
+  slotIndex: number | null
+  /** Empty slots a yet-unfounded base may be placed on (drives placement mode). */
+  foundSlots: number[]
+}
+
+export interface CatalogDistrict {
+  type: DistrictType
+  zone: SlotZonePlacement
+  founded: boolean
+  /** The slot hosting this district, or null if not founded yet. */
+  slotIndex: number | null
+  /** False while gated (e.g. no Research district yet) — the whole group is greyed. */
+  available: boolean
+  nodes: CatalogNode[]
+}
+
+export function planetDistrictCatalog(
+  planet: Planet,
+  completedTechIds: string[],
+  researchEstablished = true
+): CatalogDistrict[] {
+  const completed = new Set(completedTechIds)
+
+  return districtsForPlanetType(planet.type).map((def) => {
+    const existingIndex = planet.slots.findIndex(s => s.districtType === def.type)
+    const founded = existingIndex >= 0
+    const slot = founded ? planet.slots[existingIndex] : undefined
+    const built = new Set(slot?.nodes ?? [])
+    const inProgress = slot?.isConstructing && slot.buildingId ? slot.buildingId : null
+    const chosen = new Set<string>([...built, ...(inProgress ? [inProgress] : [])])
+    const available = def.type === 'research' || researchEstablished
+    const foundSlots = founded ? [] : emptySlotsForZone(planet, def.zone)
+
+    const nodes: CatalogNode[] = def.tree.map((node) => {
+      const isBase = node.prereqIds.length === 0
+      let state: DistrictNodeState
+      if (built.has(node.id)) {
+        state = 'built'
+      } else if (inProgress === node.id) {
+        state = 'building'
+      } else {
+        const prereqOk = node.prereqIds.every(p => chosen.has(p))
+        const branchConflict = Boolean(node.branchGroup)
+          && def.tree.some(n => n.branchGroup === node.branchGroup && n.id !== node.id && chosen.has(n.id))
+        const techOk = !node.research || completed.has(node.research)
+        if (isBase) {
+          if (!available || foundSlots.length === 0) state = 'blocked'
+          else if (!techOk) state = 'locked'
+          else state = 'available'
+        } else if (!founded || !prereqOk || branchConflict) {
+          state = 'blocked'
+        } else if (!techOk) {
+          state = 'locked'
+        } else {
+          state = 'available'
+        }
+      }
+      return {
+        nodeId: node.id,
+        isBase,
+        state,
+        cost: node.cost,
+        buildTime: node.buildTime,
+        energyUpkeep: node.energyUpkeep ?? 0,
+        output: node.output ?? {},
+        research: node.research,
+        slotIndex: founded ? existingIndex : null,
+        foundSlots: isBase && !founded ? foundSlots : []
+      }
+    })
+
+    return { type: def.type, zone: def.zone, founded, slotIndex: founded ? existingIndex : null, available, nodes }
+  })
 }
 
 /** Icon hint per district type (lucide names) for the client. */

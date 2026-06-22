@@ -62,7 +62,7 @@
         <GamePlanetSlotView
           v-if="viewMode === 'planet' && selectedPlanetWithQueue"
           :planet="selectedPlanetWithQueue"
-          :building-catalog="planetBuildCatalog"
+          :district-catalog="planetDistrictCatalogView"
           :unit-catalog="unitCatalog"
           :can-build="planetCanBuild"
           :build-queue-limit="buildQueueLimit"
@@ -194,7 +194,7 @@
 <script setup lang="ts">
 import { BASE_PLANET_PRODUCTION, BUILDING_DEFS, BUILD_QUEUE_LIMIT, UNIT_DEFS, getBuildingDef, getMissingResearch } from '~~/shared/defs/production'
 import { findDistrictNode } from '~~/shared/defs/districts'
-import { DISTRICT_ICONS, buildableDistrictNodes, hasResearchDistrict } from '~~/shared/utils/districts'
+import { DISTRICT_ICONS, planetDistrictCatalog, hasResearchDistrict } from '~~/shared/utils/districts'
 import { TECH_DEFS } from '~~/shared/defs/research-tree'
 import { validateTurnPlan } from '~~/shared/validation/turnPlan'
 import { toPlayerId } from '~~/shared/utils/playerId'
@@ -283,6 +283,31 @@ interface UnitDefinition {
   strategicCosts?: Partial<Record<string, number>>
   locked: boolean
   lockedByTechName: string | null
+}
+
+// Grouped district catalog passed to the planet builder (districts hold their buildings).
+interface DistrictNode {
+  id: string
+  name: string
+  description: string
+  icon: string
+  state: 'built' | 'building' | 'available' | 'locked' | 'blocked'
+  isBase: boolean
+  resourceCosts: BuildCosts
+  strategicCosts?: Partial<Record<string, number>>
+  productionCost: number
+  yields: Array<{ icon: string, amount: number }>
+  slotIndex: number | null
+  foundSlots: number[]
+  lockedByTechName: string | null
+}
+interface DistrictGroup {
+  type: string
+  name: string
+  icon: string
+  founded: boolean
+  available: boolean
+  nodes: DistrictNode[]
 }
 
 definePageMeta({
@@ -813,35 +838,48 @@ const selectedRawPlanet = computed(() => planets.value.find(p => p.id === select
 const myOwnedPlanets = computed(() =>
   myPlayerId.value ? planets.value.filter(p => p.owner === myPlayerId.value) : [])
 const researchEstablished = computed(() => hasResearchDistrict(myOwnedPlanets.value))
-const planetBuildCatalog = computed((): BuildingDefinition[] => {
+
+// Grouped district catalog: each district is a group that HOLDS its buildings. Founding
+// a district (its base node) uses placement; deeper buildings just auto-build into the
+// district's slot. Built districts/buildings stay listed (marked) so the group reads as
+// a bracket around its buildings and shows how developed the planet is.
+const nodeYields = (output: { energy?: number, matter?: number, research?: number, production?: number }) => {
+  const out: Array<{ icon: string, amount: number }> = []
+  if (output.energy) out.push({ icon: 'i-lucide-zap', amount: output.energy })
+  if (output.matter) out.push({ icon: 'i-lucide-pickaxe', amount: output.matter })
+  if (output.research) out.push({ icon: 'i-lucide-flask-conical', amount: output.research })
+  if (output.production) out.push({ icon: 'i-lucide-hammer', amount: output.production })
+  return out
+}
+const planetDistrictCatalogView = computed((): DistrictGroup[] => {
   const planet = selectedRawPlanet.value
   if (!planet || planet.kind === 'star') return []
-  return buildableDistrictNodes(planet, completedTechIds.value, researchEstablished.value).map((n) => {
-    const nameKey = buildingNameKey(n.nodeId)
-    const descKey = buildingDescriptionKey(n.nodeId)
-    const buildingName = te(nameKey) ? t(nameKey) : n.nodeId
-    const districtName = `${t(`game.districts.${n.districtType}`)} ${t('game.districts.label')}`
-    return {
-      id: n.nodeId,
-      // Founding a district is labelled by the DISTRICT; the building it places shows as
-      // the description ("Solar Array" is a building IN the Energy district, not the name).
-      name: n.isBase ? districtName : buildingName,
-      description: n.isBase ? buildingName : (te(descKey) ? t(descKey) : ''),
-      category: 'infrastructure' as BuildingCategory,
-      maxLevel: 1,
-      resourceCosts: { energy: n.cost.energy ?? 0, minerals: n.cost.matter ?? 0, rare: 0 },
-      productionCost: n.buildTime * BASE_PLANET_PRODUCTION,
-      icon: getBuildingDef(n.nodeId)?.icon ?? DISTRICT_ICONS[n.districtType],
-      site: 'planet' as const,
-      resourceProduction: { energy: n.output.energy, minerals: n.output.matter },
-      researchPoints: n.output.research,
-      strategicCosts: n.cost.strategic,
-      locked: n.locked,
-      lockedByTechName: null,
-      validSlots: n.validSlots,
-      districtType: n.districtType
-    }
-  })
+  return planetDistrictCatalog(planet, completedTechIds.value, researchEstablished.value).map(group => ({
+    type: group.type,
+    name: `${t(`game.districts.${group.type}`)} ${t('game.districts.label')}`,
+    icon: DISTRICT_ICONS[group.type],
+    founded: group.founded,
+    available: group.available,
+    nodes: group.nodes.map((n) => {
+      const nameKey = buildingNameKey(n.nodeId)
+      const descKey = buildingDescriptionKey(n.nodeId)
+      return {
+        id: n.nodeId,
+        name: te(nameKey) ? t(nameKey) : n.nodeId,
+        description: te(descKey) ? t(descKey) : '',
+        icon: getBuildingDef(n.nodeId)?.icon ?? DISTRICT_ICONS[group.type],
+        state: n.state,
+        isBase: n.isBase,
+        resourceCosts: { energy: n.cost.energy ?? 0, minerals: n.cost.matter ?? 0, rare: 0 },
+        strategicCosts: n.cost.strategic,
+        productionCost: n.buildTime * BASE_PLANET_PRODUCTION,
+        yields: nodeYields(n.output),
+        slotIndex: n.slotIndex,
+        foundSlots: n.foundSlots,
+        lockedByTechName: n.research ? techDisplayName(n.research) : null
+      }
+    })
+  }))
 })
 
 const unitCatalog = computed((): UnitDefinition[] => {

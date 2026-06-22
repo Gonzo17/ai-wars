@@ -459,7 +459,13 @@
       "tooltip-insufficient": "Nicht genug Ressourcen",
       "tooltip-requires-dock": "Benötigt ein Orbitaldock",
       "none-researched": "Noch nichts verfügbar — Forschung schaltet mehr frei.",
-      "read-only-hint": "Diese Welt gehört dir nicht — nur Ansicht."
+      "read-only-hint": "Diese Welt gehört dir nicht — nur Ansicht.",
+      "pick-district-hint": "Wähle einen Bezirk zum Gründen oder Ausbauen.",
+      "district-built": "Gebaut",
+      "found-district": "Bezirk gründen",
+      "needs-district": "Erst diesen Bezirk gründen.",
+      "needs-prereq": "Erst die Voraussetzung bauen.",
+      "requires-tech": "Benötigt {tech}"
     },
     "districts": {
       "label": "Bezirk",

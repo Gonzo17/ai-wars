@@ -65,19 +65,50 @@ export const TOTAL_SLOT_COUNT = SURFACE_SLOT_COUNT + ORBITAL_SLOT_COUNT
 // Planet size → slot counts (surface hexes + orbital ring). Three sizes; medium (7+5)
 // is the basic world. createPlanetSlots / PlanetSlotView read these so geometry scales.
 export type PlanetSizeKey = 'small' | 'medium' | 'large' | 'huge'
+
+// Surface slots are laid out in symmetric rows so the honeycomb fits inside the planet
+// circle: the middle row is the widest, narrowing above and below. Small 1-2-1 = 4,
+// medium 2-3-2 = 7, large 2-3-4-3-2 = 14. (`huge` is stars → not rendered here.)
+export const SURFACE_ROWS: Record<PlanetSizeKey, number[]> = {
+  small: [1, 2, 1],
+  medium: [2, 3, 2],
+  large: [2, 3, 4, 3, 2],
+  huge: [2, 3, 4, 3, 2]
+}
+const rowSum = (rows: number[]) => rows.reduce((a, b) => a + b, 0)
+
 export const SIZE_SLOTS: Record<PlanetSizeKey, { surface: number, orbit: number }> = {
-  small: { surface: 4, orbit: 3 },
-  medium: { surface: 7, orbit: 5 },
-  large: { surface: 11, orbit: 5 },
-  huge: { surface: 11, orbit: 5 } // planets don't use 'huge'; kept for the size union
+  small: { surface: rowSum(SURFACE_ROWS.small), orbit: 3 },
+  medium: { surface: rowSum(SURFACE_ROWS.medium), orbit: 5 },
+  large: { surface: rowSum(SURFACE_ROWS.large), orbit: 5 },
+  huge: { surface: rowSum(SURFACE_ROWS.huge), orbit: 5 } // planets don't use 'huge'
+}
+
+/**
+ * Axial hex coords for a planet's surface, laid out as centred rows (middle row widest)
+ * so the cluster fits a circle. Each row is centred independently; alternating even/odd
+ * row widths produce the natural honeycomb half-offset. Coords may be fractional — they
+ * are render-only (fed to hexToPixel); the server stores slots by index, row-major.
+ */
+export function surfaceHexCoords(size: PlanetSizeKey): HexCoord[] {
+  const rows = SURFACE_ROWS[size] ?? SURFACE_ROWS.medium
+  const mid = (rows.length - 1) / 2
+  const coords: HexCoord[] = []
+  rows.forEach((n, i) => {
+    const r = i - mid
+    for (let j = 0; j < n; j++) {
+      // q chosen so hexToPixel centres this row's n hexes around x = 0.
+      coords.push({ q: j - (n - 1) / 2 - r / 2, r })
+    }
+  })
+  return coords
 }
 
 const HEX_DIRS: ReadonlyArray<readonly [number, number]> = [[1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1], [1, -1]]
 
 /**
- * The first `count` axial hex coordinates spiralling out from the centre (centre, then
- * ring 1, then ring 2…). Gives a balanced honeycomb for any slot count; for count 7 it
- * is the classic centre+6 hexagon. Render-only — the server stores slots by index.
+ * The first `count` axial hex coordinates spiralling out from the centre. Kept for any
+ * generic count; the planet view uses `surfaceHexCoords(size)` for its centred rows.
  */
 export function generateHexCoords(count: number): HexCoord[] {
   const out: HexCoord[] = [{ q: 0, r: 0 }]

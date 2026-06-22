@@ -19,6 +19,8 @@ const props = defineProps<{
   costs?: CostLine[]
   /** Shown in the tooltip when the item can't be queued (resources/facility). */
   hint?: string | null
+  /** Already built / building — show as completed (check) rather than dimmed-disabled. */
+  done?: boolean
 }>()
 
 const emit = defineEmits<{ select: [] }>()
@@ -61,8 +63,9 @@ const closeTip = () => {
     :data-testid="testid"
     class="group relative flex w-full items-center gap-3 rounded-md border px-2 py-2 text-left transition"
     :class="[
-      selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
-      disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+      done ? 'border-primary-700/40 bg-primary-950/30 cursor-default'
+      : selected ? selectedClass : 'border-transparent hover:bg-neutral-800/70',
+      disabled && !done ? 'opacity-40 cursor-not-allowed' : ''
     ]"
     :disabled="disabled"
     @click="emit('select')"
@@ -84,11 +87,19 @@ const closeTip = () => {
     <span class="flex-1 min-w-0 truncate text-sm font-medium text-neutral-100">
       {{ name }}
     </span>
-    <span class="shrink-0 text-[11px] text-neutral-400">
+    <UIcon
+      v-if="done"
+      name="i-lucide-check"
+      class="h-4 w-4 shrink-0 text-primary-300"
+    />
+    <span
+      v-else
+      class="shrink-0 text-[11px] text-neutral-400"
+    >
       {{ $t('game.common.duration-rounds', { count: rounds }) }}
     </span>
     <UIcon
-      v-if="hint"
+      v-if="hint && !done"
       name="i-lucide-circle-alert"
       class="h-3.5 w-3.5 shrink-0 text-warning-400"
     />

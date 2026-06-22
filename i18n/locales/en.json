@@ -459,7 +459,13 @@
       "tooltip-insufficient": "Not enough resources",
       "tooltip-requires-dock": "Requires an orbital dock",
       "none-researched": "Nothing available yet — research unlocks more.",
-      "read-only-hint": "You don't control this world — inspection only."
+      "read-only-hint": "You don't control this world — inspection only.",
+      "pick-district-hint": "Pick a district to found or develop.",
+      "district-built": "Built",
+      "found-district": "Found district",
+      "needs-district": "Found this district first.",
+      "needs-prereq": "Build its prerequisite first.",
+      "requires-tech": "Requires {tech}"
     },
     "districts": {
       "label": "District",
