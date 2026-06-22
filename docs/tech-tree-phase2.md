@@ -127,3 +127,102 @@ one other axis — none is reachable by teching alone:
    effects + doctrine forks + the galaxyStarFraction gate; tests.
 
 Each stage is its own commit; nothing half-built between them.
+
+## 7. Concrete tech list (REVIEW ME — v2, unlocks-first)
+
+**Philosophy (revised per David):** a tech is never a bare stat bonus. Every tech **unlocks
+real things** — units, buildings, *whole districts*, mechanics, visibilities, resources — and
+may bundle **several** (Civ-style, often 2–4). A buff only ever rides *alongside* an unlock,
+never alone. Each tier header shows its **gate** (techs + the empire condition to reach it).
+
+Branch key: **E** energy/compute · **I** industry · **X** exploration · **C** colonization ·
+**M** military. ★ = doctrine fork (pick one, sibling locks). Numbers are placeholders.
+
+> Turn 1 you can only found the **Rechenzentrum** (research district) — its base is the
+> mandatory data-center build. Districts themselves are now tech-unlocked, so opening each
+> new district *is* a felt research reward.
+
+### k0.6 Foundation — 3 · gate to reach: — (start)
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| Bootstrapped AI Core | E | **Energiematrix** district + its Solaranlage; the research mechanic |
+| Planetary Grid Management | E | Fusionskern + Energierelais buildings; the power-grid adjacency synergy |
+| Industrial Robotics | I | **Materieschmiede** + **Fabrikkomplex** districts + their base buildings (Bergwerk, Montagehalle) |
+
+### k0.8 Automation — 4 (★ Bootstrap Doctrine) · gate to reach: techs only
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| **Orbital Engineering** | X | **Probe** + the **Orbitale Werft** district (Orbitaldock) + **System-Tiefenscan** visibility (see a system's contents/deposits) — the early exploration push, probe & dock together |
+| ★ Mass Production | I | Roboterwerk (adv. production building) + production-rush mechanic + (−production build cost) |
+| ★ Deep Research | E | Quantencluster (adv. research building) + stronger compute-uplink mechanic |
+| Autonomous Resource Allocation | I | **Rare resource enabled** + **Seltenerd-Mine** district + its extractor |
+
+### k1.0 Dominion — 5 · gate to reach: **1 colony beyond homeworld**
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| Colony Ship Design | C | **Colony ship** + `colonize:terrestrial/oceanic` + a habitat building |
+| Exotic Matter Survey | X | **Exotic-matter resource** + its extractor + reveals exotic deposits |
+| Data Center II | E | Neuronales Netz (adv. Rechenzentrum building) + research mechanic |
+| Combat AI | M | **Frigate** + the **Orbitalbastion** (defence district) + listening-post |
+| Planetwide Infrastructure | I | Logistics building + a build-cost mechanic |
+
+### k1.5 Hegemony — 7 (★ Strategic Doctrine; star-constructor unlocks HERE) · gate: **hold your home system**
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| ★ Expansionist | C | `colonize:barren/desert/ice` + terraform building + cheaper/faster colonisation |
+| ★ Entrenchment | M | Star-fortress + shield buildings + a strong defence posture |
+| Stellar Cartography | X | **Star-constructor** + `capture:star` + extended fleet range |
+| Orbital Shipyard | I | Larger warships + ship-cost mechanic |
+| Orbital Fabricators | I | Megastructure construction enabled (−megastructure cost) |
+| AI Governor Systems | E | Governor building + multi-district admin mechanic |
+| Fleet Coordination | M | **Dreadnought** + fleet-combat mechanic |
+
+### k2.0 Stellar Mastery — 10 (★ Stellar Doctrine; star structures & units unlock) · gate: **hold a star**
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| Stellar Energy Capture | E | Stellar shipyard + the first star-shell structures + star-energy |
+| ★ Dyson Path | E | **Dyson-sphere** megastructure (energy flavour of the win wonder) |
+| ★ Matrioshka Path | E | **Matrioshka-brain** megastructure (compute flavour of the win wonder) |
+| Stellar Computation | E | Research megastructure + big research |
+| Antimatter Containment | E | **Antimatter resource** + extractor + reveals antimatter |
+| Mega Shipyard | I | Orbital-shipyard-mega (build ships on a star) |
+| System Defense Network | M | System-shield buildings + defence-district upgrade |
+| System-Wide Shields | M | Siege-grade shields mechanic |
+| Dreadnought Doctrine | M | Capital-ship line + capital combat mechanic |
+| Temporal Ascension Engine I | E | **Victory wonder (stage 1)** — the megastructure-win line begins |
+
+### k2.3 Interstellar — 6 · gate: **hold a star + 50% of home-galaxy stars**
+| Tech | Br | Unlocks (bundle) |
+|---|---|---|
+| Interstellar Probe | X | Cross-galaxy probe + cross-galaxy intel |
+| Generation Ship | C | `colonize:cross-galaxy` |
+| Temporal Ascension Engine II | E | **Victory wonder (final stage)** → built = **Megastructure win** |
+| Galactic Logistics | I | Empire-wide logistics mechanic |
+| Planet Cracker | M | **Planet-cracker** + `planet-cracker` ability (siege finisher; disrupts peaceful wins) |
+| Galactic Network | X | Cross-galaxy gateways + intel |
+
+### k3.0 — 0 techs = the win
+Expansion = hold the galaxy · Megastructure = wonder built · Military = conquer.
+
+Doctrine groups: `bootstrap` (k0.8), `strategic` (k1.5), `stellar` (k2.0). Planet-type gating
+rides `colonize:*` flags. The Megastructure win is the *built* Temporal Ascension Engine.
+
+## 8. District & building names (distinct — a district never shares a building's name)
+
+District names should be evocative, and a district must NOT be named like a building inside
+it. Proposed (German; English follows the same spirit):
+
+| District | Name | Its buildings (distinct) |
+|---|---|---|
+| research | **Rechenzentrum** | Recheneinheit (base, ex-"data-center") · Neuronales Netz · Quantencluster |
+| energy | **Energiematrix** | Solaranlage · Fusionskern · Energierelais |
+| matter | **Materieschmiede** | Bergwerk · Raffinerie |
+| production | **Fabrikkomplex** | Montagehalle · Roboterwerk |
+| shipyard | **Orbitale Werft** | Orbitaldock |
+| rare | **Seltenerd-Mine** | Seltenerd-Förderer |
+| exotic | **Exotik-Labor** | Exotik-Extraktor |
+| antimatter | **Antimaterie-Falle** | Antimaterie-Kollektor |
+| defence | **Orbitalbastion** | Schildgenerator · Abwehrgeschütz |
+
+The current `bld:data-center` is renamed **Recheneinheit** so "Rechenzentrum" can be the
+district. (Open: better names for Energiematrix / Materieschmiede if these feel flat.)
