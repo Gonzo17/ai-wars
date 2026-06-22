@@ -633,6 +633,8 @@
       "choose-ship": "Schiff bauen",
       "tab-megastructures": "Megastrukturen",
       "tab-ships": "Schiffe",
+      "filter-megastructures": "Bauwerke",
+      "filter-ships": "Schiffe",
       "pick-megastructure-hint": "Megastruktur wählen, dann auf einer Schale platzieren."
     },
     "errors": {

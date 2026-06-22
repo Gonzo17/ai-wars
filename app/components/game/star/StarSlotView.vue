@@ -99,10 +99,15 @@ const SHELL_ANGLES = [-90, 0, 90, 180]
 const CANVAS_SIZE = (SHELL_BASE_RADIUS + (STAR_SLOT_COUNT - 1) * SHELL_STEP + SHELL_SLOT_SIZE + 36) * 2
 
 // ── Catalog + placement state ─────────────────────────────────────────
-const catalogTab = ref<'buildings' | 'units'>('buildings')
 const placementBuildingId = ref<string | null>(null)
 const hoveredSlotIndex = ref<number | null>(null)
 const dragIndex = ref<number | null>(null)
+
+// One combined list (no tabs); filter chips toggle whole categories on/off.
+const filters = ref({ megastructures: true, ships: true })
+const toggleFilter = (k: 'megastructures' | 'ships') => {
+  filters.value[k] = !filters.value[k]
+}
 
 const cancelPlacement = () => {
   placementBuildingId.value = null
@@ -111,7 +116,6 @@ const cancelPlacement = () => {
 watch(() => props.star.id, () => {
   placementBuildingId.value = null
   hoveredSlotIndex.value = null
-  catalogTab.value = 'buildings'
 })
 
 const onKeydown = (e: KeyboardEvent) => {
@@ -216,6 +220,17 @@ const canQueueUnit = (u: UnitDefinition) =>
 
 // Only researched items are listed (locked = research missing → hidden).
 const megastructureList = computed(() => props.buildingCatalog.filter(b => !b.locked))
+
+// Megastructures already standing on a shell read as "built" — the staged Dyson is the
+// exception (it's re-buildable for the next stage, so it never reads as done).
+const builtMegastructureIds = computed(() => {
+  const set = new Set<string>()
+  for (const slot of props.star.slots) {
+    if (slot.buildingId && !slot.isConstructing) set.add(slot.buildingId)
+  }
+  return set
+})
+const isMegastructureDone = (b: BuildingDefinition) => b.id !== DYSON_ID && builtMegastructureIds.value.has(b.id)
 
 // ── Tooltip content (costs/yields/hints live in the row's hover tooltip) ──
 const buildingYields = (b: BuildingDefinition) => {
@@ -339,34 +354,46 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
         v-if="canBuild"
         class="relative z-10 flex w-80 shrink-0 flex-col border-r border-amber-900/40 bg-neutral-950/95"
       >
-        <div class="flex items-center gap-2 px-3 py-2 border-b border-neutral-800">
+        <p class="px-3 pt-3 pb-1 text-[11px] text-neutral-500">
+          {{ placementBuildingId ? $t('game.slots.placement-hint') : $t('game.star.pick-megastructure-hint') }}
+        </p>
+
+        <!-- Filters: toggle categories off to declutter (mirrors the planet view) -->
+        <div class="flex items-center gap-1.5 px-2.5 pb-1.5">
+          <span class="text-[10px] uppercase tracking-wider text-neutral-600 mr-0.5">{{ $t('game.slots.filter-label') }}</span>
           <button
             type="button"
-            data-testid="star-tab-megastructures"
-            class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
-            :class="catalogTab === 'buildings' ? 'bg-amber-900/50 text-amber-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
-            @click="catalogTab = 'buildings'"
+            data-testid="star-filter-megastructures"
+            class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition"
+            :class="filters.megastructures
+              ? 'border-amber-600/40 bg-amber-900/30 text-amber-200'
+              : 'border-neutral-800 bg-neutral-900/40 text-neutral-500 line-through'"
+            @click="toggleFilter('megastructures')"
           >
-            {{ $t('game.star.tab-megastructures') }}
+            <UIcon
+              name="i-lucide-orbit"
+              class="h-3 w-3"
+            />{{ $t('game.star.filter-megastructures') }}
           </button>
           <button
             v-if="hasShipyard"
             type="button"
-            data-testid="star-tab-units"
-            class="flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition"
-            :class="catalogTab === 'units' ? 'bg-amber-900/50 text-amber-100' : 'text-neutral-400 hover:bg-neutral-800/60'"
-            @click="catalogTab = 'units'"
+            data-testid="star-filter-ships"
+            class="flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition"
+            :class="filters.ships
+              ? 'border-amber-600/40 bg-amber-900/30 text-amber-200'
+              : 'border-neutral-800 bg-neutral-900/40 text-neutral-500 line-through'"
+            @click="toggleFilter('ships')"
           >
-            {{ $t('game.star.tab-ships') }}
+            <UIcon
+              name="i-lucide-rocket"
+              class="h-3 w-3"
+            />{{ $t('game.star.filter-ships') }}
           </button>
         </div>
 
-        <p class="px-3 pt-2 text-[11px] text-neutral-500">
-          {{ placementBuildingId ? $t('game.slots.placement-hint') : $t('game.star.pick-megastructure-hint') }}
-        </p>
-
         <div class="flex-1 overflow-y-auto p-2 space-y-1">
-          <template v-if="catalogTab === 'buildings'">
+          <template v-if="filters.megastructures">
             <GameBuildListRow
               v-for="b in megastructureList"
               :key="b.id"
@@ -374,8 +401,9 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
               :name="b.name"
               :icon="b.icon"
               :rounds="estimateRounds(b.productionCost)"
-              :disabled="!canQueueBuilding(b)"
+              :disabled="!canQueueBuilding(b) || isMegastructureDone(b)"
               :selected="placementBuildingId === b.id"
+              :done="isMegastructureDone(b)"
               accent="amber"
               :description="b.description"
               :yields="buildingYields(b)"
@@ -383,15 +411,9 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
               :hint="insufficientHint(b.resourceCosts, b.strategicCosts)"
               @select="selectBuildingForPlacement(b)"
             />
-            <p
-              v-if="!megastructureList.length"
-              class="px-2 py-4 text-center text-xs text-neutral-500"
-            >
-              {{ $t('game.slots.none-researched') }}
-            </p>
           </template>
 
-          <template v-else>
+          <template v-if="filters.ships && hasShipyard">
             <GameBuildListRow
               v-for="u in shipyardUnits"
               :key="u.id"
@@ -406,40 +428,35 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
               :hint="insufficientHint(u.resourceCosts, u.strategicCosts)"
               @select="selectUnit(u)"
             />
-            <p
-              v-if="!shipyardUnits.length"
-              class="px-2 py-4 text-center text-xs text-neutral-500"
-            >
-              {{ $t('game.slots.none-researched') }}
-            </p>
           </template>
+
+          <p
+            v-if="!megastructureList.length && !shipyardUnits.length"
+            class="px-2 py-4 text-center text-xs text-neutral-500"
+          >
+            {{ $t('game.slots.none-researched') }}
+          </p>
         </div>
       </aside>
 
       <!-- ═══════ Main column ═══════ -->
       <div class="relative z-10 flex flex-1 flex-col items-center overflow-hidden star-slot-zoom-in">
-        <!-- Header -->
-        <div class="flex items-center gap-4 pt-4 z-20">
-          <div class="flex items-center gap-3">
-            <div
-              class="w-10 h-10 rounded-full bg-center bg-cover border-2 border-amber-400/50 star-header-glow"
-              :style="{ backgroundImage: `url('/sun.webp')` }"
-            />
-            <div>
-              <h2 class="text-lg font-bold text-neutral-100">
-                {{ star.name }}
-              </h2>
-              <p class="text-xs text-neutral-400">
-                {{ $t('game.star.subtitle') }} ·
-                <span v-if="canBuild">{{ $t('game.star.owner', { owner: star.ownerLabel }) }}</span>
-                <span
-                  v-else
-                  class="text-amber-300/80"
-                >{{ $t('game.star.unclaimed') }}</span>
-              </p>
-            </div>
+        <!-- Header (slim: name + classification + Dyson progress) -->
+        <div class="flex items-center gap-3 pt-3 z-20">
+          <div>
+            <h2 class="text-base font-bold text-neutral-100 leading-tight">
+              {{ star.name }}
+            </h2>
+            <p class="text-[11px] text-neutral-400">
+              {{ $t('game.star.subtitle') }} ·
+              <span v-if="canBuild">{{ $t('game.star.owner', { owner: star.ownerLabel }) }}</span>
+              <span
+                v-else
+                class="text-amber-300/80"
+              >{{ $t('game.star.unclaimed') }}</span>
+            </p>
           </div>
-          <span class="flex items-center gap-2 text-[11px]">
+          <span class="flex items-center gap-1.5 text-[11px]">
             <UIcon
               name="i-lucide-orbit"
               class="w-3.5 h-3.5 text-amber-300"
@@ -458,7 +475,6 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
             color="neutral"
             variant="ghost"
             size="sm"
-            class="ml-2"
             data-testid="star-view-close"
             @click="emit('close')"
           />
@@ -474,6 +490,71 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
             class="w-4 h-4"
           />
           {{ $t('game.star.capture-hint') }}
+        </div>
+
+        <!-- ═══════ Queue strip (owner only) — at the top, above the canvas ═══════ -->
+        <div
+          v-if="canBuild"
+          data-testid="star-build-queue"
+          class="mt-2 flex w-full items-center gap-2 border-y border-amber-900/40 bg-neutral-950/95 px-4 py-2.5 overflow-x-auto"
+        >
+          <span class="text-[11px] text-neutral-500 uppercase tracking-wider shrink-0">
+            {{ $t('game.slots.queue-title') }} {{ star.buildQueue.length }}/{{ buildQueueLimit }}
+          </span>
+          <div
+            v-if="queueItems.length === 0"
+            class="text-sm text-neutral-500"
+          >
+            {{ $t('game.slots.queue-empty') }}
+          </div>
+          <div
+            v-for="item in queueItems"
+            :key="item.index"
+            :data-testid="`star-queue-item-${item.index}`"
+            draggable="true"
+            class="relative flex items-center gap-2 rounded-md border bg-neutral-900/80 px-2 py-1.5 shrink-0 cursor-grab active:cursor-grabbing"
+            :class="item.isFront ? 'border-amber-500/50' : 'border-neutral-700/50'"
+            @dragstart="onDragStart(item.index)"
+            @dragover.prevent
+            @drop="onDrop(item.index)"
+          >
+            <UIcon
+              :name="item.icon"
+              class="h-4 w-4 shrink-0 text-amber-200"
+            />
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-neutral-100 truncate max-w-32">
+                {{ item.name }}
+              </p>
+              <div
+                v-if="item.isFront"
+                class="flex items-center gap-1.5 mt-0.5"
+              >
+                <div class="h-1 w-20 rounded-full bg-neutral-700/60 overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-amber-500 transition-all"
+                    :style="{ width: `${item.progress}%` }"
+                  />
+                </div>
+                <span class="text-[9px] text-neutral-400">{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+              </div>
+              <span
+                v-else
+                class="text-[9px] text-neutral-500"
+              >{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
+            </div>
+            <button
+              type="button"
+              :data-testid="`star-queue-item-cancel-${item.index}`"
+              class="ml-1 text-neutral-500 hover:text-critical-300 transition"
+              @click="emit('remove-queue-item', star.id, item.index)"
+            >
+              <UIcon
+                name="i-lucide-x"
+                class="h-3.5 w-3.5"
+              />
+            </button>
+          </div>
         </div>
 
         <!-- Star + shells canvas -->
@@ -637,71 +718,6 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
             >{{ unit.count }}</span>
           </div>
         </div>
-
-        <!-- ═══════ Queue strip ═══════ -->
-        <div
-          v-if="canBuild"
-          data-testid="star-build-queue"
-          class="flex w-full items-center gap-2 border-t border-amber-900/40 bg-neutral-950/95 px-4 py-3 overflow-x-auto"
-        >
-          <span class="text-[11px] text-neutral-500 uppercase tracking-wider shrink-0">
-            {{ $t('game.slots.queue-title') }} {{ star.buildQueue.length }}/{{ buildQueueLimit }}
-          </span>
-          <div
-            v-if="queueItems.length === 0"
-            class="text-sm text-neutral-500"
-          >
-            {{ $t('game.slots.queue-empty') }}
-          </div>
-          <div
-            v-for="item in queueItems"
-            :key="item.index"
-            :data-testid="`star-queue-item-${item.index}`"
-            draggable="true"
-            class="relative flex items-center gap-2 rounded-md border bg-neutral-900/80 px-2 py-1.5 shrink-0 cursor-grab active:cursor-grabbing"
-            :class="item.isFront ? 'border-amber-500/50' : 'border-neutral-700/50'"
-            @dragstart="onDragStart(item.index)"
-            @dragover.prevent
-            @drop="onDrop(item.index)"
-          >
-            <UIcon
-              :name="item.icon"
-              class="h-4 w-4 shrink-0 text-amber-200"
-            />
-            <div class="min-w-0">
-              <p class="text-xs font-medium text-neutral-100 truncate max-w-32">
-                {{ item.name }}
-              </p>
-              <div
-                v-if="item.isFront"
-                class="flex items-center gap-1.5 mt-0.5"
-              >
-                <div class="h-1 w-20 rounded-full bg-neutral-700/60 overflow-hidden">
-                  <div
-                    class="h-full rounded-full bg-amber-500 transition-all"
-                    :style="{ width: `${item.progress}%` }"
-                  />
-                </div>
-                <span class="text-[9px] text-neutral-400">{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
-              </div>
-              <span
-                v-else
-                class="text-[9px] text-neutral-500"
-              >{{ $t('game.common.duration-rounds', { count: item.roundsLeft }) }}</span>
-            </div>
-            <button
-              type="button"
-              :data-testid="`star-queue-item-cancel-${item.index}`"
-              class="ml-1 text-neutral-500 hover:text-critical-300 transition"
-              @click="emit('remove-queue-item', star.id, item.index)"
-            >
-              <UIcon
-                name="i-lucide-x"
-                class="h-3.5 w-3.5"
-              />
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   </Teleport>
@@ -726,10 +742,6 @@ const getUnitIcon = (id: string) => props.unitCatalog.find(u => u.id === id)?.ic
   box-shadow:
     0 0 60px 18px rgba(251, 191, 36, 0.35),
     0 0 120px 50px rgba(251, 146, 60, 0.18);
-}
-
-.star-header-glow {
-  box-shadow: 0 0 12px 2px rgba(251, 191, 36, 0.4);
 }
 
 .dyson-hull {

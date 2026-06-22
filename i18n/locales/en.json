@@ -633,6 +633,8 @@
       "choose-ship": "Build Ship",
       "tab-megastructures": "Megastructures",
       "tab-ships": "Ships",
+      "filter-megastructures": "Structures",
+      "filter-ships": "Ships",
       "pick-megastructure-hint": "Pick a megastructure, then place it on a shell."
     },
     "errors": {
