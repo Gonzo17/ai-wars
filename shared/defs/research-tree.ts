@@ -1,406 +1,237 @@
 import type { TechDef, AscensionGateDef } from '../types/research'
 
+/**
+ * Phase-2 tech tree (see docs/tech-tree-phase2.md). Unlocks-first: a tech opens real
+ * things (the buildings/units/districts that list it in `requirements.research`, plus the
+ * abilities/visibilities and output buffs in `effects`). Three doctrine forks
+ * (`bootstrap`/`strategic`/`stellar`) are mutually exclusive. The ladder is convergent up
+ * to k2.0 = HOLD A STAR (everyone's goal — stellar structures unlock there), then it fans
+ * out; k3.0 is the win, not a research tier (so it holds no techs).
+ */
 export const TECH_DEFS: TechDef[] = [
-  // ============================================
-  // K0.6 FOUNDATION - Starting tier (6 techs)
-  // Clean tree: Core AI -> 3 branches (Energy, Industry, Exploration)
-  // ============================================
+  // ===== k0.6 FOUNDATION (3) =====
   {
-    id: 'tech:bootstrapped-ai-core',
-    name: 'Bootstrapped AI Core',
-    description: 'The nascent intelligence that guides all operations.',
-    category: 'energy_compute',
-    tier: 'k0.6',
-    prerequisites: [],
-    researchPoints: 60
+    id: 'tech:bootstrapped-ai-core', name: 'Bootstrapped AI Core', category: 'energy_compute', tier: 'k0.6',
+    prerequisites: [], researchPoints: 60,
+    effects: [{ kind: 'resourceMult', resource: 'research', mult: 1.1 }]
   },
   {
-    id: 'tech:basic-industrial-robotics',
-    name: 'Basic Industrial Robotics',
-    description: 'Automated manufacturing arms and assembly units.',
-    category: 'economy_industry',
-    tier: 'k0.6',
-    prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 120
+    id: 'tech:planetary-grid-management', name: 'Planetary Grid Management', category: 'energy_compute', tier: 'k0.6',
+    prerequisites: ['tech:bootstrapped-ai-core'], researchPoints: 100,
+    effects: [{ kind: 'resourceMult', resource: 'energy', mult: 1.15 }]
   },
   {
-    id: 'tech:planetary-grid-management',
-    name: 'Planetary Grid Management',
-    description: 'Unified power distribution across surface installations.',
-    category: 'energy_compute',
-    tier: 'k0.6',
-    prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 120
-  },
-  {
-    id: 'tech:probe-design',
-    name: 'Probe Design',
-    description: 'Autonomous scout probes for system exploration.',
-    category: 'exploration_navigation',
-    tier: 'k0.6',
-    prerequisites: ['tech:bootstrapped-ai-core'],
-    researchPoints: 120
-  },
-  {
-    id: 'tech:first-shipyard',
-    name: 'First Shipyard',
-    description: 'Orbital construction facility for vessels.',
-    category: 'economy_industry',
-    tier: 'k0.6',
-    prerequisites: ['tech:basic-industrial-robotics'],
-    researchPoints: 180
-  },
-  {
-    id: 'tech:data-center-i',
-    name: 'Data Center I',
-    description: 'Compute infrastructure backbone. Enables advanced research.',
-    category: 'energy_compute',
-    tier: 'k0.6',
-    prerequisites: ['tech:planetary-grid-management'],
-    researchPoints: 180
+    id: 'tech:basic-industrial-robotics', name: 'Industrial Robotics', category: 'economy_industry', tier: 'k0.6',
+    prerequisites: ['tech:bootstrapped-ai-core'], researchPoints: 100,
+    effects: [{ kind: 'resourceMult', resource: 'production', mult: 1.1 }]
   },
 
-  // ============================================
-  // K0.8 PLANETARY AUTOMATION (7 techs)
-  // Branches merge and split again
-  // ============================================
+  // ===== k0.8 AUTOMATION (4) — ★ bootstrap doctrine =====
   {
-    id: 'tech:autonomous-resource-allocation',
-    name: 'Autonomous Resource Allocation',
-    description: 'AI-driven supply chain optimization.',
-    category: 'economy_industry',
-    tier: 'k0.8',
-    prerequisites: ['tech:basic-industrial-robotics', 'tech:data-center-i'],
-    researchPoints: 300
+    id: 'tech:orbital-engineering', name: 'Orbital Engineering', category: 'exploration_navigation', tier: 'k0.8',
+    prerequisites: ['tech:bootstrapped-ai-core'], researchPoints: 140,
+    effects: [{ kind: 'ability', flag: 'survey:system' }]
   },
   {
-    id: 'tech:deep-system-scan',
-    name: 'Deep System Scan',
-    description: 'Comprehensive mapping of orbital bodies and resources.',
-    category: 'exploration_navigation',
-    tier: 'k0.8',
-    prerequisites: ['tech:probe-design'],
-    researchPoints: 300
+    id: 'tech:mass-production', name: 'Mass Production', category: 'economy_industry', tier: 'k0.8',
+    prerequisites: ['tech:basic-industrial-robotics'], researchPoints: 200, doctrineGroup: 'bootstrap',
+    effects: [{ kind: 'resourceMult', resource: 'production', mult: 1.2 }]
   },
   {
-    id: 'tech:navigation-algorithms',
-    name: 'Navigation Algorithms',
-    description: 'Optimal trajectory calculations for interplanetary travel.',
-    category: 'exploration_navigation',
-    tier: 'k0.8',
-    prerequisites: ['tech:deep-system-scan'],
-    researchPoints: 200
+    id: 'tech:deep-research', name: 'Deep Research', category: 'energy_compute', tier: 'k0.8',
+    prerequisites: ['tech:planetary-grid-management'], researchPoints: 200, doctrineGroup: 'bootstrap',
+    effects: [{ kind: 'resourceMult', resource: 'research', mult: 1.25 }]
   },
   {
-    id: 'tech:habitation-modules',
-    name: 'Habitation Modules',
-    description: 'Self-contained environments for colony establishment.',
-    category: 'colonization_planettypes',
-    tier: 'k0.8',
-    prerequisites: ['tech:first-shipyard'],
-    researchPoints: 300
-  },
-  {
-    id: 'tech:colony-ship-design',
-    name: 'Colony Ship Design',
-    description: 'Vessel capable of establishing new planetary outposts.',
-    category: 'colonization_planettypes',
-    tier: 'k0.8',
-    prerequisites: ['tech:habitation-modules', 'tech:navigation-algorithms'],
-    researchPoints: 400
-  },
-  {
-    id: 'tech:data-center-ii',
-    name: 'Data Center II',
-    description: 'Expanded compute capacity for complex operations.',
-    category: 'energy_compute',
-    tier: 'k0.8',
-    prerequisites: ['tech:data-center-i'],
-    researchPoints: 400
-  },
-  {
-    id: 'tech:efficient-thrusters',
-    name: 'Efficient Thrusters',
-    description: 'Improved propulsion systems for extended range.',
-    category: 'exploration_navigation',
-    tier: 'k0.8',
-    prerequisites: ['tech:first-shipyard'],
-    researchPoints: 300
-  },
-  // ============================================
-  // K1.0 PLANETARY DOMINION (5 techs)
-  // Military branch emerges, infrastructure consolidates
-  // ============================================
-  {
-    id: 'tech:planetwide-infrastructure',
-    name: 'Planetwide Infrastructure',
-    description: 'Global logistics and manufacturing network.',
-    category: 'economy_industry',
-    tier: 'k1.0',
-    prerequisites: ['tech:autonomous-resource-allocation'],
-    researchPoints: 400
-  },
-  {
-    id: 'tech:orbital-shipyard',
-    name: 'Orbital Shipyard',
-    description: 'Large-scale construction facility for capital ships.',
-    category: 'economy_industry',
-    tier: 'k1.0',
-    prerequisites: ['tech:planetwide-infrastructure', 'tech:efficient-thrusters'],
-    researchPoints: 500
-  },
-  {
-    id: 'tech:combat-ai',
-    name: 'Combat AI',
-    description: 'Advanced fire control and threat assessment.',
-    category: 'military_defense',
-    tier: 'k1.0',
-    prerequisites: ['tech:data-center-ii'],
-    researchPoints: 300
-  },
-  {
-    id: 'tech:fleet-coordination',
-    name: 'Fleet Coordination',
-    description: 'Synchronized multi-vessel tactical operations.',
-    category: 'military_defense',
-    tier: 'k1.0',
-    prerequisites: ['tech:combat-ai', 'tech:navigation-algorithms'],
-    researchPoints: 400
-  },
-  {
-    id: 'tech:shield-generators',
-    name: 'Shield Generators',
-    description: 'Energy barriers for critical installations.',
-    category: 'military_defense',
-    tier: 'k1.0',
-    prerequisites: ['tech:combat-ai'],
-    researchPoints: 400
-  },
-  {
-    id: 'tech:exotic-matter-survey',
-    name: 'Exotic Matter Survey',
-    description: 'Reveals exotic-matter deposits and unlocks their extraction. A strategic resource needed for megastructures.',
-    category: 'exploration_navigation',
-    tier: 'k1.0',
-    prerequisites: ['tech:deep-system-scan'],
-    researchPoints: 350
+    id: 'tech:autonomous-resource-allocation', name: 'Autonomous Resource Allocation', category: 'economy_industry', tier: 'k0.8',
+    prerequisites: ['tech:basic-industrial-robotics'], researchPoints: 220,
+    effects: [{ kind: 'resourceMult', resource: 'minerals', mult: 1.15 }]
   },
 
-  // ============================================
-  // K1.5 SYSTEM HEGEMONY (5 techs)
-  // System-wide control, multi-planet operations
-  // ============================================
+  // ===== k1.0 DOMINION (5) =====
   {
-    id: 'tech:orbital-mining',
-    name: 'Orbital Mining',
-    description: 'Automated extraction from asteroids and moons.',
-    category: 'economy_industry',
-    tier: 'k1.5',
-    prerequisites: ['tech:planetwide-infrastructure', 'tech:efficient-thrusters'],
-    researchPoints: 400
+    id: 'tech:colony-ship-design', name: 'Colony Ship Design', category: 'colonization_planettypes', tier: 'k1.0',
+    prerequisites: ['tech:orbital-engineering'], researchPoints: 280,
+    effects: [{ kind: 'ability', flag: 'colonize:terrestrial' }, { kind: 'ability', flag: 'colonize:oceanic' }]
   },
   {
-    id: 'tech:orbital-fabricators',
-    name: 'Orbital Fabricators',
-    description: 'Zero-gravity manufacturing for massive structures.',
-    category: 'economy_industry',
-    tier: 'k1.5',
-    prerequisites: ['tech:orbital-shipyard', 'tech:orbital-mining'],
-    researchPoints: 500
+    id: 'tech:exotic-matter-survey', name: 'Exotic Matter Survey', category: 'exploration_navigation', tier: 'k1.0',
+    prerequisites: ['tech:orbital-engineering'], researchPoints: 300,
+    effects: [{ kind: 'ability', flag: 'survey:exotic' }]
   },
   {
-    id: 'tech:ai-governor-systems',
-    name: 'AI Governor Systems',
-    description: 'Autonomous planetary administration.',
-    category: 'energy_compute',
-    tier: 'k1.5',
-    prerequisites: ['tech:planetwide-infrastructure', 'tech:data-center-ii'],
-    researchPoints: 500
+    id: 'tech:data-center-ii', name: 'Neural Lattice', category: 'energy_compute', tier: 'k1.0',
+    prerequisites: ['tech:bootstrapped-ai-core'], researchPoints: 300,
+    effects: [{ kind: 'resourceMult', resource: 'research', mult: 1.2 }]
   },
   {
-    id: 'tech:data-center-iii',
-    name: 'Data Center III',
-    description: 'Distributed compute clusters across system bodies.',
-    category: 'energy_compute',
-    tier: 'k1.5',
-    prerequisites: ['tech:ai-governor-systems'],
-    researchPoints: 500
+    id: 'tech:combat-ai', name: 'Combat AI', category: 'military_defense', tier: 'k1.0',
+    prerequisites: ['tech:data-center-ii'], researchPoints: 280
   },
   {
-    id: 'tech:system-defense-network',
-    name: 'System Defense Network',
-    description: 'Coordinated defensive installations across the system.',
-    category: 'military_defense',
-    tier: 'k1.5',
-    prerequisites: ['tech:shield-generators', 'tech:fleet-coordination'],
-    researchPoints: 500
+    id: 'tech:planetwide-infrastructure', name: 'Planetwide Infrastructure', category: 'economy_industry', tier: 'k1.0',
+    prerequisites: ['tech:autonomous-resource-allocation'], researchPoints: 320,
+    effects: [{ kind: 'resourceMult', resource: 'production', mult: 1.15 }]
   },
 
-  // ============================================
-  // K2.0 STELLAR MASTERY (4 techs)
-  // Dyson swarm, stellar-scale operations
-  // ============================================
+  // ===== k1.5 HEGEMONY (7) — ★ strategic doctrine; star-constructor unlocks here =====
   {
-    id: 'tech:stellar-energy-capture',
-    name: 'Stellar Energy Capture',
-    description: 'Direct harvesting of solar output.',
-    category: 'energy_compute',
-    tier: 'k2.0',
-    prerequisites: ['tech:orbital-fabricators', 'tech:data-center-iii'],
-    researchPoints: 600,
-    requires: { empire: { homeSystemMajority: true } }
+    id: 'tech:expansionist', name: 'Expansionist Doctrine', category: 'colonization_planettypes', tier: 'k1.5',
+    prerequisites: ['tech:colony-ship-design'], researchPoints: 420, doctrineGroup: 'strategic',
+    effects: [
+      { kind: 'ability', flag: 'colonize:barren' },
+      { kind: 'ability', flag: 'colonize:desert' },
+      { kind: 'ability', flag: 'colonize:ice-giant' }
+    ]
   },
   {
-    id: 'tech:dyson-swarm',
-    name: 'Dyson Swarm',
-    description: 'Star-enclosing megastructure for energy collection.',
-    category: 'energy_compute',
-    tier: 'k2.0',
-    prerequisites: ['tech:stellar-energy-capture'],
-    researchPoints: 800
+    id: 'tech:entrenchment', name: 'Entrenchment Doctrine', category: 'military_defense', tier: 'k1.5',
+    prerequisites: ['tech:combat-ai'], researchPoints: 420, doctrineGroup: 'strategic'
   },
   {
-    id: 'tech:stellar-computation',
-    name: 'Stellar Computation',
-    description: 'Processing centers powered by stellar energy.',
-    category: 'energy_compute',
-    tier: 'k2.0',
-    prerequisites: ['tech:dyson-swarm'],
-    researchPoints: 600
+    id: 'tech:stellar-cartography', name: 'Stellar Cartography', category: 'exploration_navigation', tier: 'k1.5',
+    prerequisites: ['tech:exotic-matter-survey'], researchPoints: 450,
+    effects: [{ kind: 'ability', flag: 'capture:star' }]
   },
   {
-    id: 'tech:antimatter-containment',
-    name: 'Antimatter Containment',
-    description: 'Magnetic traps reveal antimatter deposits and unlock their collection — fuel for capital ships.',
-    category: 'energy_compute',
-    tier: 'k2.0',
-    prerequisites: ['tech:stellar-energy-capture'],
-    researchPoints: 700
+    id: 'tech:orbital-shipyard', name: 'Orbital Shipyard', category: 'economy_industry', tier: 'k1.5',
+    prerequisites: ['tech:planetwide-infrastructure'], researchPoints: 450
   },
   {
-    id: 'tech:system-wide-shields',
-    name: 'System-Wide Shields',
-    description: 'Defensive barriers protecting entire orbital regions.',
-    category: 'military_defense',
-    tier: 'k2.0',
-    prerequisites: ['tech:system-defense-network', 'tech:stellar-energy-capture'],
-    researchPoints: 700
+    id: 'tech:orbital-fabricators', name: 'Orbital Fabricators', category: 'economy_industry', tier: 'k1.5',
+    prerequisites: ['tech:orbital-shipyard'], researchPoints: 500
+  },
+  {
+    id: 'tech:ai-governor-systems', name: 'AI Governor Systems', category: 'energy_compute', tier: 'k1.5',
+    prerequisites: ['tech:planetwide-infrastructure'], researchPoints: 480,
+    effects: [
+      { kind: 'resourceMult', resource: 'energy', mult: 1.1 },
+      { kind: 'resourceMult', resource: 'minerals', mult: 1.1 },
+      { kind: 'resourceMult', resource: 'research', mult: 1.1 }
+    ]
+  },
+  {
+    id: 'tech:fleet-coordination', name: 'Fleet Coordination', category: 'military_defense', tier: 'k1.5',
+    prerequisites: ['tech:combat-ai'], researchPoints: 450
   },
 
-  // ============================================
-  // K2.3 INTERSTELLAR DAWN (2 techs)
-  // First steps beyond home system
-  // ============================================
+  // ===== k2.0 STELLAR MASTERY (10) — ★ stellar doctrine; star structures & units unlock =====
   {
-    id: 'tech:interstellar-probe',
-    name: 'Interstellar Probe',
-    description: 'Scout capable of reaching nearby star systems.',
-    category: 'exploration_navigation',
-    tier: 'k2.3',
-    prerequisites: ['tech:stellar-energy-capture', 'tech:orbital-fabricators'],
-    researchPoints: 800
+    id: 'tech:stellar-energy-capture', name: 'Stellar Energy Capture', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:orbital-fabricators', 'tech:stellar-cartography'], researchPoints: 600
   },
   {
-    id: 'tech:generation-ship',
-    name: 'Generation Ship',
-    description: 'Self-sustaining vessel for interstellar colonization.',
-    category: 'colonization_planettypes',
-    tier: 'k2.3',
-    prerequisites: ['tech:interstellar-probe', 'tech:ai-governor-systems'],
-    researchPoints: 1200
+    id: 'tech:dyson-swarm', name: 'Dyson Swarm', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:stellar-energy-capture'], researchPoints: 800, doctrineGroup: 'stellar',
+    effects: [{ kind: 'resourceMult', resource: 'energy', mult: 1.3 }]
+  },
+  {
+    id: 'tech:matrioshka-brain', name: 'Matrioshka Brain', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:stellar-energy-capture'], researchPoints: 800, doctrineGroup: 'stellar',
+    effects: [{ kind: 'resourceMult', resource: 'research', mult: 1.5 }]
+  },
+  {
+    id: 'tech:stellar-computation', name: 'Stellar Computation', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:stellar-energy-capture'], researchPoints: 700,
+    effects: [{ kind: 'resourceMult', resource: 'research', mult: 1.3 }]
+  },
+  {
+    id: 'tech:antimatter-containment', name: 'Antimatter Containment', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:stellar-energy-capture'], researchPoints: 700,
+    effects: [{ kind: 'ability', flag: 'survey:antimatter' }]
+  },
+  {
+    id: 'tech:mega-shipyard', name: 'Mega Shipyard', category: 'economy_industry', tier: 'k2.0',
+    prerequisites: ['tech:orbital-fabricators'], researchPoints: 650
+  },
+  {
+    id: 'tech:system-defense-network', name: 'System Defense Network', category: 'military_defense', tier: 'k2.0',
+    prerequisites: ['tech:fleet-coordination'], researchPoints: 600
+  },
+  {
+    id: 'tech:system-wide-shields', name: 'System-Wide Shields', category: 'military_defense', tier: 'k2.0',
+    prerequisites: ['tech:system-defense-network'], researchPoints: 650
+  },
+  {
+    id: 'tech:dreadnought-doctrine', name: 'Dreadnought Doctrine', category: 'military_defense', tier: 'k2.0',
+    prerequisites: ['tech:fleet-coordination'], researchPoints: 650
+  },
+  {
+    id: 'tech:temporal-ascension-i', name: 'Temporal Ascension Engine I', category: 'energy_compute', tier: 'k2.0',
+    prerequisites: ['tech:stellar-computation'], researchPoints: 900
   },
 
-  // ============================================
-  // K3.0 ENDGAME (1 tech)
-  // Final victory condition
-  // ============================================
+  // ===== k2.3 INTERSTELLAR (6) =====
   {
-    id: 'tech:galactic-network',
-    name: 'Galactic Network',
-    description: 'Communication across stellar distances.',
-    category: 'energy_compute',
-    tier: 'k3.0',
-    prerequisites: ['tech:generation-ship', 'tech:stellar-computation'],
-    researchPoints: 2000
+    id: 'tech:interstellar-probe', name: 'Interstellar Probe', category: 'exploration_navigation', tier: 'k2.3',
+    prerequisites: ['tech:stellar-energy-capture'], researchPoints: 800
+  },
+  {
+    id: 'tech:generation-ship', name: 'Generation Ship', category: 'colonization_planettypes', tier: 'k2.3',
+    prerequisites: ['tech:interstellar-probe'], researchPoints: 1000,
+    effects: [{ kind: 'ability', flag: 'colonize:cross-galaxy' }]
+  },
+  {
+    id: 'tech:temporal-ascension-ii', name: 'Temporal Ascension Engine II', category: 'energy_compute', tier: 'k2.3',
+    prerequisites: ['tech:temporal-ascension-i'], researchPoints: 1400
+  },
+  {
+    id: 'tech:galactic-logistics', name: 'Galactic Logistics', category: 'economy_industry', tier: 'k2.3',
+    prerequisites: ['tech:orbital-fabricators'], researchPoints: 900,
+    effects: [{ kind: 'resourceMult', resource: 'production', mult: 1.25 }]
+  },
+  {
+    id: 'tech:planet-cracker', name: 'Planet Cracker', category: 'military_defense', tier: 'k2.3',
+    prerequisites: ['tech:dreadnought-doctrine'], researchPoints: 1100,
+    effects: [{ kind: 'ability', flag: 'planet-cracker' }]
+  },
+  {
+    id: 'tech:galactic-network', name: 'Galactic Network', category: 'exploration_navigation', tier: 'k2.3',
+    prerequisites: ['tech:interstellar-probe'], researchPoints: 900,
+    effects: [{ kind: 'ability', flag: 'intel:galactic' }]
   }
 ]
 
+/**
+ * Each gate = required techs + an empire condition (research fused with expansion). k2.0 =
+ * hold a star (the universal milestone), k3.0 = hold the galaxy (= the expansion win, so
+ * k3.0 is reached, not researched). planetsControlled survives only as the tiny first gate.
+ */
 export const ASCENSION_GATES: AscensionGateDef[] = [
   {
     toTier: 'k0.8',
-    requiresTech: [
-      'tech:data-center-i',
-      'tech:first-shipyard',
-      'tech:probe-design'
-    ],
+    requiresTech: ['tech:planetary-grid-management', 'tech:basic-industrial-robotics'],
     requiresCompute: 0
   },
   {
     toTier: 'k1.0',
-    requiresTech: [
-      'tech:data-center-ii',
-      'tech:colony-ship-design',
-      'tech:autonomous-resource-allocation'
-    ],
+    requiresTech: ['tech:orbital-engineering', 'tech:autonomous-resource-allocation'],
     requiresCompute: 0,
-    // Minimal "you've colonized once" floor — the only gate that still reads a planet count.
-    requiresEmpire: {
-      planetsControlled: 2
-    }
+    requiresEmpire: { planetsControlled: 2 }
   },
   {
     toTier: 'k1.5',
-    requiresTech: [
-      'tech:planetwide-infrastructure',
-      'tech:orbital-shipyard',
-      'tech:fleet-coordination'
-    ],
+    requiresTech: ['tech:colony-ship-design', 'tech:combat-ai', 'tech:planetwide-infrastructure'],
     requiresCompute: 0,
-    // Hold your whole home system before expanding outward.
-    requiresEmpire: {
-      homeSystemMajority: true
-    }
+    requiresEmpire: { homeSystemMajority: true }
   },
   {
     toTier: 'k2.0',
-    requiresTech: [
-      'tech:ai-governor-systems',
-      'tech:data-center-iii',
-      'tech:orbital-fabricators'
-    ],
+    requiresTech: ['tech:stellar-cartography', 'tech:orbital-fabricators', 'tech:ai-governor-systems'],
     requiresCompute: 0,
-    // K2.0 = HOLD A STAR. The universal milestone: only on a captured star do the stellar
-    // structures & units unlock. The star-constructor unlocks at k1.5, so the capture
-    // itself is the gate (no Dyson needed yet — that's a k2.0 activity).
-    requiresEmpire: {
-      starsControlled: 1
-    }
+    requiresEmpire: { starsControlled: 1 }
   },
   {
     toTier: 'k2.3',
-    requiresTech: [
-      'tech:stellar-computation',
-      'tech:dyson-swarm'
-    ],
+    requiresTech: ['tech:stellar-energy-capture', 'tech:stellar-computation'],
     requiresCompute: 0,
-    // Post-star expansion: still holding a star and grown to half your home galaxy.
-    requiresEmpire: {
-      starsControlled: 1,
-      galaxyStarFraction: 0.5
-    }
+    requiresEmpire: { starsControlled: 1, galaxyStarFraction: 0.5 }
   },
   {
     toTier: 'k3.0',
-    requiresTech: [
-      'tech:generation-ship',
-      'tech:stellar-computation'
-    ],
+    requiresTech: ['tech:generation-ship', 'tech:temporal-ascension-ii'],
     requiresCompute: 0,
-    // K3.0 = HOLD THE GALAXY. This threshold IS the expansion win (see resolve/victory.ts);
-    // reaching k3.0 means the game is over. Not a research tier.
-    requiresEmpire: {
-      galaxyStarFraction: 0.9
-    }
+    requiresEmpire: { galaxyStarFraction: 0.9 }
   }
 ]
 

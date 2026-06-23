@@ -180,9 +180,10 @@ describe('star megastructures', () => {
     const repo = seedGame()
     const state = getSnapshot(repo, 1)
     const { star, homeworld } = ownHomeStar(state)
-    // Give the player enough resources so only the site rule can fail.
+    // Give the player enough resources + the Dyson tech so only the site rule can fail.
     const u1 = state.players.find(p => p.id === toPlayerId(U1))!
     for (const r of u1.resources) r.current = 5000
+    u1.research.completedTechIds.push('tech:dyson-swarm')
 
     // Megastructure on the captured star → allowed
     const onStar: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }] }] }
@@ -226,7 +227,7 @@ describe('star megastructures', () => {
     const { star } = ownHomeStar(state)
     const u1 = state.players.find(p => p.id === toPlayerId(U1))!
     for (const r of u1.resources) r.current = 5000
-    u1.research.completedTechIds.push('tech:first-shipyard')
+    u1.research.completedTechIds.push('tech:combat-ai')
 
     // Without a shipyard the star cannot build ships (no orbital dock).
     const noYard: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'unit', unitId: 'unit:frigate' as UnitId }] }] }

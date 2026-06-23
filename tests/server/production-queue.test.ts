@@ -112,7 +112,7 @@ describe('shared production queue', () => {
     const dock = homePlanet(seed).slots.find(s => s.zone === 'orbital')!
     dock.buildingId = 'bld:orbital-dock' as never
     dock.buildingLevel = 1
-    p1.research.completedTechIds.push('tech:probe-design', 'tech:colony-ship-design')
+    p1.research.completedTechIds.push('tech:orbital-engineering', 'tech:colony-ship-design')
 
     // Queue probe then colony-ship. 20 production/turn → the front probe gets 20.
     await playTurn(repo, 1, queueCmd(HOME, [unit('unit:probe'), unit('unit:colony-ship')]))

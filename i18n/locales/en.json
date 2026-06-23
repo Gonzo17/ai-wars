@@ -214,8 +214,8 @@
           "description": "The nascent intelligence that guides all operations."
         },
         "basic-industrial-robotics": {
-          "name": "Basic Industrial Robotics",
-          "description": "Automated manufacturing arms and assembly units."
+          "name": "Industrial Robotics",
+          "description": "Automated assembly. Opens the Assembly Complex district."
         },
         "planetary-grid-management": {
           "name": "Planetary Grid Management",
@@ -262,8 +262,8 @@
           "description": "Vessel capable of establishing new planetary outposts."
         },
         "data-center-ii": {
-          "name": "Data Center II",
-          "description": "Expanded compute capacity for complex operations."
+          "name": "Neural Lattice",
+          "description": "Expanded compute substrate. Stronger research output."
         },
         "efficient-thrusters": {
           "name": "Efficient Thrusters",
@@ -335,7 +335,59 @@
         },
         "galactic-network": {
           "name": "Galactic Network",
-          "description": "Communication across stellar distances."
+          "description": "Cross-galaxy gateways and intel."
+        },
+        "orbital-engineering": {
+          "name": "Orbital Engineering",
+          "description": "The early exploration push: probes, the Orbital Shipyard district, and deep-system scans."
+        },
+        "mass-production": {
+          "name": "Mass Production",
+          "description": "Doctrine: cheaper, faster industry. Unlocks the Robotics Bay. Locks out Deep Research."
+        },
+        "deep-research": {
+          "name": "Deep Research",
+          "description": "Doctrine: a research-focused economy (+25% research). Locks out Mass Production."
+        },
+        "expansionist": {
+          "name": "Expansionist Doctrine",
+          "description": "Doctrine: colonise barren, desert and ice worlds; faster, cheaper expansion. Locks out Entrenchment."
+        },
+        "entrenchment": {
+          "name": "Entrenchment Doctrine",
+          "description": "Doctrine: the Star Fortress and a hardened defence. Locks out Expansionist."
+        },
+        "stellar-cartography": {
+          "name": "Stellar Cartography",
+          "description": "Unlocks the star-constructor — capture a star to reach K2.0."
+        },
+        "matrioshka-brain": {
+          "name": "Matrioshka Brain",
+          "description": "Stellar doctrine: a compute megastructure (+50% research). Locks out Dyson Swarm."
+        },
+        "mega-shipyard": {
+          "name": "Mega Shipyard",
+          "description": "Build warships directly on a captured star."
+        },
+        "dreadnought-doctrine": {
+          "name": "Dreadnought Doctrine",
+          "description": "The capital-ship line and combat doctrine."
+        },
+        "temporal-ascension-i": {
+          "name": "Temporal Ascension Engine I",
+          "description": "Begins the victory wonder — the megastructure path to ascension."
+        },
+        "temporal-ascension-ii": {
+          "name": "Temporal Ascension Engine II",
+          "description": "Completes the victory wonder. Built to completion, it wins the game."
+        },
+        "galactic-logistics": {
+          "name": "Galactic Logistics",
+          "description": "Empire-wide production logistics."
+        },
+        "planet-cracker": {
+          "name": "Planet Cracker",
+          "description": "A siege finisher that cracks worlds — the military endgame."
         }
       },
       "unlocks-label": "Unlocks"
@@ -588,6 +640,10 @@
       "antimatter-collector": {
         "name": "Antimatter Collector",
         "description": "Harvests antimatter from a deposit. Must be built on an antimatter node."
+      },
+      "temporal-engine": {
+        "name": "Temporal Ascension Engine",
+        "description": "The victory wonder. Built to completion on a star, it ascends your civilisation."
       }
     },
     "units": {
@@ -614,6 +670,10 @@
       "dreadnought": {
         "name": "Dreadnought",
         "role": "Antimatter capital ship"
+      },
+      "planet-cracker": {
+        "name": "Planet Cracker",
+        "role": "Siege finisher"
       }
     },
     "star": {

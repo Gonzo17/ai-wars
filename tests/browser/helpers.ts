@@ -288,7 +288,7 @@ export function seedRichState(snapshot: GameSnapshot, userId: string): SeedIds {
   setRes('res:antimatter', 120)
 
   // Unlock the build options the tour touches.
-  for (const tech of ['tech:exotic-matter-survey', 'tech:antimatter-containment', 'tech:first-shipyard', 'tech:colony-ship-design']) {
+  for (const tech of ['tech:orbital-engineering', 'tech:exotic-matter-survey', 'tech:antimatter-containment', 'tech:colony-ship-design']) {
     if (!player.research.completedTechIds.includes(tech)) player.research.completedTechIds.push(tech)
   }
 

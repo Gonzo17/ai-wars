@@ -214,8 +214,8 @@
           "description": "Die entstehende Intelligenz, die alle Operationen leitet."
         },
         "basic-industrial-robotics": {
-          "name": "Grundlegende Industrierobotik",
-          "description": "Automatisierte Fertigungsarme und Montageeinheiten."
+          "name": "Industrierobotik",
+          "description": "Automatisierte Montage. Eröffnet den Fabrikkomplex-Bezirk."
         },
         "planetary-grid-management": {
           "name": "Planetare Netzverwaltung",
@@ -262,8 +262,8 @@
           "description": "Schiff zum Aufbau neuer planetarer Außenposten."
         },
         "data-center-ii": {
-          "name": "Datenzentrum II",
-          "description": "Erweiterte Rechenkapazität für komplexe Operationen."
+          "name": "Neuronales Netz",
+          "description": "Erweitertes Rechensubstrat. Stärkere Forschungsausbeute."
         },
         "efficient-thrusters": {
           "name": "Effiziente Triebwerke",
@@ -335,7 +335,59 @@
         },
         "galactic-network": {
           "name": "Galaktisches Netzwerk",
-          "description": "Kommunikation über stellare Distanzen."
+          "description": "Galaxienübergreifende Tore und Aufklärung."
+        },
+        "orbital-engineering": {
+          "name": "Orbital-Ingenieurwesen",
+          "description": "Der frühe Erkundungs-Push: Sonden, der Bezirk Orbitale Werft und System-Tiefenscans."
+        },
+        "mass-production": {
+          "name": "Massenproduktion",
+          "description": "Doktrin: günstigere, schnellere Industrie. Schaltet das Roboterwerk frei. Sperrt Tiefenforschung."
+        },
+        "deep-research": {
+          "name": "Tiefenforschung",
+          "description": "Doktrin: forschungslastige Ökonomie (+25% Forschung). Sperrt Massenproduktion."
+        },
+        "expansionist": {
+          "name": "Expansionsdoktrin",
+          "description": "Doktrin: Besiedlung von Ödland-, Wüsten- und Eiswelten; schnellere, günstigere Expansion. Sperrt Verschanzung."
+        },
+        "entrenchment": {
+          "name": "Verschanzungsdoktrin",
+          "description": "Doktrin: die Sternenfestung und gehärtete Verteidigung. Sperrt Expansion."
+        },
+        "stellar-cartography": {
+          "name": "Stellare Kartografie",
+          "description": "Schaltet den Stern-Konstruktor frei — erobere einen Stern, um K2.0 zu erreichen."
+        },
+        "matrioshka-brain": {
+          "name": "Matrioschka-Gehirn",
+          "description": "Stellar-Doktrin: eine Compute-Megastruktur (+50% Forschung). Sperrt den Dyson-Schwarm."
+        },
+        "mega-shipyard": {
+          "name": "Mega-Werft",
+          "description": "Baue Kriegsschiffe direkt auf einem eroberten Stern."
+        },
+        "dreadnought-doctrine": {
+          "name": "Dreadnought-Doktrin",
+          "description": "Die Großkampfschiff-Linie und Kampfdoktrin."
+        },
+        "temporal-ascension-i": {
+          "name": "Temporale Aufstiegsmaschine I",
+          "description": "Beginnt das Sieg-Wunder — der Megastruktur-Weg zum Aufstieg."
+        },
+        "temporal-ascension-ii": {
+          "name": "Temporale Aufstiegsmaschine II",
+          "description": "Vollendet das Sieg-Wunder. Fertig gebaut gewinnt es das Spiel."
+        },
+        "galactic-logistics": {
+          "name": "Galaktische Logistik",
+          "description": "Imperiumsweite Produktionslogistik."
+        },
+        "planet-cracker": {
+          "name": "Planeten-Brecher",
+          "description": "Ein Belagerungs-Finisher, der Welten knackt — das militärische Endspiel."
         }
       },
       "unlocks-label": "Schaltet frei"
@@ -588,6 +640,10 @@
       "antimatter-collector": {
         "name": "Antimaterie-Kollektor",
         "description": "Sammelt Antimaterie aus einem Vorkommen. Muss auf einem Antimaterie-Vorkommen stehen."
+      },
+      "temporal-engine": {
+        "name": "Temporale Aufstiegsmaschine",
+        "description": "Das Sieg-Wunder. Auf einem Stern fertig gebaut, lässt es deine Zivilisation aufsteigen."
       }
     },
     "units": {
@@ -614,6 +670,10 @@
       "dreadnought": {
         "name": "Schlachtkreuzer",
         "role": "Antimaterie-Großkampfschiff"
+      },
+      "planet-cracker": {
+        "name": "Planeten-Brecher",
+        "role": "Belagerungs-Finisher"
       }
     },
     "star": {

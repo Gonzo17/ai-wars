@@ -91,10 +91,10 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
   // Rare element production buildings
   { id: 'bld:rare-extractor', category: 'rare', resourceCosts: { energy: 80, minerals: 100, rare: 0 }, productionCost: 100, buildTime: 5, requirements: { research: ['tech:autonomous-resource-allocation'] }, resourceProduction: { rare: 5 }, maxLevel: 3, icon: 'i-lucide-atom' },
   // Military buildings
-  { id: 'bld:orbital-dock', category: 'military', resourceCosts: { energy: 90, minerals: 110, rare: 15 }, productionCost: 80, buildTime: 4, requirements: { research: ['tech:first-shipyard'] }, maxLevel: 3, icon: 'i-lucide-anchor' },
-  { id: 'bld:listening-post', category: 'military', resourceCosts: { energy: 45, minerals: 35, rare: 4 }, productionCost: 60, buildTime: 3, requirements: { research: ['tech:deep-system-scan'] }, maxLevel: 2, icon: 'i-lucide-satellite-dish' },
-  // Research buildings
-  { id: 'bld:data-center', category: 'research', resourceCosts: { energy: 80, minerals: 60, rare: 12 }, productionCost: 120, buildTime: 6, requirements: { research: ['tech:data-center-i'] }, researchPoints: 20, maxLevel: 3, icon: 'i-lucide-flask-conical' },
+  { id: 'bld:orbital-dock', category: 'military', resourceCosts: { energy: 90, minerals: 110, rare: 15 }, productionCost: 80, buildTime: 4, requirements: { research: ['tech:orbital-engineering'] }, maxLevel: 3, icon: 'i-lucide-anchor' },
+  { id: 'bld:listening-post', category: 'military', resourceCosts: { energy: 45, minerals: 35, rare: 4 }, productionCost: 60, buildTime: 3, requirements: { research: ['tech:combat-ai'] }, maxLevel: 2, icon: 'i-lucide-satellite-dish' },
+  // Research buildings — the Compute Core is the free Data Center base (no tech gate).
+  { id: 'bld:data-center', category: 'research', resourceCosts: { energy: 80, minerals: 60, rare: 12 }, productionCost: 120, buildTime: 6, requirements: {}, researchPoints: 20, maxLevel: 3, icon: 'i-lucide-flask-conical' },
   // Infrastructure buildings
   { id: 'bld:hydroponics', category: 'infrastructure', resourceCosts: { energy: 60, minerals: 40, rare: 5 }, productionCost: 60, buildTime: 3, requirements: {}, maxLevel: 4, icon: 'i-lucide-leaf' },
   { id: 'bld:hab-complex', category: 'infrastructure', resourceCosts: { energy: 70, minerals: 95, rare: 8 }, productionCost: 100, buildTime: 5, requirements: {}, maxLevel: 4, icon: 'i-lucide-home' },
@@ -107,21 +107,26 @@ export const BUILDING_DEFS: BuildingDefinition[] = [
   // pass happens once the whole stellar loop is in (see Step 2 design). The
   // Dyson sphere is staged via maxLevel (each level = one Dyson stage); a built
   // Dyson stage drives the path to Kardashev K2.0.
-  { id: 'bld:dyson-sphere', category: 'energy', site: 'star', resourceCosts: { energy: 0, minerals: 500, rare: 50 }, strategicCosts: { 'res:exotic-matter': 50 }, productionCost: 400, buildTime: 20, requirements: {}, resourceProduction: { energy: 200 }, maxLevel: 5, icon: 'i-lucide-orbit' },
-  { id: 'bld:matrioshka-brain', category: 'research', site: 'star', resourceCosts: { energy: 300, minerals: 300, rare: 80 }, productionCost: 400, buildTime: 20, requirements: {}, researchPoints: 60, maxLevel: 3, icon: 'i-lucide-brain-circuit' },
-  { id: 'bld:orbital-shipyard-mega', category: 'military', site: 'star', resourceCosts: { energy: 200, minerals: 300, rare: 40 }, productionCost: 300, buildTime: 15, requirements: {}, maxLevel: 1, icon: 'i-lucide-wrench' },
-  { id: 'bld:star-fortress', category: 'military', site: 'star', resourceCosts: { energy: 150, minerals: 250, rare: 30 }, productionCost: 250, buildTime: 12, requirements: {}, maxLevel: 3, icon: 'i-lucide-shield' }
+  { id: 'bld:dyson-sphere', category: 'energy', site: 'star', resourceCosts: { energy: 0, minerals: 500, rare: 50 }, strategicCosts: { 'res:exotic-matter': 50 }, productionCost: 400, buildTime: 20, requirements: { research: ['tech:dyson-swarm'] }, resourceProduction: { energy: 200 }, maxLevel: 5, icon: 'i-lucide-orbit' },
+  { id: 'bld:matrioshka-brain', category: 'research', site: 'star', resourceCosts: { energy: 300, minerals: 300, rare: 80 }, productionCost: 400, buildTime: 20, requirements: { research: ['tech:matrioshka-brain'] }, researchPoints: 60, maxLevel: 3, icon: 'i-lucide-brain-circuit' },
+  { id: 'bld:orbital-shipyard-mega', category: 'military', site: 'star', resourceCosts: { energy: 200, minerals: 300, rare: 40 }, productionCost: 300, buildTime: 15, requirements: { research: ['tech:mega-shipyard'] }, maxLevel: 1, icon: 'i-lucide-wrench' },
+  { id: 'bld:star-fortress', category: 'military', site: 'star', resourceCosts: { energy: 150, minerals: 250, rare: 30 }, productionCost: 250, buildTime: 12, requirements: { research: ['tech:entrenchment'] }, maxLevel: 3, icon: 'i-lucide-shield' },
+  // The victory wonder (Megastructure win): staged on a star, gated by the two Temporal
+  // Ascension Engine techs. Building it to completion is a path to K3.0 (wired in victory).
+  { id: 'bld:temporal-engine', category: 'research', site: 'star', resourceCosts: { energy: 600, minerals: 700, rare: 150 }, strategicCosts: { 'res:exotic-matter': 80, 'res:antimatter': 60 }, productionCost: 800, buildTime: 30, requirements: { research: ['tech:temporal-ascension-i'] }, researchPoints: 40, maxLevel: 2, icon: 'i-lucide-infinity' }
 ]
 
 export const UNIT_DEFS: UnitDefinition[] = [
   // Support units — the first ships cost only the basic materials (energy + matter).
-  { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:probe-design'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
+  { id: 'unit:probe', category: 'support', resourceCosts: { energy: 60, minerals: 50, rare: 0 }, productionCost: 60, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:orbital-engineering'] }, unitType: 'probe', strength: 1, icon: 'i-lucide-radar' },
   { id: 'unit:colony-ship', category: 'support', resourceCosts: { energy: 100, minerals: 120, rare: 0 }, productionCost: 100, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'colonizer', strength: 1, icon: 'i-lucide-tent' },
-  { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 0 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:colony-ship-design'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
+  { id: 'unit:star-constructor', category: 'support', resourceCosts: { energy: 200, minerals: 250, rare: 0 }, productionCost: 200, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:stellar-cartography'] }, unitType: 'star-constructor', strength: 1, icon: 'i-lucide-sun' },
   // Combat units
-  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 0 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:first-shipyard'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' },
+  { id: 'unit:frigate', category: 'combat', resourceCosts: { energy: 120, minerals: 140, rare: 0 }, productionCost: 120, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:combat-ai'] }, unitType: 'battleship', strength: 4, icon: 'i-lucide-ship' },
   // Antimatter capital ship — needs mined antimatter on top of the base cost.
-  { id: 'unit:dreadnought', category: 'combat', resourceCosts: { energy: 300, minerals: 400, rare: 60 }, strategicCosts: { 'res:antimatter': 30 }, productionCost: 300, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:antimatter-containment'] }, unitType: 'battleship', strength: 12, icon: 'i-lucide-rocket' }
+  { id: 'unit:dreadnought', category: 'combat', resourceCosts: { energy: 300, minerals: 400, rare: 60 }, strategicCosts: { 'res:antimatter': 30 }, productionCost: 300, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:fleet-coordination'] }, unitType: 'battleship', strength: 12, icon: 'i-lucide-rocket' },
+  // Siege finisher — cracks a planet (wired in combat/victory later); the military endgame.
+  { id: 'unit:planet-cracker', category: 'combat', resourceCosts: { energy: 500, minerals: 600, rare: 120 }, strategicCosts: { 'res:antimatter': 80 }, productionCost: 500, buildTime: 1, requirements: { buildings: [{ id: 'bld:orbital-dock', level: 1 }], research: ['tech:planet-cracker'] }, unitType: 'battleship', strength: 20, icon: 'i-lucide-bomb' }
 ]
 
 export const getBuildingDef = (id: BuildingId) => BUILDING_DEFS.find(def => def.id === id)

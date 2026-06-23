@@ -220,7 +220,8 @@ describe('research cycle', () => {
     await playTurn(repo, 1, { [U1]: plan })
 
     const turn2 = getSnapshot(repo, 2)
-    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(24)
+    // 24 base research × the AI-core's +10% research effect = 26 (rounded).
+    expect(getPlayer(turn2, U1).research.activeResearch?.progressPoints).toBe(26)
 
     for (let turn = 2; turn <= 5; turn++) {
       await playTurn(repo, turn)
@@ -231,7 +232,7 @@ describe('research cycle', () => {
     expect(p1.research.completedTechIds).toContain('tech:planetary-grid-management')
     expect(p1.research.activeResearch).toBeUndefined()
     // Its child becomes available
-    expect(p1.availableResearchIds).toContain('tech:data-center-i')
+    expect(p1.availableResearchIds).toContain('tech:deep-research')
     expect(p1.events.some(e => e.type === 'research-complete')).toBe(true)
 
     // Player 2 only has the pre-completed AI core
@@ -243,10 +244,10 @@ describe('unit production cycle', () => {
   it('a finished ship joins the global fleet list', async () => {
     const repo = seedTwoPlayerGame()
     // Probes cost 8 rare; players start with 0 → grant some up front.
-    // Probes also require tech:probe-design since tech gating landed.
+    // Probes also require tech:orbital-engineering since tech gating landed.
     const seedState = getSnapshot(repo, 1)
     getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
-    getPlayer(seedState, U1).research.completedTechIds.push('tech:probe-design')
+    getPlayer(seedState, U1).research.completedTechIds.push('tech:orbital-engineering')
     // Probes need an orbital dock; the empty start has none, so seed one.
     const dock = seedState.planets.find(p => p.id === 'pl:aurora')!.slots.find(s => s.zone === 'orbital')!
     dock.buildingId = 'bld:orbital-dock'
@@ -313,7 +314,7 @@ describe('tech gating', () => {
     getPlayer(seedState, U1).resources.find(r => r.key === 'res:rare')!.current = 100
 
     const plan: TurnPlan = {
-      // frigate requires tech:first-shipyard
+      // frigate requires tech:combat-ai
       commands: [unitCmd('pl:aurora', 'unit:frigate')]
     }
 

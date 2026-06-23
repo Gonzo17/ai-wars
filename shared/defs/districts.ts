@@ -60,26 +60,29 @@ export const DISTRICT_DEFS: Record<DistrictType, DistrictDef> = {
     ]
   },
 
-  // 🏭 PRODUCTION — build throughput on top of the data center's base.
+  // 🏭 PRODUCTION (Fabrikkomplex) — build throughput on top of the data center's base.
+  // The district itself is unlocked by Industrial Robotics; the deeper Roboterwerk by the
+  // Mass Production doctrine.
   production: {
     type: 'production',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'barren', 'gas-giant'],
     zone: 'surface',
+    research: 'tech:basic-industrial-robotics',
     tree: [
       { id: b('bld:assembler'), prereqIds: [], cost: { energy: 30, matter: 40 }, buildTime: 3, output: { production: 15 } },
-      // Deeper automation boosts throughput.
-      { id: b('bld:robotics-bay'), prereqIds: [b('bld:assembler')], research: 'tech:basic-industrial-robotics', cost: { energy: 60, matter: 90 }, buildTime: 5, output: { production: 30 } }
+      { id: b('bld:robotics-bay'), prereqIds: [b('bld:assembler')], research: 'tech:mass-production', cost: { energy: 60, matter: 90 }, buildTime: 5, output: { production: 30 } }
     ]
   },
 
-  // 🚀 SHIPYARD — the orbital dock that lets a planet build ships. Founding it IS the
-  // orbital dock (units list under this district and require it). Gated by first-shipyard.
+  // 🚀 SHIPYARD (Orbitale Werft) — the orbital dock that lets a planet build ships.
+  // Founding it IS the orbital dock (units list under it). Unlocked by Orbital Engineering.
   shipyard: {
     type: 'shipyard',
     availableOn: ['terrestrial', 'oceanic', 'desert', 'ice-giant', 'gas-giant', 'barren'],
     zone: 'orbital',
+    research: 'tech:orbital-engineering',
     tree: [
-      { id: b('bld:orbital-dock'), prereqIds: [], research: 'tech:first-shipyard', cost: { energy: 90, matter: 110 }, buildTime: 4, output: {} }
+      { id: b('bld:orbital-dock'), prereqIds: [], cost: { energy: 90, matter: 110 }, buildTime: 4, output: {} }
     ]
   },
 

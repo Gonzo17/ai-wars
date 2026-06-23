@@ -111,6 +111,7 @@ describe('strategic resources', () => {
     star.owner = toPlayerId(U1)
     setResource(state, U1, 'res:material', 5000)
     setResource(state, U1, 'res:rare', 5000)
+    state.players.find(p => p.id === toPlayerId(U1))!.research.completedTechIds.push('tech:dyson-swarm')
 
     const dyson: TurnPlan = { commands: [{ type: 'setProductionQueue', planetId: star.id, items: [{ kind: 'building', slotIndex: 0, buildingId: 'bld:dyson-sphere' as BuildingId }] }] }
     // No exotic matter yet → rejected.
@@ -133,7 +134,7 @@ describe('strategic resources', () => {
     setResource(state, U1, 'res:energy', 5000)
     setResource(state, U1, 'res:material', 5000)
     setResource(state, U1, 'res:rare', 5000)
-    state.players.find(p => p.id === toPlayerId(U1))!.research.completedTechIds.push('tech:antimatter-containment')
+    state.players.find(p => p.id === toPlayerId(U1))!.research.completedTechIds.push('tech:fleet-coordination')
     // The dreadnought needs an orbital dock; the empty start has none, so seed one.
     const dock = homeworld.slots.find(s => s.zone === 'orbital')!
     dock.buildingId = 'bld:orbital-dock'
